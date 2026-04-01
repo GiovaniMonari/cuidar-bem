@@ -32,9 +32,13 @@ export default function LoginPage() {
     <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4 py-12 bg-gradient-to-br from-primary-50 via-white to-accent-50">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="bg-primary-600 w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Heart className="w-7 h-7 text-white" />
-          </div>
+           <div className="flex items-center justify-center mb-1">
+              <img 
+                src="/logo_cuidadores_transparente.png" 
+                alt="Logo CuidarBem" 
+                className="w-32 h-32 object-contain hover:scale-105 transition-transform"
+              />
+            </div>
           <h1 className="text-2xl font-bold text-gray-900">Bem-vindo de volta</h1>
           <p className="text-gray-500 mt-1">Entre na sua conta CuidarBem</p>
         </div>
@@ -97,14 +101,6 @@ export default function LoginPage() {
               Cadastre-se
             </Link>
           </p>
-        </div>
-
-        <div className="mt-6 card p-4">
-          <p className="text-xs text-gray-500 text-center mb-2 font-medium">Contas de teste:</p>
-          <div className="text-xs text-gray-400 text-center space-y-1">
-            <p>Cliente: cliente@email.com / 123456</p>
-            <p>Cuidador: maria@email.com / 123456</p>
-          </div>
         </div>
       </div>
     </div>

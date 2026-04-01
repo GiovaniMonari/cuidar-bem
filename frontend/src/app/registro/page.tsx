@@ -61,13 +61,16 @@ function RegisterForm() {
   return (
     <div className="w-full max-w-md">
       <div className="text-center mb-8">
-        <div className="bg-primary-600 w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <Heart className="w-7 h-7 text-white" />
+        <div className="flex items-center justify-center mb-1">
+          <img 
+            src="/logo_cuidadores_transparente.png" 
+            alt="Logo CuidarBem" 
+            className="w-32 h-32 object-contain hover:scale-105 transition-transform"
+          />
         </div>
         <h1 className="text-2xl font-bold text-gray-900">Criar Conta</h1>
         <p className="text-gray-500 mt-1">Junte-se à comunidade CuidarBem</p>
       </div>
-
       <div className="card p-8">
         {error && (
           <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm">

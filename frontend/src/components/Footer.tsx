@@ -6,9 +6,13 @@ export function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="bg-primary-600 p-2 rounded-xl">
-                <Heart className="w-5 h-5 text-white" />
+            <div className="flex items-center mb-4">
+              <div>
+                <img 
+                  src="/logo_cuidadores_transparente.png" 
+                  alt="Logo" 
+                  className="w-20 h-20 object-contain group-hover:scale-105 transition-transform"
+                />
               </div>
               <span className="text-xl font-bold text-white">CuidarBem</span>
             </div>

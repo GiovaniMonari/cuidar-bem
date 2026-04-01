@@ -21,10 +21,13 @@ export function Navbar() {
     <nav className="bg-white/80 backdrop-blur-lg border-b border-gray-100 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="bg-primary-600 p-2 rounded-xl group-hover:bg-primary-700 transition-colors">
-              <Heart className="w-5 h-5 text-white" />
+          <Link href="/" className="flex items-center">
+            <div>
+              <img
+                src="/logo_cuidadores_transparente.png" 
+                alt="Logo" 
+                className="w-20 h-20 object-contain group-hover:scale-105 transition-transform"
+              />
             </div>
             <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent">
               CuidarBem

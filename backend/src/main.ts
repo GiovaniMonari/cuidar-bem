@@ -9,6 +9,7 @@ async function bootstrap() {
     origin: [
       'http://localhost:3000',
       'https://cuidar-bem-giovanimonaris-projects.vercel.app',
+      'https://cuidar-bem-pink.vercel.app/',
     ],
     credentials: true,
   });

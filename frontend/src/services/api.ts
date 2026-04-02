@@ -17,10 +17,7 @@ class ApiService {
     return headers;
   }
 
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {},
-  ): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const res = await fetch(`${API_URL}${endpoint}`, options);
     if (!res.ok) {
       const error = await res.json().catch(() => ({ message: 'Erro na requisição' }));
@@ -123,6 +120,26 @@ class ApiService {
       method: 'POST',
       headers: this.headers(true),
       body: JSON.stringify(data),
+    });
+  }
+
+  // Payments
+  async getPaymentByBooking(bookingId: string) {
+    return this.request<any>(`/payments/booking/${bookingId}`, {
+      headers: this.headers(true),
+    });
+  }
+
+  async getMyPayments() {
+    return this.request<any>('/payments/my', {
+      headers: this.headers(true),
+    });
+  }
+
+  async simulatePayment(bookingId: string) {
+    return this.request<any>(`/payments/simulate/${bookingId}`, {
+      method: 'POST',
+      headers: this.headers(true),
     });
   }
 }

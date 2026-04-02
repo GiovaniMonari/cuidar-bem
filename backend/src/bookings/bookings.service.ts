@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Booking, BookingDocument } from './schemas/booking.schema';
@@ -6,9 +6,17 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 
 @Injectable()
 export class BookingsService {
+  // Referência ao PaymentsService será injetada depois
+  private paymentsService: any;
+
   constructor(
     @InjectModel(Booking.name) private bookingModel: Model<BookingDocument>,
   ) {}
+
+  // Setter para injeção circular
+  setPaymentsService(paymentsService: any) {
+    this.paymentsService = paymentsService;
+  }
 
   async create(clientId: string, dto: CreateBookingDto): Promise<BookingDocument> {
     const booking = new this.bookingModel({
@@ -33,7 +41,6 @@ export class BookingsService {
   }
 
   async findByCaregiver(userId: string) {
-    // First find caregiver by userId, then find bookings
     return this.bookingModel
       .find()
       .populate({
@@ -58,24 +65,48 @@ export class BookingsService {
   }
 
   async updateStatus(id: string, userId: string, status: string, role: string) {
-    const booking = await this.bookingModel.findById(id).populate('caregiverId');
+    const booking = await this.bookingModel.findById(id).populate({
+      path: 'caregiverId',
+      populate: { path: 'userId', select: 'name email phone' },
+    });
     if (!booking) throw new NotFoundException('Agendamento não encontrado');
 
-    // Check permissions
     const isClient = booking.clientId.toString() === userId;
-    const isCaregiver = (booking.caregiverId as any)?.userId?.toString() === userId;
+    const isCaregiver = (booking.caregiverId as any)?.userId?._id?.toString() === userId;
 
     if (!isClient && !isCaregiver) {
       throw new ForbiddenException('Sem permissão');
     }
 
-    // Clients can cancel; caregivers can confirm, complete, or cancel
     if (role === 'client' && status !== 'cancelled') {
       throw new ForbiddenException('Clientes só podem cancelar agendamentos');
     }
 
     booking.status = status;
-    return booking.save();
+    const saved = await booking.save();
+
+    // Integração com pagamentos
+    if (this.paymentsService) {
+      try {
+        if (status === 'confirmed') {
+          // Cuidador aceitou → criar cobrança
+          await this.paymentsService.createPayment(id);
+        } else if (status === 'completed') {
+          // Serviço concluído → liberar pagamento
+          await this.paymentsService.releasePayment(id);
+        } else if (status === 'cancelled') {
+          // Cancelado → reembolsar se houver pagamento
+          const payment = await this.paymentsService.findByBooking(id);
+          if (payment && ['held', 'paid'].includes(payment.status)) {
+            await this.paymentsService.refundPayment(id);
+          }
+        }
+      } catch (error) {
+        console.error('Erro na integração de pagamento:', error.message);
+      }
+    }
+
+    return saved;
   }
 
   async findOne(id: string) {

@@ -1,23 +1,52 @@
-import { IsDateString, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import {
+  IsDateString,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsArray,
+  Min,
+} from 'class-validator';
 
 export class CreateBookingDto {
   @IsString()
   @IsNotEmpty()
   caregiverId: string;
 
+  @IsString()
+  @IsNotEmpty()
+  serviceType: string;
+
+  @IsString()
+  @IsNotEmpty()
+  durationKey: string;
+
+  @IsNumber()
+  @Min(1)
+  durationHours: number;
+
+  @IsNumber()
+  @Min(0)
+  pricePerHour: number;
+
+  @IsNumber()
+  @Min(0)
+  totalAmount: number;
+
+  @IsOptional()
+  @IsNumber()
+  discount?: number;
+
   @IsDateString()
   startDate: string;
 
+  @IsOptional()
   @IsDateString()
-  endDate: string;
+  endDate?: string;
 
   @IsOptional()
   @IsString()
   notes?: string;
-
-  @IsOptional()
-  @IsNumber()
-  totalAmount?: number;
 
   @IsOptional()
   @IsString()
@@ -33,5 +62,18 @@ export class CreateBookingDto {
 
   @IsOptional()
   @IsString()
-  careType?: string;
+  patientName?: string;
+
+  @IsOptional()
+  @IsNumber()
+  patientAge?: number;
+
+  @IsOptional()
+  @IsString()
+  patientCondition?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  specialRequirements?: string[];
 }

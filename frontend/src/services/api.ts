@@ -142,6 +142,29 @@ class ApiService {
       headers: this.headers(true),
     });
   }
+
+  async getServiceTypes(category?: string) {
+    const query = category ? `?category=${category}` : '';
+    return this.request<any>(`/services${query}`, {
+      headers: this.headers(),
+    });
+  }
+
+  async getServiceType(key: string) {
+    return this.request<any>(`/services/${key}`, {
+      headers: this.headers(),
+    });
+  }
+
+  async calculateServicePrice(serviceKey: string, durationKey: string, pricePerHour?: number) {
+    const query = new URLSearchParams({
+      duration: durationKey,
+      ...(pricePerHour && { pricePerHour: String(pricePerHour) }),
+    }).toString();
+    return this.request<any>(`/services/${serviceKey}/calculate?${query}`, {
+      headers: this.headers(),
+    });
+  }
 }
 
 export const api = new ApiService();

@@ -6,10 +6,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { Payment, PaymentDocument } from './schemas/payment.schema';
 import { BookingsService } from '../bookings/bookings.service';
 import { CaregiversService } from '../caregivers/caregivers.service';
-import { UsersService } from '../users/schemas/users.service';
+import { UsersService } from '../users/users.service';
 import { EmailService } from '../email/email.service';
 
-const PLATFORM_FEE_PERCENT = 10; // 10% taxa da plataforma
+const PLATFORM_FEE_PERCENT = 10;
 
 @Injectable()
 export class PaymentsService {
@@ -28,48 +28,48 @@ export class PaymentsService {
     });
   }
 
-  // Calcular valores
   private calculateAmounts(totalAmount: number) {
     const platformFee = Math.round(totalAmount * PLATFORM_FEE_PERCENT) / 100;
     const caregiverAmount = totalAmount - platformFee;
     return { platformFee, caregiverAmount };
   }
 
-  // 1. Criar cobrança quando cuidador aceita o agendamento
   async createPayment(bookingId: string): Promise<PaymentDocument> {
     const booking = await this.bookingsService.findOne(bookingId);
     if (!booking) throw new NotFoundException('Agendamento não encontrado');
 
-    // Verificar se já existe pagamento
     const existing = await this.paymentModel.findOne({ bookingId });
     if (existing) return existing;
 
-    // Calcular horas e valor
-    const start = new Date(booking.startDate);
-    const end = new Date(booking.endDate);
-    const hours = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60)));
-    const caregiver = booking.caregiverId as any;
-    const hourlyRate = caregiver?.hourlyRate || 50;
-    const totalAmount = hours * hourlyRate;
+    // Usar os valores já calculados no booking
+    const totalAmount = booking.totalAmount || 0;
+    const hours = booking.durationHours || 1;
 
     const { platformFee, caregiverAmount } = this.calculateAmounts(totalAmount);
     const transactionId = `CB-${uuidv4().substring(0, 8).toUpperCase()}`;
 
-    // Criar preferência no Mercado Pago
-    const preference = new Preference(this.mpClient);
+    const caregiver = booking.caregiverId as any;
     const caregiverName = caregiver?.userId?.name || 'Cuidador';
     const clientUser = booking.clientId as any;
 
-    let mpPreference: any;
+    // Descrição usando os novos campos
+    const serviceName = booking.serviceName || booking.serviceType || 'Atendimento domiciliar';
+    const durationLabel = booking.durationLabel || `${hours}h`;
+
+    const checkoutUrl = `${process.env.FRONTEND_URL}/pagamento/checkout?booking=${bookingId}`;
+
+    let mpPreferenceId = '';
+    let mpPaymentUrl = '';
 
     try {
-      mpPreference = await preference.create({
+      const preference = new Preference(this.mpClient);
+      const mpPreference = await preference.create({
         body: {
           items: [
             {
               id: transactionId,
-              title: `CuidarBem - Atendimento com ${caregiverName}`,
-              description: `${hours}h de cuidado - ${booking.careType || 'Atendimento domiciliar'}`,
+              title: `CuidarBem - ${serviceName}`,
+              description: `${durationLabel} de cuidado com ${caregiverName}`,
               quantity: 1,
               unit_price: totalAmount,
               currency_id: 'BRL',
@@ -88,23 +88,17 @@ export class PaymentsService {
           notification_url: `${process.env.BACKEND_URL}/api/payments/webhook`,
           external_reference: transactionId,
           statement_descriptor: 'CUIDARBEM',
-          payment_methods: {
-            installments: 3,
-            excluded_payment_types: [],
-          },
         },
       });
+
+      mpPreferenceId = mpPreference.id || '';
+      mpPaymentUrl = mpPreference.init_point || mpPreference.sandbox_init_point || '';
+      this.logger.log(`✅ Preferência MP criada: ${mpPreferenceId}`);
     } catch (error) {
-      this.logger.error(`Erro Mercado Pago: ${error.message}`);
-      // Criar pagamento mesmo sem MP (para testes)
-      mpPreference = {
-        id: `test-${transactionId}`,
-        init_point: '#',
-        sandbox_init_point: '#',
-      };
+      this.logger.warn(`⚠️ Mercado Pago indisponível`);
+      this.logger.warn(`Usando checkout local: ${checkoutUrl}`);
     }
 
-    // Salvar pagamento
     const payment = new this.paymentModel({
       transactionId,
       bookingId: booking._id,
@@ -114,8 +108,8 @@ export class PaymentsService {
       platformFee,
       caregiverAmount,
       status: 'pending',
-      mpPreferenceId: mpPreference.id,
-      paymentUrl: mpPreference.init_point || mpPreference.sandbox_init_point,
+      mpPreferenceId,
+      paymentUrl: mpPaymentUrl || checkoutUrl,
       payerInfo: {
         email: clientUser?.email,
         name: clientUser?.name || booking.clientName,
@@ -131,22 +125,27 @@ export class PaymentsService {
 
     const saved = await payment.save();
 
-    // Enviar email para o cliente
-    await this.emailService.sendPaymentEmail({
-      to: clientUser?.email,
-      clientName: clientUser?.name || booking.clientName || 'Cliente',
-      caregiverName,
-      amount: totalAmount,
-      paymentUrl: mpPreference.init_point || mpPreference.sandbox_init_point || '#',
-      bookingDate: start.toLocaleDateString('pt-BR'),
-      serviceType: booking.careType || 'Atendimento domiciliar',
-    });
+    // Enviar email
+    const start = new Date(booking.startDate);
+    
+    try {
+      await this.emailService.sendPaymentEmail({
+        to: clientUser?.email,
+        clientName: clientUser?.name || booking.clientName || 'Cliente',
+        caregiverName,
+        amount: totalAmount,
+        paymentUrl: checkoutUrl,
+        bookingDate: start.toLocaleDateString('pt-BR'),
+        serviceType: serviceName,
+      });
+    } catch (emailError) {
+      this.logger.warn(`⚠️ Email não enviado`);
+    }
 
     this.logger.log(`💳 Pagamento ${transactionId} criado: R$ ${totalAmount}`);
     return saved;
   }
 
-  // 2. Webhook do Mercado Pago
   async handleWebhook(data: any) {
     this.logger.log(`🔔 Webhook recebido: ${JSON.stringify(data)}`);
 
@@ -169,7 +168,7 @@ export class PaymentsService {
         payment.mpStatus = mpPayment.status;
 
         if (mpPayment.status === 'approved') {
-          payment.status = 'held'; // Dinheiro retido no mediador
+          payment.status = 'held';
           payment.paidAt = new Date();
           payment.history.push({
             status: 'held',
@@ -177,12 +176,10 @@ export class PaymentsService {
             description: 'Pagamento aprovado - valor retido na plataforma',
           });
 
-          // Atualizar booking
           const booking = await this.bookingsService.findOne(
             payment.bookingId.toString(),
           );
 
-          // Enviar email de confirmação
           const clientUser = booking?.clientId as any;
           const caregiver = booking?.caregiverId as any;
 
@@ -212,12 +209,11 @@ export class PaymentsService {
 
         await payment.save();
       } catch (error) {
-        this.logger.error(`Erro no webhook: ${error.message}`);
+        this.logger.error(`Erro no webhook`);
       }
     }
   }
 
-  // 3. Liberar pagamento (quando serviço é concluído)
   async releasePayment(bookingId: string): Promise<PaymentDocument> {
     const payment = await this.paymentModel.findOne({ bookingId });
     if (!payment) throw new NotFoundException('Pagamento não encontrado');
@@ -238,7 +234,6 @@ export class PaymentsService {
 
     await payment.save();
 
-    // Enviar emails de conclusão
     const booking = await this.bookingsService.findOne(bookingId);
     const clientUser = booking?.clientId as any;
     const caregiver = booking?.caregiverId as any;
@@ -257,7 +252,6 @@ export class PaymentsService {
     return payment;
   }
 
-  // 4. Reembolso (quando cancela)
   async refundPayment(bookingId: string): Promise<PaymentDocument> {
     const payment = await this.paymentModel.findOne({ bookingId });
     if (!payment) throw new NotFoundException('Pagamento não encontrado');
@@ -266,13 +260,12 @@ export class PaymentsService {
       throw new BadRequestException('Pagamento não pode ser reembolsado');
     }
 
-    // Reembolso via Mercado Pago
     if (payment.mpPaymentId) {
       try {
         const mpPaymentApi = new MPPayment(this.mpClient);
         await mpPaymentApi.cancel({ id: payment.mpPaymentId });
       } catch (error) {
-        this.logger.error(`Erro no reembolso MP: ${error.message}`);
+        this.logger.error(`Erro no reembolso MP}`);
       }
     }
 
@@ -289,12 +282,10 @@ export class PaymentsService {
     return payment;
   }
 
-  // 5. Buscar pagamento por booking
   async findByBooking(bookingId: string): Promise<PaymentDocument | null> {
     return this.paymentModel.findOne({ bookingId });
   }
 
-  // 6. Buscar todos os pagamentos de um usuário
   async findByUser(userId: string, role: string) {
     const query = role === 'client' ? { clientId: userId } : { caregiverId: userId };
     return this.paymentModel
@@ -303,7 +294,6 @@ export class PaymentsService {
       .sort({ createdAt: -1 });
   }
 
-  // 7. Simular pagamento aprovado (para testes sem MP real)
   async simulatePayment(bookingId: string): Promise<PaymentDocument> {
     const payment = await this.paymentModel.findOne({ bookingId });
     if (!payment) throw new NotFoundException('Pagamento não encontrado');
@@ -320,7 +310,6 @@ export class PaymentsService {
 
     await payment.save();
 
-    // Enviar email de confirmação
     const booking = await this.bookingsService.findOne(bookingId);
     const clientUser = booking?.clientId as any;
     const caregiver = booking?.caregiverId as any;

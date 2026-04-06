@@ -8,6 +8,7 @@ import { BookingsModule } from './bookings/bookings.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { PaymentsModule } from './payments/payments.module';
 import { EmailModule } from './email/email.module';
+import { ServicesModule } from './services/services-module'; // NOVO
 import { BookingsService } from './bookings/bookings.service';
 import { PaymentsService } from './payments/payments.service';
 
@@ -24,6 +25,7 @@ import { PaymentsService } from './payments/payments.service';
     BookingsModule,
     ReviewsModule,
     PaymentsModule,
+    ServicesModule, // NOVO
   ],
 })
 export class AppModule implements OnModuleInit {
@@ -33,7 +35,6 @@ export class AppModule implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    // Resolver dependência circular
     this.bookingsService.setPaymentsService(this.paymentsService);
   }
 }

@@ -29,8 +29,20 @@ export class Caregiver {
   @Prop({ required: true, min: 0 })
   experienceYears: number;
 
+  // Preço base por hora (mantido para compatibilidade)
   @Prop({ required: true, min: 0 })
   hourlyRate: number;
+
+  // NOVO: Preços por tipo de serviço
+  @Prop({
+    type: [Object],
+    default: [],
+  })
+  servicePrices: {
+    serviceKey: string;
+    pricePerHour: number;
+    isAvailable: boolean;
+  }[];
 
   @Prop({ required: true })
   city: string;

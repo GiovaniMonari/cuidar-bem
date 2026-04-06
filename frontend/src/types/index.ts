@@ -8,6 +8,12 @@ export interface User {
   avatar?: string;
 }
 
+export interface CaregiverServicePrice {
+  serviceKey: string;
+  pricePerHour: number;
+  isAvailable: boolean;
+}
+
 export interface Caregiver {
   _id: string;
   userId: User;
@@ -15,6 +21,7 @@ export interface Caregiver {
   specialties: string[];
   experienceYears: number;
   hourlyRate: number;
+  servicePrices: CaregiverServicePrice[]; // NOVO
   city: string;
   state: string;
   availability: string[];
@@ -25,19 +32,64 @@ export interface Caregiver {
   profileImage?: string;
 }
 
+export interface ServiceDuration {
+  key: string;
+  label: string;
+  description?: string;
+  hours: number;
+  multiplier: number;
+}
+
+export interface ServiceType {
+  _id: string;
+  key: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: string;
+  durations: ServiceDuration[];
+  basePriceMin: number;
+  basePriceMax: number;
+  suggestedPrice: number;
+  includes: string[];
+  requirements: string[];
+  isActive: boolean;
+  order: number;
+}
+
+export interface PriceCalculation {
+  service: ServiceType;
+  duration: ServiceDuration;
+  pricePerHour: number;
+  hours: number;
+  baseTotal: number;
+  discount: number;
+  totalAmount: number;
+}
+
 export interface Booking {
   _id: string;
   clientId: User;
   caregiverId: Caregiver;
+  serviceType: string;
+  serviceName?: string;
+  durationKey: string;
+  durationHours: number;
+  durationLabel?: string;
+  pricePerHour: number;
+  totalAmount: number;
+  discount: number;
   startDate: string;
   endDate: string;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
   notes?: string;
-  totalAmount?: number;
   clientName?: string;
   clientPhone?: string;
   address?: string;
-  careType?: string;
+  patientName?: string;
+  patientAge?: number;
+  patientCondition?: string;
+  specialRequirements?: string[];
   createdAt: string;
 }
 
@@ -84,7 +136,7 @@ export const DAYS: Record<string, string> = {
 };
 
 export const STATES = [
-  'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
-  'MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC',
-  'SP','SE','TO',
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS',
+  'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC',
+  'SP', 'SE', 'TO',
 ];

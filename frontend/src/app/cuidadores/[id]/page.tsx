@@ -6,6 +6,7 @@ import { api } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Caregiver, Review, SPECIALTIES, DAYS } from '@/types';
 import { StarRating } from '@/components/StarRating';
+import { ServiceSelector } from '@/components/ServiceSelector';
 import {
   MapPin,
   Clock,
@@ -18,7 +19,7 @@ import {
   CheckCircle,
   MessageSquare,
   Send,
-  AlertCircle,
+  X,
 } from 'lucide-react';
 
 export default function CaregiverDetailPage() {
@@ -33,14 +34,26 @@ export default function CaregiverDetailPage() {
   const [showReview, setShowReview] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
 
+  const [bookingData, setBookingData] = useState({
+    serviceType: '',
+    serviceName: '',
+    durationKey: '',
+    durationLabel: '',
+    durationHours: 0,
+    pricePerHour: 0,
+    totalAmount: 0,
+    discount: 0,
+  });
+
   const [bookingForm, setBookingForm] = useState({
     startDate: '',
-    endDate: '',
     notes: '',
     clientName: '',
     clientPhone: '',
     address: '',
-    careType: '',
+    patientName: '',
+    patientAge: '',
+    patientCondition: '',
   });
 
   const [reviewForm, setReviewForm] = useState({
@@ -68,10 +81,33 @@ export default function CaregiverDetailPage() {
 
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!bookingData.serviceType || !bookingData.durationKey) {
+      alert('Por favor, selecione o tipo de serviço e duração');
+      return;
+    }
+
     try {
+      const start = new Date(bookingForm.startDate);
+      const end = new Date(start.getTime() + bookingData.durationHours * 60 * 60 * 1000);
+
       await api.createBooking({
         caregiverId: id,
-        ...bookingForm,
+        serviceType: bookingData.serviceType,
+        durationKey: bookingData.durationKey,
+        durationHours: bookingData.durationHours,
+        pricePerHour: bookingData.pricePerHour,
+        totalAmount: bookingData.totalAmount,
+        discount: bookingData.discount,
+        startDate: bookingForm.startDate,
+        endDate: end.toISOString(),
+        notes: bookingForm.notes,
+        clientName: bookingForm.clientName,
+        clientPhone: bookingForm.clientPhone,
+        address: bookingForm.address,
+        patientName: bookingForm.patientName,
+        patientAge: bookingForm.patientAge ? Number(bookingForm.patientAge) : undefined,
+        patientCondition: bookingForm.patientCondition,
       });
       setShowBooking(false);
       setBookingSuccess(true);
@@ -118,7 +154,7 @@ export default function CaregiverDetailPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-gradient-to-r from-primary-600 to-primary-800 py-8">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <button
             onClick={() => router.back()}
             className="text-white/80 hover:text-white flex items-center gap-1 mb-6 text-sm"
@@ -165,7 +201,7 @@ export default function CaregiverDetailPage() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {bookingSuccess && (
           <div className="bg-green-50 text-green-700 px-6 py-4 rounded-xl mb-6 flex items-center gap-3">
             <CheckCircle className="w-5 h-5" />
@@ -174,6 +210,249 @@ export default function CaregiverDetailPage() {
               <p className="text-sm text-green-600">
                 O cuidador receberá sua solicitação e entrará em contato.
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Agendamento - Tela cheia em mobile, modal grande em desktop */}
+        {showBooking && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-6 lg:p-8">
+            <div className="bg-white rounded-2xl w-full max-w-4xl my-4 shadow-2xl">
+              {/* Header do Modal */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    Solicitar Atendimento
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    com {caregiverUser?.name}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowBooking(false)}
+                  className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              {/* Conteúdo do Modal */}
+              <form onSubmit={handleBooking} className="p-6">
+                <div className="grid lg:grid-cols-2 gap-8">
+                  {/* Coluna 1: Seleção de Serviço */}
+                  <div className="space-y-4">
+                    <ServiceSelector
+                      caregiverPrices={caregiver.servicePrices || []}
+                      defaultPrice={caregiver.hourlyRate}
+                      onSelect={(data) => setBookingData(data)}
+                    />
+                  </div>
+
+                  {/* Coluna 2: Dados do Agendamento */}
+                  <div className="space-y-4">
+                    {bookingData.serviceType ? (
+                      <>
+                        <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                          <span className="bg-primary-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold">
+                            3
+                          </span>
+                          Dados do Agendamento
+                        </h3>
+
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-sm font-medium text-gray-700 mb-1 block">
+                              Seu Nome *
+                            </label>
+                            <input
+                              type="text"
+                              value={bookingForm.clientName}
+                              onChange={(e) =>
+                                setBookingForm((prev) => ({
+                                  ...prev,
+                                  clientName: e.target.value,
+                                }))
+                              }
+                              className="input-field"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium text-gray-700 mb-1 block">
+                              Telefone *
+                            </label>
+                            <input
+                              type="tel"
+                              value={bookingForm.clientPhone}
+                              onChange={(e) =>
+                                setBookingForm((prev) => ({
+                                  ...prev,
+                                  clientPhone: e.target.value,
+                                }))
+                              }
+                              className="input-field"
+                              placeholder="(11) 99999-0000"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-sm font-medium text-gray-700 mb-1 block">
+                            Data e Hora de Início *
+                          </label>
+                          <input
+                            type="datetime-local"
+                            value={bookingForm.startDate}
+                            onChange={(e) =>
+                              setBookingForm((prev) => ({
+                                ...prev,
+                                startDate: e.target.value,
+                              }))
+                            }
+                            className="input-field"
+                            required
+                          />
+                          {bookingData.durationHours > 0 && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Duração: {bookingData.durationLabel} ({bookingData.durationHours}h)
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="text-sm font-medium text-gray-700 mb-1 block">
+                            Endereço do Atendimento *
+                          </label>
+                          <input
+                            type="text"
+                            value={bookingForm.address}
+                            onChange={(e) =>
+                              setBookingForm((prev) => ({
+                                ...prev,
+                                address: e.target.value,
+                              }))
+                            }
+                            className="input-field"
+                            placeholder="Rua, número, bairro, cidade"
+                            required
+                          />
+                        </div>
+
+                        <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                          <h4 className="text-sm font-medium text-gray-700">
+                            Dados do Paciente (opcional)
+                          </h4>
+                          <div className="grid grid-cols-2 gap-3">
+                            <input
+                              type="text"
+                              value={bookingForm.patientName}
+                              onChange={(e) =>
+                                setBookingForm((prev) => ({
+                                  ...prev,
+                                  patientName: e.target.value,
+                                }))
+                              }
+                              className="input-field"
+                              placeholder="Nome do paciente"
+                            />
+                            <input
+                              type="number"
+                              value={bookingForm.patientAge}
+                              onChange={(e) =>
+                                setBookingForm((prev) => ({
+                                  ...prev,
+                                  patientAge: e.target.value,
+                                }))
+                              }
+                              className="input-field"
+                              placeholder="Idade"
+                            />
+                          </div>
+                          <input
+                            type="text"
+                            value={bookingForm.patientCondition}
+                            onChange={(e) =>
+                              setBookingForm((prev) => ({
+                                ...prev,
+                                patientCondition: e.target.value,
+                              }))
+                            }
+                            className="input-field"
+                            placeholder="Condição de saúde (ex: Alzheimer, pós-AVC)"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-sm font-medium text-gray-700 mb-1 block">
+                            Observações adicionais
+                          </label>
+                          <textarea
+                            value={bookingForm.notes}
+                            onChange={(e) =>
+                              setBookingForm((prev) => ({
+                                ...prev,
+                                notes: e.target.value,
+                              }))
+                            }
+                            className="input-field"
+                            rows={3}
+                            placeholder="Informações importantes, rotina do paciente, etc."
+                          />
+                        </div>
+
+                        {/* Resumo do Valor */}
+                        <div className="bg-gradient-to-br from-primary-50 to-accent-50 rounded-xl p-4 border border-primary-200">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <span className="font-medium text-gray-700 block">Total a pagar</span>
+                              <span className="text-xs text-gray-500">
+                                {bookingData.serviceName} • {bookingData.durationLabel}
+                              </span>
+                            </div>
+                            <span className="text-2xl font-bold text-primary-600">
+                              R$ {bookingData.totalAmount.toFixed(2)}
+                            </span>
+                          </div>
+                          {bookingData.discount > 0 && (
+                            <p className="text-xs text-green-600 text-right mt-1">
+                              Você economiza R$ {bookingData.discount.toFixed(2)}
+                            </p>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-center py-12">
+                        <div>
+                          <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                          <p className="text-gray-500 font-medium">
+                            Selecione o serviço e duração
+                          </p>
+                          <p className="text-gray-400 text-sm mt-1">
+                            para preencher os dados do agendamento
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer do Modal */}
+                {bookingData.serviceType && (
+                  <div className="flex gap-3 mt-6 pt-6 border-t border-gray-100">
+                    <button
+                      type="button"
+                      onClick={() => setShowBooking(false)}
+                      className="btn-secondary flex-1 sm:flex-none"
+                    >
+                      Cancelar
+                    </button>
+                    <button type="submit" className="btn-primary flex-1 sm:flex-none sm:min-w-[200px]">
+                      Solicitar Agendamento
+                    </button>
+                  </div>
+                )}
+              </form>
             </div>
           </div>
         )}
@@ -301,9 +580,7 @@ export default function CaregiverDetailPage() {
 
               {/* Reviews List */}
               {reviews.length === 0 ? (
-                <p className="text-gray-400 text-sm">
-                  Nenhuma avaliação ainda
-                </p>
+                <p className="text-gray-400 text-sm">Nenhuma avaliação ainda</p>
               ) : (
                 <div className="space-y-4">
                   {reviews.map((review) => (
@@ -344,172 +621,33 @@ export default function CaregiverDetailPage() {
               </h3>
 
               {isAuthenticated && user?.role === 'client' ? (
-                showBooking ? (
-                  <form onSubmit={handleBooking} className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">
-                        Seu Nome
-                      </label>
-                      <input
-                        type="text"
-                        value={bookingForm.clientName}
-                        onChange={(e) =>
-                          setBookingForm((prev) => ({
-                            ...prev,
-                            clientName: e.target.value,
-                          }))
-                        }
-                        className="input-field !py-2"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">
-                        Telefone
-                      </label>
-                      <input
-                        type="tel"
-                        value={bookingForm.clientPhone}
-                        onChange={(e) =>
-                          setBookingForm((prev) => ({
-                            ...prev,
-                            clientPhone: e.target.value,
-                          }))
-                        }
-                        className="input-field !py-2"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">
-                        Data Início
-                      </label>
-                      <input
-                        type="datetime-local"
-                        value={bookingForm.startDate}
-                        onChange={(e) =>
-                          setBookingForm((prev) => ({
-                            ...prev,
-                            startDate: e.target.value,
-                          }))
-                        }
-                        className="input-field !py-2"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">
-                        Data Fim
-                      </label>
-                      <input
-                        type="datetime-local"
-                        value={bookingForm.endDate}
-                        onChange={(e) =>
-                          setBookingForm((prev) => ({
-                            ...prev,
-                            endDate: e.target.value,
-                          }))
-                        }
-                        className="input-field !py-2"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">
-                        Tipo de Cuidado
-                      </label>
-                      <select
-                        value={bookingForm.careType}
-                        onChange={(e) =>
-                          setBookingForm((prev) => ({
-                            ...prev,
-                            careType: e.target.value,
-                          }))
-                        }
-                        className="input-field !py-2"
-                      >
-                        <option value="">Selecione</option>
-                        {Object.entries(SPECIALTIES).map(([k, v]) => (
-                          <option key={k} value={k}>{v}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">
-                        Endereço
-                      </label>
-                      <input
-                        type="text"
-                        value={bookingForm.address}
-                        onChange={(e) =>
-                          setBookingForm((prev) => ({
-                            ...prev,
-                            address: e.target.value,
-                          }))
-                        }
-                        className="input-field !py-2"
-                        placeholder="Endereço do atendimento"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">
-                        Observações
-                      </label>
-                      <textarea
-                        value={bookingForm.notes}
-                        onChange={(e) =>
-                          setBookingForm((prev) => ({
-                            ...prev,
-                            notes: e.target.value,
-                          }))
-                        }
-                        className="input-field !py-2"
-                        rows={3}
-                        placeholder="Descreva as necessidades..."
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <button type="submit" className="btn-primary flex-1">
-                        Enviar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowBooking(false)}
-                        className="btn-secondary"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => setShowBooking(true)}
-                      className="btn-primary w-full flex items-center justify-center gap-2"
+                <div className="space-y-3">
+                  <button
+                    onClick={() => setShowBooking(true)}
+                    className="btn-primary w-full flex items-center justify-center gap-2"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    Agendar Atendimento
+                  </button>
+                  {caregiverUser?.phone && (
+                    <a
+                      href={`tel:${caregiverUser.phone}`}
+                      className="btn-secondary w-full flex items-center justify-center gap-2"
                     >
-                      <Calendar className="w-4 h-4" />
-                      Agendar Atendimento
-                    </button>
-                    {caregiverUser?.phone && (
-                      <a
-                        href={`tel:${caregiverUser.phone}`}
-                        className="btn-secondary w-full flex items-center justify-center gap-2"
-                      >
-                        <Phone className="w-4 h-4" />
-                        Ligar
-                      </a>
-                    )}
-                    {caregiverUser?.email && (
-                      <a
-                        href={`mailto:${caregiverUser.email}`}
-                        className="btn-secondary w-full flex items-center justify-center gap-2"
-                      >
-                        <Mail className="w-4 h-4" />
-                        Email
-                      </a>
-                    )}
-                  </div>
-                )
+                      <Phone className="w-4 h-4" />
+                      Ligar
+                    </a>
+                  )}
+                  {caregiverUser?.email && (
+                    <a
+                      href={`mailto:${caregiverUser.email}`}
+                      className="btn-secondary w-full flex items-center justify-center gap-2"
+                    >
+                      <Mail className="w-4 h-4" />
+                      Email
+                    </a>
+                  )}
+                </div>
               ) : !isAuthenticated ? (
                 <div className="text-center">
                   <p className="text-gray-500 text-sm mb-4">
@@ -524,6 +662,28 @@ export default function CaregiverDetailPage() {
                   Apenas clientes podem solicitar atendimento
                 </p>
               )}
+
+              {/* Info adicional */}
+              <div className="mt-6 pt-6 border-t border-gray-100 space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Valor/hora</span>
+                  <span className="font-bold text-primary-600">
+                    R$ {caregiver.hourlyRate}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Experiência</span>
+                  <span className="font-medium text-gray-900">
+                    {caregiver.experienceYears} anos
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Avaliação</span>
+                  <span className="font-medium text-gray-900 flex items-center gap-1">
+                    {caregiver.rating.toFixed(1)}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

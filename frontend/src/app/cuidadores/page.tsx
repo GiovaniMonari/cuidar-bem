@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { api } from '@/services/api';
 import { Caregiver, SPECIALTIES, STATES } from '@/types';
 import { CaregiverCard } from '@/components/CaregiverCard';
@@ -16,7 +17,10 @@ import {
   ChevronRight,
 } from 'lucide-react';
 
-export default function CaregiverListPage() {
+function CaregiverListContent() {
+  const searchParams = useSearchParams();
+  const initialSpecialty = searchParams.get('specialty') || '';
+
   const [caregivers, setCaregivers] = useState<Caregiver[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalPages, setTotalPages] = useState(1);
@@ -24,7 +28,7 @@ export default function CaregiverListPage() {
   const [filters, setFilters] = useState({
     city: '',
     state: '',
-    specialty: '',
+    specialty: initialSpecialty,
     minRate: '',
     maxRate: '',
     minRating: '',
@@ -49,8 +53,12 @@ export default function CaregiverListPage() {
   };
 
   useEffect(() => {
+    setFilters(prev => ({ ...prev, specialty: initialSpecialty, page: '1' }));
+  }, [initialSpecialty]);
+
+  useEffect(() => {
     fetchCaregivers();
-  }, [filters.page]);
+  }, [filters.page, filters.specialty]);
 
   const handleSearch = () => {
     setFilters((prev) => ({ ...prev, page: '1' }));
@@ -74,17 +82,20 @@ export default function CaregiverListPage() {
 
   return (
     <div>
-      {/* Header */}
+
       <div className="bg-gradient-to-r from-primary-600 to-primary-800 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-3xl font-bold text-white mb-2">
-            Encontre Cuidadores
+            {filters.specialty 
+              ? `Cuidadores: ${SPECIALTIES[filters.specialty] || filters.specialty}`
+              : 'Encontre Cuidadores'}
           </h1>
           <p className="text-primary-200">
-            Profissionais qualificados na sua região
+            {filters.specialty 
+              ? `Profissionais especializados em ${SPECIALTIES[filters.specialty]?.toLowerCase()}`
+              : 'Profissionais qualificados na sua região'}
           </p>
 
-          {/* Search Bar */}
           <div className="mt-6 flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -119,7 +130,7 @@ export default function CaregiverListPage() {
               }
               className="input-field sm:!w-52"
             >
-              <option value="">Especialidade</option>
+              <option value="">Todas Especialidades</option>
               {Object.entries(SPECIALTIES).map(([key, label]) => (
                 <option key={key} value={key}>
                   {label}
@@ -139,7 +150,21 @@ export default function CaregiverListPage() {
             </button>
           </div>
 
-          {/* Extra Filters */}
+          {filters.specialty && (
+            <div className="mt-4 flex items-center gap-2">
+              <span className="text-white/70 text-sm">Filtrando por:</span>
+              <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2">
+                {SPECIALTIES[filters.specialty]}
+                <button
+                  onClick={() => setFilters(prev => ({ ...prev, specialty: '' }))}
+                  className="hover:bg-white/20 rounded-full p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            </div>
+          )}
+
           {showFilters && (
             <div className="mt-4 bg-white/10 backdrop-blur-sm rounded-xl p-4 flex flex-wrap gap-4 items-end">
               <div>
@@ -195,14 +220,13 @@ export default function CaregiverListPage() {
                 className="text-white/80 hover:text-white text-sm flex items-center gap-1 pb-2"
               >
                 <X className="w-3.5 h-3.5" />
-                Limpar
+                Limpar filtros
               </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Results */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {loading ? (
           <div className="flex justify-center items-center py-20">
@@ -214,19 +238,32 @@ export default function CaregiverListPage() {
             <h3 className="text-xl font-semibold text-gray-600 mb-2">
               Nenhum cuidador encontrado
             </h3>
-            <p className="text-gray-400">
+            <p className="text-gray-400 mb-4">
               Tente ajustar os filtros de busca
             </p>
+            {filters.specialty && (
+              <button
+                onClick={() => setFilters(prev => ({ ...prev, specialty: '' }))}
+                className="btn-secondary"
+              >
+                Limpar filtro de especialidade
+              </button>
+            )}
           </div>
         ) : (
           <>
+            <div className="flex items-center justify-between mb-6">
+              <p className="text-gray-500">
+                {caregivers.length} cuidador{caregivers.length > 1 ? 'es' : ''} encontrado{caregivers.length > 1 ? 's' : ''}
+              </p>
+            </div>
+
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {caregivers.map((caregiver) => (
                 <CaregiverCard key={caregiver._id} caregiver={caregiver} />
               ))}
             </div>
 
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex justify-center items-center gap-2 mt-10">
                 <button
@@ -276,5 +313,19 @@ export default function CaregiverListPage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function CaregiverListPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
+        </div>
+      }
+    >
+      <CaregiverListContent />
+    </Suspense>
   );
 }

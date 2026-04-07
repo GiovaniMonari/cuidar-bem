@@ -31,6 +31,7 @@ export function Footer() {
                 </p>
               </div>
             </div>
+
             <div className="flex flex-wrap gap-6 text-sm">
               <div className="flex items-center gap-2 text-primary-200">
                 <Lock className="w-4 h-4" />
@@ -54,20 +55,27 @@ export function Footer() {
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Sobre */}
           <div>
-            <div className="flex items-center">
-              <div>
+            <div className="flex items-center gap-3 mb-4">
               <img
-                src="/logo_cuidadores_transparente.png" 
-                alt="Logo" 
-                className="w-20 h-20 object-contain"
+                src="/logo_cuidadores_transparente.png"
+                alt="Logo CuidarBem"
+                className="w-14 h-14 object-contain flex-shrink-0"
               />
+              <div>
+                <span className="text-white font-bold text-xl block">
+                  CuidarBem
+                </span>
+                <span className="text-gray-500 text-xs">
+                  Cuidado com amor e segurança
+                </span>
+              </div>
             </div>
-              <span className="text-white font-bold text-lg">CuidarBem</span>
-            </div>
+
             <p className="text-gray-400 text-sm leading-relaxed mb-4">
-              Conectamos famílias a cuidadores qualificados e verificados. 
+              Conectamos famílias a cuidadores qualificados e verificados.
               Cuidado com amor, segurança e profissionalismo.
             </p>
+
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2 text-gray-400">
                 <Mail className="w-4 h-4" />
@@ -156,7 +164,6 @@ export function Footer() {
               ))}
             </ul>
 
-            {/* Certificados */}
             <div className="mt-6 flex items-center gap-3">
               <div className="bg-gray-800 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 flex items-center gap-1.5">
                 <Lock className="w-3 h-3" />
@@ -175,7 +182,7 @@ export function Footer() {
       <div className="border-t border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-gray-500 text-sm">
+            <p className="text-gray-500 text-sm text-center md:text-left">
               © {new Date().getFullYear()} CuidarBem. Todos os direitos reservados. CNPJ: 00.000.000/0001-00
             </p>
             <div className="flex items-center gap-4 text-xs text-gray-500">

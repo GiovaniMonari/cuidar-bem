@@ -211,6 +211,24 @@ class ApiService {
       headers: this.headers(true),
     });
   }
+    async getOrCreateConversation(bookingId: string) {
+    return this.request<any>(`/chat/booking/${bookingId}`, {
+      method: 'POST',
+      headers: this.headers(true),
+    });
+  }
+
+  async getConversations() {
+    return this.request<any[]>('/chat/conversations', {
+      headers: this.headers(true),
+    });
+  }
+
+  async getMessages(conversationId: string) {
+    return this.request<any[]>(`/chat/messages/${conversationId}`, {
+      headers: this.headers(true),
+    });
+  }
 }
 
 export const api = new ApiService();

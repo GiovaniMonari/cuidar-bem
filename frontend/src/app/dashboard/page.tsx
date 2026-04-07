@@ -20,6 +20,7 @@ import {
   Shield,
   ArrowRight,
   BadgeDollarSign,
+  MessageCircle,
 } from 'lucide-react';
 import { BookingCalendar } from '@/components/BookingCalendar';
 
@@ -111,6 +112,15 @@ export default function DashboardPage() {
       alert(error.message);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+    const openChat = async (bookingId: string) => {
+    try {
+      const conversation = await api.getOrCreateConversation(bookingId);
+      router.push(`/chat?conversation=${conversation._id}`);
+    } catch (error: any) {
+      alert(error.message || 'Erro ao abrir conversa');
     }
   };
 
@@ -392,6 +402,13 @@ export default function DashboardPage() {
                               className="bg-red-100 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
                             >
                               Cancelar
+                            </button>
+                            <button
+                              onClick={() => openChat(booking._id)}
+                              className="bg-primary-100 text-primary-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-200 transition-colors flex items-center gap-1.5"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                              Abrir Chat
                             </button>
                           </>
                         )}

@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { Footer } from '@/components/Footer';
 import { api } from '@/services/api';
 import { Caregiver, SPECIALTIES } from '@/types';
-import { StarRating } from '@/components/StarRating';
 import {
   Heart,
   Shield,
@@ -24,6 +23,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { UserAvatar } from '@/components/UserAvatar';
 
 const SERVICES = [
   {
@@ -229,7 +229,8 @@ export default function HomePage() {
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {topCaregivers.map((caregiver, index) => {
-                const user = caregiver.userId;
+                const caregiverUser = caregiver.userId;
+
                 return (
                   <Link
                     key={caregiver._id}
@@ -251,13 +252,16 @@ export default function HomePage() {
                     )}
 
                     <div className="flex items-start gap-4">
-                      <div className="w-16 h-16 bg-gradient-to-br from-primary-400 to-primary-600 rounded-2xl flex items-center justify-center text-white text-xl font-bold flex-shrink-0 group-hover:scale-105 transition-transform">
-                        {user?.name?.charAt(0)?.toUpperCase()}
-                      </div>
+                      <UserAvatar
+                        name={caregiverUser?.name}
+                        avatar={caregiverUser?.avatar}
+                        size={64}
+                        className="rounded-2xl border border-gray-200 flex-shrink-0"
+                      />
 
                       <div className="flex-1 min-w-0">
                         <h3 className="font-bold text-lg text-gray-900 truncate">
-                          {user?.name}
+                          {caregiverUser?.name}
                         </h3>
                         <div className="flex items-center gap-1 text-sm text-gray-500 mt-0.5">
                           <MapPin className="w-3.5 h-3.5" />
@@ -282,7 +286,6 @@ export default function HomePage() {
                       {caregiver.bio}
                     </p>
 
-                    {/* Specialties */}
                     <div className="flex flex-wrap gap-1.5 mt-4">
                       {caregiver.specialties.slice(0, 3).map((spec) => (
                         <span
@@ -299,7 +302,6 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    {/* Footer */}
                     <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
                       <div className="flex items-center gap-3 text-sm text-gray-500">
                         <span className="flex items-center gap-1">
@@ -316,7 +318,6 @@ export default function HomePage() {
                       </div>
                     </div>
 
-                    {/* Hover indicator */}
                     <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 to-accent-500 transform scale-x-0 group-hover:scale-x-100 transition-transform rounded-b-2xl" />
                   </Link>
                 );
@@ -324,7 +325,6 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* CTA para ver mais */}
           <div className="text-center mt-10">
             <Link
               href="/cuidadores"
@@ -420,8 +420,8 @@ export default function HomePage() {
             ].map((testimonial, i) => (
               <div key={i} className="card p-6">
                 <div className="flex items-center gap-1 mb-4">
-                  {[...Array(testimonial.rating)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+                  {[...Array(testimonial.rating)].map((_, starIndex) => (
+                    <Star key={starIndex} className="w-5 h-5 text-yellow-500 fill-yellow-500" />
                   ))}
                 </div>
                 <p className="text-gray-600 mb-6 italic">"{testimonial.text}"</p>
@@ -444,16 +444,17 @@ export default function HomePage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-gradient-to-br from-primary-600 to-primary-800 rounded-3xl p-10 lg:p-14 text-center relative overflow-hidden">
             <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.05%22%3E%3Cpath%20d%3D%22M36%2034v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6%2034v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6%204V0H4v4H0v2h4v4h2V6h4V4H6z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-30" />
-            
+
             <div className="relative z-10">
               {isAuthenticated ? (
                 <>
                   <div className="flex items-center justify-center gap-2 mb-4">
-                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-lg">
-                        {user?.name?.charAt(0)?.toUpperCase()}
-                      </span>
-                    </div>
+                    <UserAvatar
+                      name={user?.name}
+                      avatar={user?.avatar}
+                      size={48}
+                      className="border-2 border-white/20"
+                    />
                   </div>
                   <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
                     Olá, {user?.name?.split(' ')[0]}!
@@ -464,8 +465,8 @@ export default function HomePage() {
                       : 'Continue explorando cuidadores ou acompanhe seus agendamentos.'}
                   </p>
                   <div className="flex flex-wrap justify-center gap-4">
-                    <Link 
-                      href="/dashboard" 
+                    <Link
+                      href="/dashboard"
                       className="btn-accent !px-8 text-lg flex items-center gap-2"
                     >
                       <CheckCircle2 className="w-5 h-5" />
@@ -511,7 +512,6 @@ export default function HomePage() {
                       Ver Cuidadores
                     </Link>
                   </div>
-                  {/* Link para login */}
                   <p className="text-white/60 text-sm mt-6">
                     Já tem uma conta?{' '}
                     <Link href="/login" className="text-white underline hover:text-accent-300">

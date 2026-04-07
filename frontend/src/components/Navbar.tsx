@@ -12,6 +12,7 @@ import {
   Calendar,
   LogOut,
   Search,
+  MessageCircle,
 } from 'lucide-react';
 
 export function Navbar() {
@@ -48,12 +49,20 @@ export function Navbar() {
             {isAuthenticated ? (
               <>
                 <Link
+                  href="/chat"
+                  className="flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Chat
+                </Link>
+                <Link
                   href="/dashboard"
                   className="flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors"
                 >
                   <Calendar className="w-4 h-4" />
                   Dashboard
                 </Link>
+                
                 <div className="flex items-center gap-3 pl-3 border-l border-gray-200">
                   <Link
                     href="/perfil"

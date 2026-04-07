@@ -42,7 +42,8 @@ function CaregiverDetailContent() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [availableDates, setAvailableDates] = useState<{ date: string; slots: string[]; isAvailable: boolean }[]>([]);
-
+  const [canChat, setCanChat] = useState(false);
+  const [chatBookingId, setChatBookingId] = useState<string | null>(null);
 
   // Estados do modal de agendamento
   const [showBooking, setShowBooking] = useState(false);
@@ -271,6 +272,60 @@ function CaregiverDetailContent() {
       setTimeout(() => setBookingSuccess(false), 5000);
     } catch (error: any) {
       alert(error.message);
+    }
+  };
+
+    useEffect(() => {
+    const checkChatAvailability = async () => {
+      if (!isAuthenticated || user?.role !== 'client') {
+        setCanChat(false);
+        setChatBookingId(null);
+        return;
+      }
+
+      try {
+        const bookings = await api.getMyBookings();
+
+        const relatedBooking = bookings.find((booking: any) => {
+          const caregiverBookingId =
+            typeof booking.caregiverId === 'string'
+              ? booking.caregiverId
+              : booking.caregiverId?._id;
+
+          return (
+            String(caregiverBookingId) === String(id) &&
+            ['pending', 'confirmed', 'in_progress', 'completed'].includes(booking.status)
+          );
+        });
+
+        if (relatedBooking) {
+          setCanChat(true);
+          setChatBookingId(relatedBooking._id);
+        } else {
+          setCanChat(false);
+          setChatBookingId(null);
+        }
+      } catch (error) {
+        console.error('Erro ao verificar disponibilidade do chat:', error);
+        setCanChat(false);
+        setChatBookingId(null);
+      }
+    };
+
+    checkChatAvailability();
+  }, [id, isAuthenticated, user]);
+
+    const handleStartChat = async () => {
+    if (!chatBookingId) {
+      alert('Para conversar com este cuidador, primeiro solicite um atendimento.');
+      return;
+    }
+
+    try {
+      const conversation = await api.getOrCreateConversation(chatBookingId);
+      router.push(`/chat?conversation=${conversation._id}`);
+    } catch (error: any) {
+      alert(error.message || 'Erro ao iniciar chat');
     }
   };
 
@@ -860,7 +915,7 @@ function CaregiverDetailContent() {
             )}
 
             {/* Availability */}
-                        <div className="card p-6">
+            <div className="card p-6">
               <h2 className="text-lg font-bold text-gray-900 mb-3">
                 Disponibilidade
               </h2>
@@ -882,6 +937,10 @@ function CaregiverDetailContent() {
               )}
             </div>
 
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-700">
+              O chat com o cuidador é liberado após a solicitação de atendimento.
+            </div>
+            
             {/* Reviews */}
             <div className="card p-6">
               <div className="flex items-center justify-between mb-4">
@@ -1051,6 +1110,7 @@ function CaregiverDetailContent() {
                     <Calendar className="w-4 h-4" />
                     Agendar Atendimento
                   </button>
+
                   {caregiverUser?.phone && (
                     <a
                       href={`tel:${caregiverUser.phone}`}
@@ -1060,6 +1120,7 @@ function CaregiverDetailContent() {
                       Ligar
                     </a>
                   )}
+
                   {caregiverUser?.email && (
                     <a
                       href={`mailto:${caregiverUser.email}`}
@@ -1069,11 +1130,33 @@ function CaregiverDetailContent() {
                       Email
                     </a>
                   )}
+
+                  {/* Seção do Chat */}
+                  <div className="pt-2">
+                    {canChat ? (
+                      <div className="space-y-2">
+                        <p className="text-xs text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                          Você já possui um atendimento com este cuidador.
+                        </p>
+                        <button
+                          onClick={handleStartChat}
+                          className="btn-secondary w-full flex items-center justify-center gap-2"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          Iniciar Chat
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-3 leading-relaxed">
+                        Para conversar com este cuidador, primeiro envie uma solicitação de atendimento.
+                      </div>
+                    )}
+                  </div>
                 </div>
-              ) : !isAuthenticated ? (
+                ) : !isAuthenticated ? (
                 <div className="text-center">
                   <p className="text-gray-500 text-sm mb-4">
-                    Faça login para solicitar atendimento
+                    Faça login para solicitar atendimento e conversar com o cuidador.
                   </p>
                   <a href="/login" className="btn-primary w-full inline-block text-center">
                     Fazer Login

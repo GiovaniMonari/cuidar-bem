@@ -12,6 +12,7 @@ import { ServicesModule } from './services/services-module'; // NOVO
 import { BookingsService } from './bookings/bookings.service';
 import { PaymentsService } from './payments/payments.service';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
     PaymentsModule,
     ServicesModule,
     CloudinaryModule,
+    ChatModule,
   ],
 })
 export class AppModule implements OnModuleInit {

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/services/api';
+import { AvailabilityCalendar } from '@/components/AvailabilityCalendar';
 import { SPECIALTIES, STATES } from '@/types';
 import {
   Save,
@@ -34,14 +35,15 @@ export default function CaregiverProfilePage() {
   const [error, setError] = useState('');
   const [newCert, setNewCert] = useState('');
 
-  const [form, setForm] = useState({
+      const [form, setForm] = useState({
     bio: '',
     specialties: [] as string[],
     experienceYears: 0,
     hourlyRate: 0,
+    servicePrices: [] as { serviceKey: string; pricePerHour: number; isAvailable: boolean }[],
     city: '',
     state: '',
-    availability: [] as string[],
+    availabilityCalendar: [] as { date: string; slots: string[]; isAvailable: boolean }[],
     certifications: [] as string[],
     isAvailable: true,
   });
@@ -64,14 +66,15 @@ export default function CaregiverProfilePage() {
     try {
       const data = await api.getMyCaregiverProfile();
       setExistingId(data._id);
-      setForm({
+                  setForm({
         bio: data.bio,
         specialties: data.specialties,
         experienceYears: data.experienceYears,
         hourlyRate: data.hourlyRate,
+        servicePrices: data.servicePrices || [],
         city: data.city,
         state: data.state,
-        availability: data.availability || [],
+        availabilityCalendar: data.availabilityCalendar || [],
         certifications: data.certifications || [],
         isAvailable: data.isAvailable,
       });
@@ -88,15 +91,6 @@ export default function CaregiverProfilePage() {
       specialties: prev.specialties.includes(spec)
         ? prev.specialties.filter((s) => s !== spec)
         : [...prev.specialties, spec],
-    }));
-  };
-
-  const toggleDay = (day: string) => {
-    setForm((prev) => ({
-      ...prev,
-      availability: prev.availability.includes(day)
-        ? prev.availability.filter((d) => d !== day)
-        : [...prev.availability, day],
     }));
   };
 
@@ -286,27 +280,95 @@ export default function CaregiverProfilePage() {
             </div>
           </div>
 
+          <div className="card p-6">
+            <h2 className="font-semibold text-gray-900 mb-4">
+              Preços por Serviço
+            </h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Defina quanto você cobra por hora em cada tipo de serviço.
+            </p>
+
+            <div className="space-y-3">
+              {Object.entries(SPECIALTIES).map(([key, label]) => {
+                const current = form.servicePrices.find((s) => s.serviceKey === key);
+
+                return (
+                  <div
+                    key={key}
+                    className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center border border-gray-100 rounded-xl p-3"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-900">{label}</p>
+                    </div>
+
+                    <input
+                      type="number"
+                      min={0}
+                      value={current?.pricePerHour || ''}
+                      onChange={(e) => {
+                        const value = Number(e.target.value);
+                        setForm((prev) => {
+                          const others = prev.servicePrices.filter((s) => s.serviceKey !== key);
+                          return {
+                            ...prev,
+                            servicePrices: [
+                              ...others,
+                              {
+                                serviceKey: key,
+                                pricePerHour: value,
+                                isAvailable: true,
+                              },
+                            ],
+                          };
+                        });
+                      }}
+                      className="input-field"
+                      placeholder="Preço por hora"
+                    />
+
+                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={current?.isAvailable ?? false}
+                        onChange={(e) => {
+                          setForm((prev) => {
+                            const existing = prev.servicePrices.find((s) => s.serviceKey === key);
+                            const others = prev.servicePrices.filter((s) => s.serviceKey !== key);
+
+                            return {
+                              ...prev,
+                              servicePrices: [
+                                ...others,
+                                {
+                                  serviceKey: key,
+                                  pricePerHour: existing?.pricePerHour || prev.hourlyRate,
+                                  isAvailable: e.target.checked,
+                                },
+                              ],
+                            };
+                          });
+                        }}
+                      />
+                      Disponível neste serviço
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Availability */}
           <div className="card p-6">
             <h2 className="font-semibold text-gray-900 mb-4">
-              Disponibilidade
+              Calendário de Disponibilidade
             </h2>
-            <div className="flex flex-wrap gap-2">
-              {DAYS_OPTIONS.map(({ key, label }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => toggleDay(key)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                    form.availability.includes(key)
-                      ? 'bg-accent-500 text-white shadow-lg shadow-accent-500/25'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+
+            <AvailabilityCalendar
+              selectedDates={form.availabilityCalendar}
+              onChange={(dates) =>
+                setForm((prev) => ({ ...prev, availabilityCalendar: dates }))
+              }
+            />
 
             <div className="mt-4">
               <label className="flex items-center gap-2 cursor-pointer">

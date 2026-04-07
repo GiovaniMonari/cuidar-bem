@@ -14,6 +14,12 @@ export interface CaregiverServicePrice {
   isAvailable: boolean;
 }
 
+export interface AvailabilityDate {
+  date: string;
+  slots: ('manha' | 'tarde' | 'noite' | 'integral')[];
+  isAvailable: boolean;
+}
+
 export interface Caregiver {
   _id: string;
   userId: User;
@@ -21,10 +27,10 @@ export interface Caregiver {
   specialties: string[];
   experienceYears: number;
   hourlyRate: number;
-  servicePrices: CaregiverServicePrice[]; // NOVO
+  servicePrices: CaregiverServicePrice[];
   city: string;
   state: string;
-  availability: string[];
+  availabilityCalendar: AvailabilityDate[];
   certifications: string[];
   rating: number;
   reviewCount: number;

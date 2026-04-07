@@ -102,4 +102,10 @@ export class CaregiversService {
     caregiver.rating = Math.round((totalRating / caregiver.reviewCount) * 10) / 10;
     await caregiver.save();
   }
+
+    async getAvailability(id: string) {
+    const caregiver = await this.caregiverModel.findById(id).select('availabilityCalendar');
+    if (!caregiver) throw new NotFoundException('Cuidador não encontrado');
+    return caregiver.availabilityCalendar || [];
+  }
 }

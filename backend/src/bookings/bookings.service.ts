@@ -1,33 +1,78 @@
-import { Injectable, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Booking, BookingDocument } from './schemas/booking.schema';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class BookingsService {
-  // Referência ao PaymentsService será injetada depois
   private paymentsService: any;
 
   constructor(
     @InjectModel(Booking.name) private bookingModel: Model<BookingDocument>,
+    private emailService: EmailService,
   ) {}
 
-  // Setter para injeção circular
   setPaymentsService(paymentsService: any) {
     this.paymentsService = paymentsService;
   }
 
-  async create(clientId: string, dto: CreateBookingDto): Promise<BookingDocument> {
+  async create(clientId: string, dto: CreateBookingDto, clientUser: any): Promise<BookingDocument> {
     const booking = new this.bookingModel({
       ...dto,
       clientId,
       status: 'pending',
     });
-    return (await booking.save()).populate([
+
+    const saved = await (await booking.save()).populate([
       { path: 'clientId', select: 'name email phone' },
-      { path: 'caregiverId', populate: { path: 'userId', select: 'name email' } },
+      { path: 'caregiverId', populate: { path: 'userId', select: 'name email phone' } },
     ]);
+
+    // Enviar emails
+    const caregiver = saved.caregiverId as any;
+    const caregiverUser = caregiver?.userId;
+    const client = saved.clientId as any;
+
+    // Email para o cuidador
+    if (caregiverUser?.email) {
+      try {
+        await this.emailService.sendNewBookingRequestEmail({
+          to: caregiverUser.email,
+          caregiverName: caregiverUser.name,
+          clientName: dto.clientName || client?.name || 'Cliente',
+          clientPhone: dto.clientPhone || client?.phone || '',
+          serviceName: dto.serviceName || dto.serviceType || 'Atendimento',
+          durationLabel: dto.durationLabel || `${dto.durationHours}h`,
+          startDate: new Date(dto.startDate).toLocaleString('pt-BR'),
+          address: dto.address || '',
+          totalAmount: dto.totalAmount,
+          notes: dto.notes,
+        });
+      } catch (error) {
+        console.error('Erro ao enviar email para cuidador:');
+      }
+    }
+
+    // Email para o cliente
+    if (client?.email) {
+      try {
+        await this.emailService.sendBookingConfirmationToClientEmail({
+          to: client.email,
+          clientName: client.name,
+          caregiverName: caregiverUser?.name || 'Cuidador',
+          serviceName: dto.serviceName || dto.serviceType || 'Atendimento',
+          durationLabel: dto.durationLabel || `${dto.durationHours}h`,
+          startDate: new Date(dto.startDate).toLocaleString('pt-BR'),
+          totalAmount: dto.totalAmount,
+        });
+      } catch (error) {
+        console.error('Erro ao enviar email para cliente:');
+      }
+    }
+
+    return saved;
   }
 
   async findByClient(clientId: string) {
@@ -68,10 +113,11 @@ export class BookingsService {
     const booking = await this.bookingModel.findById(id).populate({
       path: 'caregiverId',
       populate: { path: 'userId', select: 'name email phone' },
-    });
+    }).populate('clientId', 'name email phone');
+    
     if (!booking) throw new NotFoundException('Agendamento não encontrado');
 
-    const isClient = booking.clientId.toString() === userId;
+    const isClient = booking.clientId._id.toString() === userId;
     const isCaregiver = (booking.caregiverId as any)?.userId?._id?.toString() === userId;
 
     if (!isClient && !isCaregiver) {
@@ -82,28 +128,47 @@ export class BookingsService {
       throw new ForbiddenException('Clientes só podem cancelar agendamentos');
     }
 
+    const previousStatus = booking.status;
     booking.status = status;
     const saved = await booking.save();
 
-    // Integração com pagamentos
-    if (this.paymentsService) {
-      try {
-        if (status === 'confirmed') {
-          // Cuidador aceitou → criar cobrança
-          await this.paymentsService.createPayment(id);
-        } else if (status === 'completed') {
-          // Serviço concluído → liberar pagamento
-          await this.paymentsService.releasePayment(id);
-        } else if (status === 'cancelled') {
-          // Cancelado → reembolsar se houver pagamento
+    // Integração com pagamentos e emails
+    try {
+      if (status === 'confirmed' && this.paymentsService) {
+        await this.paymentsService.createPayment(id);
+      } else if (status === 'completed') {
+        // Liberar pagamento
+        if (this.paymentsService) {
           const payment = await this.paymentsService.findByBooking(id);
           if (payment && ['held', 'paid'].includes(payment.status)) {
-            await this.paymentsService.refundPayment(id);
+            await this.paymentsService.releasePayment(id);
           }
         }
-      } catch (error) {
-        console.error('Erro na integração de pagamento:', error.message);
+
+        // Enviar emails de conclusão
+        const caregiver = booking.caregiverId as any;
+        const caregiverUser = caregiver?.userId;
+        const client = booking.clientId as any;
+
+        // Email para o cliente (pedindo avaliação)
+        if (client?.email) {
+          await this.emailService.sendServiceCompletedToClientEmail({
+            to: client.email,
+            clientName: client.name,
+            caregiverName: caregiverUser?.name || 'Cuidador',
+            serviceName: booking.serviceName || booking.serviceType || 'Atendimento',
+            caregiverId: caregiver._id.toString(),
+            bookingId: booking._id.toString(),
+          });
+        }
+      } else if (status === 'cancelled' && this.paymentsService) {
+        const payment = await this.paymentsService.findByBooking(id);
+        if (payment && ['held', 'paid'].includes(payment.status)) {
+          await this.paymentsService.refundPayment(id);
+        }
       }
+    } catch (error) {
+      console.error('Erro na integração:');
     }
 
     return saved;
@@ -117,5 +182,29 @@ export class BookingsService {
         path: 'caregiverId',
         populate: { path: 'userId', select: 'name email phone' },
       });
+  }
+
+  // Verificar se cliente pode avaliar um cuidador
+  async canReview(clientId: string, caregiverId: string): Promise<{ canReview: boolean; bookingId?: string }> {
+    const completedBooking = await this.bookingModel.findOne({
+      clientId,
+      caregiverId,
+      status: 'completed',
+    }).sort({ createdAt: -1 });
+
+    if (!completedBooking) {
+      return { canReview: false };
+    }
+
+    return { canReview: true, bookingId: completedBooking._id.toString() };
+  }
+
+  // Buscar bookings completados entre cliente e cuidador
+  async getCompletedBookings(clientId: string, caregiverId: string) {
+    return this.bookingModel.find({
+      clientId,
+      caregiverId,
+      status: 'completed',
+    }).sort({ createdAt: -1 });
   }
 }

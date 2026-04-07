@@ -17,9 +17,17 @@ export class CreateBookingDto {
   @IsNotEmpty()
   serviceType: string;
 
+  @IsOptional()
+  @IsString()
+  serviceName?: string;
+
   @IsString()
   @IsNotEmpty()
   durationKey: string;
+
+  @IsOptional()
+  @IsString()
+  durationLabel?: string;
 
   @IsNumber()
   @Min(1)

@@ -5,7 +5,35 @@ import {
   IsOptional,
   IsString,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+
+class ServicePriceDto {
+  @IsString()
+  serviceKey: string;
+
+  @IsNumber()
+  @Min(0)
+  pricePerHour: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isAvailable?: boolean;
+}
+
+class AvailabilityDateDto {
+  @IsString()
+  date: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  slots: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  isAvailable?: boolean;
+}
 
 export class CreateCaregiverDto {
   @IsString()
@@ -23,6 +51,12 @@ export class CreateCaregiverDto {
   @Min(0)
   hourlyRate: number;
 
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ServicePriceDto)
+  servicePrices?: ServicePriceDto[];
+
   @IsString()
   city: string;
 
@@ -31,8 +65,9 @@ export class CreateCaregiverDto {
 
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  availability?: string[];
+  @ValidateNested({ each: true })
+  @Type(() => AvailabilityDateDto)
+  availabilityCalendar?: AvailabilityDateDto[];
 
   @IsOptional()
   @IsArray()

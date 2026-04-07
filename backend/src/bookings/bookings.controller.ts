@@ -5,6 +5,7 @@ import {
   Put,
   Body,
   Param,
+  Query,
   UseGuards,
   Request,
 } from '@nestjs/common';
@@ -19,7 +20,7 @@ export class BookingsController {
 
   @Post()
   create(@Request() req, @Body() dto: CreateBookingDto) {
-    return this.bookingsService.create(req.user.userId, dto);
+    return this.bookingsService.create(req.user.userId, dto, req.user);
   }
 
   @Get('my')
@@ -28,6 +29,11 @@ export class BookingsController {
       return this.bookingsService.findByCaregiver(req.user.userId);
     }
     return this.bookingsService.findByClient(req.user.userId);
+  }
+
+  @Get('can-review/:caregiverId')
+  canReview(@Request() req, @Param('caregiverId') caregiverId: string) {
+    return this.bookingsService.canReview(req.user.userId, caregiverId);
   }
 
   @Get(':id')

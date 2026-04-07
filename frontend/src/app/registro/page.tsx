@@ -1,11 +1,24 @@
 'use client';
 
-import { Suspense } from 'react';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { Heart, User, Mail, Lock, Phone, AlertCircle, Users, Stethoscope, Loader2 } from 'lucide-react';
+import {
+  Heart,
+  User,
+  Mail,
+  Lock,
+  Phone,
+  AlertCircle,
+  Users,
+  Stethoscope,
+  Loader2,
+  CheckSquare,
+  Square,
+  FileText,
+  Shield,
+} from 'lucide-react';
 
 function RegisterForm() {
   const searchParams = useSearchParams();
@@ -19,6 +32,7 @@ function RegisterForm() {
     phone: '',
     role: defaultRole,
   });
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
@@ -32,8 +46,18 @@ function RegisterForm() {
     e.preventDefault();
     setError('');
 
+    if (!acceptedTerms) {
+      setError('Você precisa aceitar os Termos de Uso e Política de Privacidade para continuar.');
+      return;
+    }
+
     if (form.password !== form.confirmPassword) {
       setError('As senhas não conferem');
+      return;
+    }
+
+    if (form.password.length < 6) {
+      setError('A senha deve ter no mínimo 6 caracteres');
       return;
     }
 
@@ -62,20 +86,21 @@ function RegisterForm() {
     <div className="w-full max-w-md">
       <div className="text-center mb-8">
         <div className="flex items-center justify-center mb-1">
-          <img 
-            src="/logo_cuidadores_transparente.png" 
-            alt="Logo CuidarBem" 
-            className="w-32 h-32 object-contain hover:scale-105 transition-transform"
-          />
-        </div>
+              <img 
+                src="/logo_cuidadores_transparente.png" 
+                alt="Logo CuidarBem" 
+                className="w-32 h-32 object-contain hover:scale-105 transition-transform"
+              />
+            </div>
         <h1 className="text-2xl font-bold text-gray-900">Criar Conta</h1>
         <p className="text-gray-500 mt-1">Junte-se à comunidade CuidarBem</p>
       </div>
+
       <div className="card p-8">
         {error && (
-          <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            {error}
+          <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl mb-6 flex items-start gap-2 text-sm">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span>{error}</span>
           </div>
         )}
 
@@ -199,8 +224,64 @@ function RegisterForm() {
             </div>
           </div>
 
-          <button type="submit" disabled={loading} className="btn-primary w-full">
-            {loading ? 'Cadastrando...' : 'Criar Conta'}
+          {/* Termos e Privacidade */}
+          <div className="bg-gray-50 rounded-xl p-4">
+            <button
+              type="button"
+              onClick={() => setAcceptedTerms(!acceptedTerms)}
+              className="flex items-start gap-3 w-full text-left"
+            >
+              <div className="mt-0.5">
+                {acceptedTerms ? (
+                  <CheckSquare className="w-5 h-5 text-primary-600" />
+                ) : (
+                  <Square className="w-5 h-5 text-gray-400" />
+                )}
+              </div>
+              <span className="text-sm text-gray-600 leading-relaxed">
+                Li e aceito os{' '}
+                <Link
+                  href="/termos"
+                  target="_blank"
+                  className="text-primary-600 font-semibold hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Termos de Uso
+                </Link>{' '}
+                e a{' '}
+                <Link
+                  href="/privacidade"
+                  target="_blank"
+                  className="text-primary-600 font-semibold hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Política de Privacidade
+                </Link>{' '}
+                da plataforma CuidarBem.
+              </span>
+            </button>
+
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
+              <Shield className="w-4 h-4 text-gray-400" />
+              <span className="text-xs text-gray-500">
+                Seus dados estão protegidos conforme a LGPD
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || !acceptedTerms}
+            className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Cadastrando...
+              </span>
+            ) : (
+              'Criar Conta'
+            )}
           </button>
         </form>
 

@@ -3,6 +3,32 @@ import { Document, Types } from 'mongoose';
 
 export type CaregiverDocument = Caregiver & Document;
 
+class ServicePrice {
+  @Prop({ required: true })
+  serviceKey: string;
+
+  @Prop({ required: true, min: 0 })
+  pricePerHour: number;
+
+  @Prop({ default: true })
+  isAvailable: boolean;
+}
+
+class AvailabilityDate {
+  @Prop({ required: true })
+  date: string; // YYYY-MM-DD
+
+  @Prop({
+    type: [String],
+    enum: ['manha', 'tarde', 'noite', 'integral'],
+    default: [],
+  })
+  slots: string[];
+
+  @Prop({ default: true })
+  isAvailable: boolean;
+}
+
 @Schema({ timestamps: true })
 export class Caregiver {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true, unique: true })
@@ -29,20 +55,11 @@ export class Caregiver {
   @Prop({ required: true, min: 0 })
   experienceYears: number;
 
-  // Preço base por hora (mantido para compatibilidade)
   @Prop({ required: true, min: 0 })
   hourlyRate: number;
 
-  // NOVO: Preços por tipo de serviço
-  @Prop({
-    type: [Object],
-    default: [],
-  })
-  servicePrices: {
-    serviceKey: string;
-    pricePerHour: number;
-    isAvailable: boolean;
-  }[];
+  @Prop({ type: [ServicePrice], default: [] })
+  servicePrices: ServicePrice[];
 
   @Prop({ required: true })
   city: string;
@@ -50,8 +67,9 @@ export class Caregiver {
   @Prop({ required: true })
   state: string;
 
-  @Prop({ type: [String] })
-  availability: string[];
+  // substitui availability por calendário real
+  @Prop({ type: [AvailabilityDate], default: [] })
+  availabilityCalendar: AvailabilityDate[];
 
   @Prop({ type: [String] })
   certifications: string[];
@@ -75,3 +93,4 @@ CaregiverSchema.index({ city: 1, state: 1 });
 CaregiverSchema.index({ specialties: 1 });
 CaregiverSchema.index({ rating: -1 });
 CaregiverSchema.index({ hourlyRate: 1 });
+CaregiverSchema.index({ 'availabilityCalendar.date': 1 });

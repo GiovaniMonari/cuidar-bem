@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { Caregiver, Review, SPECIALTIES, DAYS } from '@/types';
+import { Caregiver, Review, SPECIALTIES} from '@/types';
+import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { StarRating } from '@/components/StarRating';
+import { AvailabilityCalendar } from '@/components/AvailabilityCalendar';
 import { ServiceSelector } from '@/components/ServiceSelector';
 import {
   MapPin,
@@ -20,20 +22,37 @@ import {
   MessageSquare,
   Send,
   X,
+  AlertCircle,
+  Star,
 } from 'lucide-react';
 
-export default function CaregiverDetailPage() {
+function CaregiverDetailContent() {
   const { id } = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isAuthenticated } = useAuth();
 
+  // Estados principais
   const [caregiver, setCaregiver] = useState<Caregiver | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const [availableDates, setAvailableDates] = useState<{ date: string; slots: string[]; isAvailable: boolean }[]>([]);
+
+  // Estados do modal de agendamento
   const [showBooking, setShowBooking] = useState(false);
-  const [showReview, setShowReview] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
 
+  // Estados de avaliação
+  const [showReview, setShowReview] = useState(false);
+  const [canReview, setCanReview] = useState(false);
+  const [reviewBookingId, setReviewBookingId] = useState<string | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewSuccess, setReviewSuccess] = useState(false);
+
+  // Parâmetro de URL para abrir avaliação automaticamente
+  const avaliarBookingId = searchParams.get('avaliar');
+
+  // Estado do formulário de agendamento
   const [bookingData, setBookingData] = useState({
     serviceType: '',
     serviceName: '',
@@ -48,37 +67,70 @@ export default function CaregiverDetailPage() {
   const [bookingForm, setBookingForm] = useState({
     startDate: '',
     notes: '',
-    clientName: '',
-    clientPhone: '',
+    cep: '',
     address: '',
     patientName: '',
     patientAge: '',
     patientCondition: '',
   });
 
+  // Estado do formulário de avaliação
   const [reviewForm, setReviewForm] = useState({
     rating: 5,
     comment: '',
   });
 
-  useEffect(() => {
+  // Carregar dados do cuidador e reviews
+    useEffect(() => {
     const fetchData = async () => {
       try {
-        const [caregiverData, reviewsData] = await Promise.all([
+        const [caregiverData, reviewsData, availabilityData] = await Promise.all([
           api.getCaregiver(id as string),
           api.getReviews(id as string),
+          api.getCaregiverAvailability(id as string),
         ]);
+
         setCaregiver(caregiverData);
         setReviews(reviewsData);
+        setAvailableDates(availabilityData || []);
       } catch (error) {
         console.error(error);
       } finally {
         setLoading(false);
       }
     };
+
     fetchData();
   }, [id]);
 
+  // Verificar se o usuário pode avaliar este cuidador
+  useEffect(() => {
+    const checkCanReview = async () => {
+      if (!isAuthenticated || user?.role !== 'client' || !caregiver) {
+        setCanReview(false);
+        return;
+      }
+
+      try {
+        const result = await api.canReviewCaregiver(id as string);
+        setCanReview(result.canReview);
+        setReviewBookingId(result.bookingId || null);
+
+        // Se veio do email de conclusão com parâmetro avaliar, abrir formulário
+        if (avaliarBookingId && result.canReview) {
+          setShowReview(true);
+          setReviewBookingId(avaliarBookingId);
+        }
+      } catch (error) {
+        console.error('Erro ao verificar permissão de avaliação:', error);
+        setCanReview(false);
+      }
+    };
+
+    checkCanReview();
+  }, [id, isAuthenticated, user, caregiver, avaliarBookingId]);
+
+  // Submeter agendamento
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -94,7 +146,9 @@ export default function CaregiverDetailPage() {
       await api.createBooking({
         caregiverId: id,
         serviceType: bookingData.serviceType,
+        serviceName: bookingData.serviceName,
         durationKey: bookingData.durationKey,
+        durationLabel: bookingData.durationLabel,
         durationHours: bookingData.durationHours,
         pricePerHour: bookingData.pricePerHour,
         totalAmount: bookingData.totalAmount,
@@ -102,33 +156,78 @@ export default function CaregiverDetailPage() {
         startDate: bookingForm.startDate,
         endDate: end.toISOString(),
         notes: bookingForm.notes,
-        clientName: bookingForm.clientName,
-        clientPhone: bookingForm.clientPhone,
+        clientName: user?.name,
+        clientPhone: user?.phone,
         address: bookingForm.address,
         patientName: bookingForm.patientName,
         patientAge: bookingForm.patientAge ? Number(bookingForm.patientAge) : undefined,
         patientCondition: bookingForm.patientCondition,
       });
+
       setShowBooking(false);
       setBookingSuccess(true);
+      
+      // Resetar formulário
+      setBookingData({
+        serviceType: '',
+        serviceName: '',
+        durationKey: '',
+        durationLabel: '',
+        durationHours: 0,
+        pricePerHour: 0,
+        totalAmount: 0,
+        discount: 0,
+      });
+        setBookingForm({
+        startDate: '',
+        notes: '',
+        cep: '',
+        address: '',
+        patientName: '',
+        patientAge: '',
+        patientCondition: '',
+      });
+
       setTimeout(() => setBookingSuccess(false), 5000);
     } catch (error: any) {
       alert(error.message);
     }
   };
 
+  // Submeter avaliação
   const handleReview = async (e: React.FormEvent) => {
     e.preventDefault();
+    setReviewLoading(true);
+
     try {
       const newReview = await api.createReview({
         caregiverId: id,
-        ...reviewForm,
+        bookingId: reviewBookingId || avaliarBookingId,
+        rating: reviewForm.rating,
+        comment: reviewForm.comment,
       });
+
       setReviews((prev) => [newReview, ...prev]);
       setShowReview(false);
+      setCanReview(false); // Não pode mais avaliar este serviço
       setReviewForm({ rating: 5, comment: '' });
+      setReviewSuccess(true);
+      setTimeout(() => setReviewSuccess(false), 5000);
+
+      // Atualizar rating do cuidador localmente
+      if (caregiver) {
+        const totalRating = caregiver.rating * caregiver.reviewCount + reviewForm.rating;
+        const newCount = caregiver.reviewCount + 1;
+        setCaregiver({
+          ...caregiver,
+          rating: totalRating / newCount,
+          reviewCount: newCount,
+        });
+      }
     } catch (error: any) {
       alert(error.message);
+    } finally {
+      setReviewLoading(false);
     }
   };
 
@@ -202,19 +301,33 @@ export default function CaregiverDetailPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Mensagem de sucesso do agendamento */}
         {bookingSuccess && (
           <div className="bg-green-50 text-green-700 px-6 py-4 rounded-xl mb-6 flex items-center gap-3">
-            <CheckCircle className="w-5 h-5" />
+            <CheckCircle className="w-5 h-5 flex-shrink-0" />
             <div>
-              <p className="font-semibold">Solicitação enviada!</p>
+              <p className="font-semibold">Solicitação enviada com sucesso!</p>
               <p className="text-sm text-green-600">
-                O cuidador receberá sua solicitação e entrará em contato.
+                O cuidador receberá sua solicitação por email e responderá em breve.
               </p>
             </div>
           </div>
         )}
 
-        {/* Modal de Agendamento - Tela cheia em mobile, modal grande em desktop */}
+        {/* Mensagem de sucesso da avaliação */}
+        {reviewSuccess && (
+          <div className="bg-green-50 text-green-700 px-6 py-4 rounded-xl mb-6 flex items-center gap-3">
+            <Star className="w-5 h-5 flex-shrink-0 fill-green-500" />
+            <div>
+              <p className="font-semibold">Avaliação enviada!</p>
+              <p className="text-sm text-green-600">
+                Obrigado por avaliar. Sua opinião ajuda outros clientes!
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Agendamento */}
         {showBooking && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-6 lg:p-8">
             <div className="bg-white rounded-2xl w-full max-w-4xl my-4 shadow-2xl">
@@ -259,50 +372,25 @@ export default function CaregiverDetailPage() {
                           Dados do Agendamento
                         </h3>
 
-                        <div className="grid sm:grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-sm font-medium text-gray-700 mb-1 block">
-                              Seu Nome *
-                            </label>
-                            <input
-                              type="text"
-                              value={bookingForm.clientName}
-                              onChange={(e) =>
-                                setBookingForm((prev) => ({
-                                  ...prev,
-                                  clientName: e.target.value,
-                                }))
-                              }
-                              className="input-field"
-                              required
-                            />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium text-gray-700 mb-1 block">
-                              Telefone *
-                            </label>
-                            <input
-                              type="tel"
-                              value={bookingForm.clientPhone}
-                              onChange={(e) =>
-                                setBookingForm((prev) => ({
-                                  ...prev,
-                                  clientPhone: e.target.value,
-                                }))
-                              }
-                              className="input-field"
-                              placeholder="(11) 99999-0000"
-                              required
-                            />
+                        <div className="bg-gray-50 rounded-xl p-4">
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">
+                            Dados do Solicitante
+                          </h4>
+                          <div className="space-y-1 text-sm">
+                            <p className="text-gray-900">
+                              <strong>Nome:</strong> {user?.name || 'Não informado'}
+                            </p>
+                            <p className="text-gray-900">
+                              <strong>Telefone:</strong> {user?.phone || 'Não informado'}
+                            </p>
                           </div>
                         </div>
 
-                        <div>
+                                                <div>
                           <label className="text-sm font-medium text-gray-700 mb-1 block">
-                            Data e Hora de Início *
+                            Data disponível *
                           </label>
-                          <input
-                            type="datetime-local"
+                          <select
                             value={bookingForm.startDate}
                             onChange={(e) =>
                               setBookingForm((prev) => ({
@@ -312,7 +400,22 @@ export default function CaregiverDetailPage() {
                             }
                             className="input-field"
                             required
-                          />
+                          >
+                            <option value="">Selecione uma data</option>
+                            {availableDates
+                            .filter((item) => item.isAvailable)
+                            .sort((a, b) => a.date.localeCompare(b.date))
+                            .map((item) => (
+                              <option key={item.date} value={`${item.date}T08:00`}>
+                                {new Date(item.date + 'T00:00:00').toLocaleDateString('pt-BR', {
+                                  weekday: 'long',
+                                  day: '2-digit',
+                                  month: 'long',
+                                  year: 'numeric',
+                                })}
+                              </option>
+                            ))}
+                          </select>
                           {bookingData.durationHours > 0 && (
                             <p className="text-xs text-gray-500 mt-1">
                               Duração: {bookingData.durationLabel} ({bookingData.durationHours}h)
@@ -320,24 +423,17 @@ export default function CaregiverDetailPage() {
                           )}
                         </div>
 
-                        <div>
-                          <label className="text-sm font-medium text-gray-700 mb-1 block">
-                            Endereço do Atendimento *
-                          </label>
-                          <input
-                            type="text"
-                            value={bookingForm.address}
-                            onChange={(e) =>
-                              setBookingForm((prev) => ({
-                                ...prev,
-                                address: e.target.value,
-                              }))
-                            }
-                            className="input-field"
-                            placeholder="Rua, número, bairro, cidade"
-                            required
-                          />
-                        </div>
+                        <AddressAutocomplete
+                          value={bookingForm.address}
+                          cep={bookingForm.cep}
+                          onChange={(data) =>
+                            setBookingForm((prev) => ({
+                              ...prev,
+                              cep: data.cep ?? prev.cep,
+                              address: data.address ?? prev.address,
+                            }))
+                          }
+                        />
 
                         <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                           <h4 className="text-sm font-medium text-gray-700">
@@ -501,20 +597,25 @@ export default function CaregiverDetailPage() {
             )}
 
             {/* Availability */}
-            <div className="card p-6">
+                        <div className="card p-6">
               <h2 className="text-lg font-bold text-gray-900 mb-3">
                 Disponibilidade
               </h2>
-              <div className="flex flex-wrap gap-2">
-                {caregiver.availability?.map((day) => (
-                  <span
-                    key={day}
-                    className="bg-accent-50 text-accent-700 px-4 py-2 rounded-xl text-sm font-medium"
-                  >
-                    {DAYS[day] || day}
-                  </span>
-                ))}
-              </div>
+              {caregiver.availabilityCalendar?.length > 0 ? (
+                <>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Dias disponíveis para atendimento
+                  </p>
+                  <AvailabilityCalendar
+                    selectedDates={caregiver.availabilityCalendar}
+                    readOnly
+                  />
+                </>
+              ) : (
+                <p className="text-gray-400 text-sm">
+                  Nenhuma data disponível cadastrada no momento.
+                </p>
+              )}
             </div>
 
             {/* Reviews */}
@@ -523,39 +624,63 @@ export default function CaregiverDetailPage() {
                 <h2 className="text-lg font-bold text-gray-900">
                   Avaliações ({reviews.length})
                 </h2>
-                {isAuthenticated && user?.role === 'client' && (
+                
+                {/* Botão de avaliar - só aparece se pode avaliar */}
+                {isAuthenticated && user?.role === 'client' && canReview && (
                   <button
                     onClick={() => setShowReview(!showReview)}
-                    className="btn-secondary !py-2 !px-4 text-sm flex items-center gap-1.5"
+                    className="btn-accent !py-2 !px-4 text-sm flex items-center gap-1.5"
                   >
-                    <MessageSquare className="w-3.5 h-3.5" />
+                    <Star className="w-3.5 h-3.5" />
                     Avaliar
                   </button>
                 )}
               </div>
 
-              {/* Review Form */}
-              {showReview && (
+              {/* Mensagem se não pode avaliar */}
+              {isAuthenticated && user?.role === 'client' && !canReview && (
+                <div className="bg-blue-50 rounded-xl p-4 mb-4 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-blue-700 font-medium">
+                      Como funciona a avaliação?
+                    </p>
+                    <p className="text-sm text-blue-600 mt-1">
+                      Você poderá avaliar este cuidador após contratar um serviço e ele ser concluído.
+                      Isso garante que as avaliações sejam de clientes reais.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Formulário de Avaliação */}
+              {showReview && canReview && (
                 <form
                   onSubmit={handleReview}
-                  className="bg-gray-50 rounded-xl p-4 mb-6 space-y-3"
+                  className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-5 mb-6 space-y-4 border border-yellow-200"
                 >
                   <div>
-                    <label className="text-sm font-medium text-gray-700 mb-1 block">
-                      Nota
+                    <label className="text-sm font-medium text-gray-700 mb-2 block">
+                      Como você avalia o atendimento?
                     </label>
-                    <StarRating
-                      rating={reviewForm.rating}
-                      size={24}
-                      interactive
-                      onChange={(r) =>
-                        setReviewForm((prev) => ({ ...prev, rating: r }))
-                      }
-                    />
+                    <div className="flex items-center gap-3">
+                      <StarRating
+                        rating={reviewForm.rating}
+                        size={32}
+                        interactive
+                        onChange={(r) =>
+                          setReviewForm((prev) => ({ ...prev, rating: r }))
+                        }
+                      />
+                      <span className="text-lg font-bold text-gray-700">
+                        {reviewForm.rating}/5
+                      </span>
+                    </div>
                   </div>
+                  
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-1 block">
-                      Comentário
+                      Conte sua experiência
                     </label>
                     <textarea
                       value={reviewForm.comment}
@@ -565,44 +690,75 @@ export default function CaregiverDetailPage() {
                           comment: e.target.value,
                         }))
                       }
-                      className="input-field !py-2"
-                      rows={3}
-                      placeholder="Como foi sua experiência?"
+                      className="input-field"
+                      rows={4}
+                      placeholder="Como foi o atendimento? O cuidador foi pontual? Atendeu bem às necessidades? Recomendaria?"
                       required
                     />
                   </div>
-                  <button type="submit" className="btn-primary !py-2 text-sm flex items-center gap-1.5">
-                    <Send className="w-3.5 h-3.5" />
-                    Enviar Avaliação
-                  </button>
+
+                  <div className="flex gap-2">
+                    <button 
+                      type="submit" 
+                      disabled={reviewLoading}
+                      className="btn-primary flex items-center gap-1.5"
+                    >
+                      {reviewLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Enviando...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" />
+                          Enviar Avaliação
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowReview(false)}
+                      className="btn-secondary"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
                 </form>
               )}
 
-              {/* Reviews List */}
+              {/* Lista de Reviews */}
               {reviews.length === 0 ? (
-                <p className="text-gray-400 text-sm">Nenhuma avaliação ainda</p>
+                <div className="text-center py-8">
+                  <MessageSquare className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+                  <p className="text-gray-400">Nenhuma avaliação ainda</p>
+                  <p className="text-gray-400 text-sm mt-1">
+                    Seja o primeiro a avaliar após um atendimento!
+                  </p>
+                </div>
               ) : (
                 <div className="space-y-4">
                   {reviews.map((review) => (
                     <div
                       key={review._id}
-                      className="border-b border-gray-100 pb-4 last:border-0"
+                      className="border-b border-gray-100 pb-4 last:border-0 last:pb-0"
                     >
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-sm font-bold text-gray-600">
-                          {(review.clientId as any)?.name?.charAt(0) || '?'}
+                        <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-sm font-bold text-white">
+                          {(review.clientId as any)?.name?.charAt(0)?.toUpperCase() || '?'}
                         </div>
-                        <div>
-                          <p className="font-medium text-sm text-gray-900">
-                            {(review.clientId as any)?.name || 'Anônimo'}
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">
+                            {(review.clientId as any)?.name || 'Cliente'}
                           </p>
-                          <StarRating rating={review.rating} size={12} />
+                          <div className="flex items-center gap-2">
+                            <StarRating rating={review.rating} size={14} />
+                            <span className="text-xs text-gray-400">
+                              {new Date(review.createdAt).toLocaleDateString('pt-BR')}
+                            </span>
+                          </div>
                         </div>
-                        <span className="text-xs text-gray-400 ml-auto">
-                          {new Date(review.createdAt).toLocaleDateString('pt-BR')}
-                        </span>
                       </div>
-                      <p className="text-gray-600 text-sm pl-11">
+                      <p className="text-gray-600 text-sm leading-relaxed pl-[52px]">
                         {review.comment}
                       </p>
                     </div>
@@ -680,6 +836,7 @@ export default function CaregiverDetailPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-500">Avaliação</span>
                   <span className="font-medium text-gray-900 flex items-center gap-1">
+                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                     {caregiver.rating.toFixed(1)}
                   </span>
                 </div>
@@ -689,5 +846,20 @@ export default function CaregiverDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Componente principal com Suspense (necessário para useSearchParams)
+export default function CaregiverDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
+        </div>
+      }
+    >
+      <CaregiverDetailContent />
+    </Suspense>
   );
 }

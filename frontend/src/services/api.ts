@@ -165,6 +165,19 @@ class ApiService {
       headers: this.headers(),
     });
   }
+
+  async canReviewCaregiver(caregiverId: string) {
+    return this.request<{ canReview: boolean; bookingId?: string }>(
+      `/reviews/can-review/${caregiverId}`,
+      { headers: this.headers(true) },
+    );
+  }
+
+    async getCaregiverAvailability(id: string) {
+    return this.request<any>(`/caregivers/${id}/availability`, {
+      headers: this.headers(),
+    });
+  }
 }
 
 export const api = new ApiService();

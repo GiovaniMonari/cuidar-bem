@@ -49,4 +49,9 @@ export class CaregiversController {
   ) {
     return this.caregiversService.update(id, req.user.userId, dto);
   }
+
+  @Get(':id/availability')
+  getAvailability(@Param('id') id: string) {
+    return this.caregiversService.getAvailability(id);
+  }
 }

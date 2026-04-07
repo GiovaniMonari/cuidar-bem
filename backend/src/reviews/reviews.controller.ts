@@ -21,6 +21,12 @@ export class ReviewsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('can-review/:caregiverId')
+  canReview(@Request() req, @Param('caregiverId') caregiverId: string) {
+    return this.reviewsService.checkCanReview(req.user.userId, caregiverId);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post()
   create(@Request() req, @Body() dto: CreateReviewDto) {
     return this.reviewsService.create(req.user.userId, dto);

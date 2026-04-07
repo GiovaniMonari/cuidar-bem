@@ -27,7 +27,9 @@ export class UsersService {
   async findByEmail(email: string): Promise<UserDocument | null> {
     return this.userModel.findOne({ email });
   }
-
+  async findRawById(id: string): Promise<UserDocument | null> {
+    return this.userModel.findById(id);
+  }
   async findById(id: string): Promise<UserDocument> {
     const user = await this.userModel.findById(id).select('-password');
     if (!user) throw new NotFoundException('Usuário não encontrado');

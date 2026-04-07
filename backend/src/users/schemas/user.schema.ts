@@ -23,6 +23,9 @@ export class User {
   @Prop()
   avatar: string;
 
+  @Prop()
+  avatarPublicId: string;
+
   @Prop({ default: true })
   isActive: boolean;
 }

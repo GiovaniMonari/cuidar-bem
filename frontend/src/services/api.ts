@@ -178,6 +178,39 @@ class ApiService {
       headers: this.headers(),
     });
   }
+
+    async getCaregiverBookedDates(id: string) {
+    return this.request<string[]>(`/caregivers/${id}/booked-dates`, {
+      headers: this.headers(),
+    });
+  }
+
+    async uploadAvatar(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token =
+      typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+    const res = await fetch(`${API_URL}/users/me/avatar`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ message: 'Erro ao enviar imagem' }));
+      throw new Error(error.message || 'Erro ao enviar imagem');
+    }
+
+    return res.json();
+  }
+  async removeAvatar() {
+    return this.request<any>('/users/me/avatar/remove', {
+      method: 'POST',
+      headers: this.headers(true),
+    });
+  }
 }
 
 export const api = new ApiService();

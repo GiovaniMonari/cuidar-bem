@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { UserAvatar } from '@/components/UserAvatar';
 import {
   Heart,
   Menu,
@@ -58,9 +59,11 @@ export function Navbar() {
                     href="/perfil"
                     className="flex items-center gap-2 text-gray-700 hover:text-primary-600 transition-colors"
                   >
-                    <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                      <User className="w-4 h-4 text-primary-600" />
-                    </div>
+                    <UserAvatar
+                      name={user?.name}
+                      avatar={user?.avatar}
+                      size={32}
+                    />
                     <span className="font-medium text-sm">{user?.name?.split(' ')[0]}</span>
                   </Link>
                   <button

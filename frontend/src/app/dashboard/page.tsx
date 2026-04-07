@@ -21,6 +21,7 @@ import {
   ArrowRight,
   BadgeDollarSign,
 } from 'lucide-react';
+import { BookingCalendar } from '@/components/BookingCalendar';
 
 const STATUS_MAP: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
@@ -145,7 +146,7 @@ export default function DashboardPage() {
               : 'Acompanhe seus agendamentos e pagamentos'}
           </p>
         </div>
-
+        
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           <div className="card p-4">
@@ -179,6 +180,12 @@ export default function DashboardPage() {
             <div className="text-sm text-gray-500">Retido</div>
           </div>
         </div>
+
+        {user?.role === 'caregiver' && bookings.length > 0 && (
+          <div className="mb-8">
+            <BookingCalendar bookings={bookings} />
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6 overflow-x-auto">

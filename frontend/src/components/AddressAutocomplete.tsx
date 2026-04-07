@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { addressService } from '@/services/address';
+import { maskCep } from '@/utils/masks';
 import {
   MapPin,
-  Search,
   Loader2,
   CheckCircle,
+  Search,
 } from 'lucide-react';
 
 interface Props {
@@ -15,6 +16,8 @@ interface Props {
   onChange: (data: {
     cep?: string;
     address?: string;
+    lat?: string;
+    lon?: string;
   }) => void;
 }
 
@@ -22,6 +25,17 @@ export function AddressAutocomplete({ value, cep, onChange }: Props) {
   const [cepLoading, setCepLoading] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [selectedCoords, setSelectedCoords] = useState<{ lat: string; lon: string } | null>(null);
+
+  const mapUrl = useMemo(() => {
+    if (!selectedCoords) return null;
+
+    return `https://www.openstreetmap.org/export/embed.html?bbox=${
+      Number(selectedCoords.lon) - 0.01
+    }%2C${Number(selectedCoords.lat) - 0.01}%2C${
+      Number(selectedCoords.lon) + 0.01
+    }%2C${Number(selectedCoords.lat) + 0.01}&layer=mapnik&marker=${selectedCoords.lat}%2C${selectedCoords.lon}`;
+  }, [selectedCoords]);
 
   const handleCepSearch = async () => {
     if (!cep) return;
@@ -44,6 +58,13 @@ export function AddressAutocomplete({ value, cep, onChange }: Props) {
           cep: result.cep,
           address: fullAddress,
         });
+
+        // opcionalmente buscar coordenadas por texto
+        const geo = await addressService.searchByText(fullAddress);
+        if (geo.length > 0) {
+          setSelectedCoords({ lat: geo[0].lat, lon: geo[0].lon });
+          onChange({ lat: geo[0].lat, lon: geo[0].lon });
+        }
       } else {
         alert('CEP não encontrado.');
       }
@@ -57,7 +78,7 @@ export function AddressAutocomplete({ value, cep, onChange }: Props) {
   const handleTextSearch = async (text: string) => {
     onChange({ address: text });
 
-    if (text.length < 4) {
+    if (text.trim().length < 4) {
       setSuggestions([]);
       return;
     }
@@ -74,7 +95,7 @@ export function AddressAutocomplete({ value, cep, onChange }: Props) {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* CEP */}
       <div>
         <label className="text-sm font-medium text-gray-700 mb-1 block">
@@ -84,7 +105,7 @@ export function AddressAutocomplete({ value, cep, onChange }: Props) {
           <input
             type="text"
             value={cep}
-            onChange={(e) => onChange({ cep: e.target.value })}
+            onChange={(e) => onChange({ cep: maskCep(e.target.value) })}
             className="input-field"
             placeholder="00000-000"
           />
@@ -102,7 +123,7 @@ export function AddressAutocomplete({ value, cep, onChange }: Props) {
         </div>
       </div>
 
-      {/* Endereço */}
+      {/* Busca por endereço */}
       <div>
         <label className="text-sm font-medium text-gray-700 mb-1 block">
           Endereço do Atendimento *
@@ -119,7 +140,6 @@ export function AddressAutocomplete({ value, cep, onChange }: Props) {
           />
         </div>
 
-        {/* Sugestões */}
         {searchLoading && (
           <div className="mt-2 text-sm text-gray-500 flex items-center gap-2">
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -128,13 +148,18 @@ export function AddressAutocomplete({ value, cep, onChange }: Props) {
         )}
 
         {suggestions.length > 0 && (
-          <div className="mt-2 border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
+          <div className="mt-2 border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden max-h-64 overflow-y-auto">
             {suggestions.map((item, index) => (
               <button
                 key={index}
                 type="button"
                 onClick={() => {
-                  onChange({ address: item.display_name });
+                  onChange({
+                    address: item.display_name,
+                    lat: item.lat,
+                    lon: item.lon,
+                  });
+                  setSelectedCoords({ lat: item.lat, lon: item.lon });
                   setSuggestions([]);
                 }}
                 className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 text-sm text-gray-700"
@@ -148,6 +173,23 @@ export function AddressAutocomplete({ value, cep, onChange }: Props) {
           </div>
         )}
       </div>
+
+      {/* Mapa */}
+      {mapUrl && (
+        <div>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">
+            Localização no mapa
+          </label>
+          <div className="rounded-xl overflow-hidden border border-gray-200 h-64">
+            <iframe
+              title="Mapa do endereço"
+              src={mapUrl}
+              className="w-full h-full border-0"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

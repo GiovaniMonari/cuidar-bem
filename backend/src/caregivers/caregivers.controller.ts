@@ -54,4 +54,9 @@ export class CaregiversController {
   getAvailability(@Param('id') id: string) {
     return this.caregiversService.getAvailability(id);
   }
+
+  @Get(':id/booked-dates')
+  getBookedDates(@Param('id') id: string) {
+    return this.caregiversService.getBookedDates(id);
+  }
 }

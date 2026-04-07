@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Caregiver, Review, SPECIALTIES} from '@/types';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { StarRating } from '@/components/StarRating';
+import { UserAvatar } from '@/components/UserAvatar';
 import { AvailabilityCalendar } from '@/components/AvailabilityCalendar';
 import { ServiceSelector } from '@/components/ServiceSelector';
 import {
@@ -25,6 +26,10 @@ import {
   AlertCircle,
   Star,
 } from 'lucide-react';
+import { saveAddress } from '@/utils/savedAddresses';
+import { SavedAddresses } from '@/components/SavedAddress';
+import { combineDateAndTime, getSuggestedEndDate, isHourlyDuration, isMultiDayDuration } from '@/utils/booking';
+import { getDatesInRange } from '@/utils/dateRange';
 
 function CaregiverDetailContent() {
   const { id } = useParams();
@@ -38,9 +43,13 @@ function CaregiverDetailContent() {
   const [loading, setLoading] = useState(true);
   const [availableDates, setAvailableDates] = useState<{ date: string; slots: string[]; isAvailable: boolean }[]>([]);
 
+
   // Estados do modal de agendamento
   const [showBooking, setShowBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [bookedDates, setBookedDates] = useState<string[]>([]);
+  const [dateRangeError, setDateRangeError] = useState('');
+  const [isRangeAvailable, setIsRangeAvailable] = useState(true);
 
   // Estados de avaliação
   const [showReview, setShowReview] = useState(false);
@@ -64,11 +73,16 @@ function CaregiverDetailContent() {
     discount: 0,
   });
 
-  const [bookingForm, setBookingForm] = useState({
+      const [bookingForm, setBookingForm] = useState({
     startDate: '',
+    endDate: '',
+    startTime: '',
+    endTime: '',
     notes: '',
     cep: '',
     address: '',
+    lat: '',
+    lon: '',
     patientName: '',
     patientAge: '',
     patientCondition: '',
@@ -81,18 +95,20 @@ function CaregiverDetailContent() {
   });
 
   // Carregar dados do cuidador e reviews
-    useEffect(() => {
+      useEffect(() => {
     const fetchData = async () => {
       try {
-        const [caregiverData, reviewsData, availabilityData] = await Promise.all([
+        const [caregiverData, reviewsData, availabilityData, bookedData] = await Promise.all([
           api.getCaregiver(id as string),
           api.getReviews(id as string),
           api.getCaregiverAvailability(id as string),
+          api.getCaregiverBookedDates(id as string),
         ]);
 
         setCaregiver(caregiverData);
         setReviews(reviewsData);
         setAvailableDates(availabilityData || []);
+        setBookedDates(bookedData || []);
       } catch (error) {
         console.error(error);
       } finally {
@@ -131,7 +147,7 @@ function CaregiverDetailContent() {
   }, [id, isAuthenticated, user, caregiver, avaliarBookingId]);
 
   // Submeter agendamento
-  const handleBooking = async (e: React.FormEvent) => {
+    const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!bookingData.serviceType || !bookingData.durationKey) {
@@ -139,10 +155,57 @@ function CaregiverDetailContent() {
       return;
     }
 
-    try {
-      const start = new Date(bookingForm.startDate);
-      const end = new Date(start.getTime() + bookingData.durationHours * 60 * 60 * 1000);
+    if (!user?.phone) {
+      alert('Por favor, complete seu telefone no perfil antes de solicitar atendimento.');
+      return;
+    }
 
+    let finalStartDate = '';
+    let finalEndDate = '';
+
+    if (isHourlyDuration(bookingData.durationKey)) {
+      if (!bookingForm.startDate || !bookingForm.startTime || !bookingForm.endTime) {
+        alert('Selecione a data, horário de início e horário de fim.');
+        return;
+      }
+
+      finalStartDate = combineDateAndTime(bookingForm.startDate, bookingForm.startTime);
+      finalEndDate = combineDateAndTime(bookingForm.startDate, bookingForm.endTime);
+
+      const startDateObj = new Date(finalStartDate);
+      const endDateObj = new Date(finalEndDate);
+
+      if (endDateObj <= startDateObj) {
+        alert('O horário de fim deve ser maior que o horário de início.');
+        return;
+      }
+    } else {
+      if (!bookingForm.startDate || !bookingForm.endDate) {
+        alert('Selecione a data de início e a data de término.');
+        return;
+      }
+
+      finalStartDate = `${bookingForm.startDate}T08:00:00`;
+      finalEndDate = `${bookingForm.endDate}T23:59:59`;
+
+      const startDateObj = new Date(finalStartDate);
+      const endDateObj = new Date(finalEndDate);
+
+      if (endDateObj < startDateObj) {
+        alert('A data final não pode ser anterior à data inicial.');
+        return;
+      }
+    }
+
+        if (isMultiDayDuration(bookingData.durationKey)) {
+      const valid = validateDateRange(bookingForm.startDate, bookingForm.endDate);
+      if (!valid) {
+        alert('O cuidador não está disponível para todas as datas deste período.');
+        return;
+      }
+    }
+
+    try {
       await api.createBooking({
         caregiverId: id,
         serviceType: bookingData.serviceType,
@@ -153,8 +216,8 @@ function CaregiverDetailContent() {
         pricePerHour: bookingData.pricePerHour,
         totalAmount: bookingData.totalAmount,
         discount: bookingData.discount,
-        startDate: bookingForm.startDate,
-        endDate: end.toISOString(),
+        startDate: finalStartDate,
+        endDate: finalEndDate,
         notes: bookingForm.notes,
         clientName: user?.name,
         clientPhone: user?.phone,
@@ -164,10 +227,21 @@ function CaregiverDetailContent() {
         patientCondition: bookingForm.patientCondition,
       });
 
+      if (bookingForm.address) {
+        saveAddress({
+          label: bookingForm.patientName
+            ? `Atendimento - ${bookingForm.patientName}`
+            : 'Endereço de atendimento',
+          address: bookingForm.address,
+          cep: bookingForm.cep,
+          lat: bookingForm.lat,
+          lon: bookingForm.lon,
+        });
+      }
+
       setShowBooking(false);
       setBookingSuccess(true);
-      
-      // Resetar formulário
+
       setBookingData({
         serviceType: '',
         serviceName: '',
@@ -178,11 +252,17 @@ function CaregiverDetailContent() {
         totalAmount: 0,
         discount: 0,
       });
-        setBookingForm({
+
+      setBookingForm({
         startDate: '',
+        endDate: '',
+        startTime: '',
+        endTime: '',
         notes: '',
         cep: '',
         address: '',
+        lat: '',
+        lon: '',
         patientName: '',
         patientAge: '',
         patientCondition: '',
@@ -192,6 +272,42 @@ function CaregiverDetailContent() {
     } catch (error: any) {
       alert(error.message);
     }
+  };
+
+    const validateDateRange = (startDate: string, endDate: string) => {
+    if (!startDate || !endDate) {
+      setDateRangeError('');
+      setIsRangeAvailable(true);
+      return true;
+    }
+
+    const allDates = getDatesInRange(startDate, endDate);
+    const availableDateStrings = availableDates
+      .filter((item) => item.isAvailable)
+      .map((item) => item.date);
+
+    const unavailableDates = allDates.filter(
+      (date) => !availableDateStrings.includes(date),
+    );
+
+    if (unavailableDates.length > 0) {
+      const formatted = unavailableDates
+        .slice(0, 5)
+        .map((date) =>
+          new Date(date + 'T00:00:00').toLocaleDateString('pt-BR'),
+        )
+        .join(', ');
+
+      setDateRangeError(
+        `O cuidador não possui disponibilidade em todo o período. Datas indisponíveis: ${formatted}${unavailableDates.length > 5 ? '...' : ''}`,
+      );
+      setIsRangeAvailable(false);
+      return false;
+    }
+
+    setDateRangeError('');
+    setIsRangeAvailable(true);
+    return true;
   };
 
   // Submeter avaliação
@@ -263,9 +379,12 @@ function CaregiverDetailContent() {
           </button>
 
           <div className="flex flex-col sm:flex-row items-start gap-6">
-            <div className="w-24 h-24 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-white text-3xl font-bold flex-shrink-0">
-              {caregiverUser?.name?.charAt(0)?.toUpperCase()}
-            </div>
+            <UserAvatar
+              name={caregiverUser?.name}
+              avatar={caregiverUser?.avatar}
+              size={96}
+              className="rounded-2xl border-2 border-white/20 flex-shrink-0"
+            />
             <div className="flex-1">
               <h1 className="text-3xl font-bold text-white">
                 {caregiverUser?.name}
@@ -386,42 +505,180 @@ function CaregiverDetailContent() {
                           </div>
                         </div>
 
-                                                <div>
-                          <label className="text-sm font-medium text-gray-700 mb-1 block">
-                            Data disponível *
-                          </label>
-                          <select
-                            value={bookingForm.startDate}
-                            onChange={(e) =>
-                              setBookingForm((prev) => ({
-                                ...prev,
-                                startDate: e.target.value,
-                              }))
-                            }
-                            className="input-field"
-                            required
-                          >
-                            <option value="">Selecione uma data</option>
-                            {availableDates
-                            .filter((item) => item.isAvailable)
-                            .sort((a, b) => a.date.localeCompare(b.date))
-                            .map((item) => (
-                              <option key={item.date} value={`${item.date}T08:00`}>
-                                {new Date(item.date + 'T00:00:00').toLocaleDateString('pt-BR', {
-                                  weekday: 'long',
-                                  day: '2-digit',
-                                  month: 'long',
-                                  year: 'numeric',
-                                })}
-                              </option>
-                            ))}
-                          </select>
-                          {bookingData.durationHours > 0 && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              Duração: {bookingData.durationLabel} ({bookingData.durationHours}h)
+                        {isHourlyDuration(bookingData.durationKey) ? (
+                          <div className="space-y-4">
+                            <div>
+                              <label className="text-sm font-medium text-gray-700 mb-1 block">
+                                Data do Atendimento *
+                              </label>
+                              <select
+                                value={bookingForm.startDate}
+                                onChange={(e) =>
+                                  setBookingForm((prev) => ({
+                                    ...prev,
+                                    startDate: e.target.value,
+                                  }))
+                                }
+                                className="input-field"
+                                required
+                              >
+                                <option value="">Selecione uma data</option>
+                                {availableDates
+                                  .filter((item) => item.isAvailable)
+                                  .sort((a, b) => a.date.localeCompare(b.date))
+                                  .map((item) => (
+                                    <option key={item.date} value={item.date}>
+                                      {new Date(item.date + 'T00:00:00').toLocaleDateString(
+                                        'pt-BR',
+                                        {
+                                          weekday: 'long',
+                                          day: '2-digit',
+                                          month: 'long',
+                                          year: 'numeric',
+                                        },
+                                      )}
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="text-sm font-medium text-gray-700 mb-1 block">
+                                  Horário de início *
+                                </label>
+                                <input
+                                  type="time"
+                                  value={bookingForm.startTime}
+                                  onChange={(e) =>
+                                    setBookingForm((prev) => ({
+                                      ...prev,
+                                      startTime: e.target.value,
+                                    }))
+                                  }
+                                  className="input-field"
+                                  required
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-sm font-medium text-gray-700 mb-1 block">
+                                  Horário de fim *
+                                </label>
+                                <input
+                                  type="time"
+                                  value={bookingForm.endTime}
+                                  onChange={(e) =>
+                                    setBookingForm((prev) => ({
+                                      ...prev,
+                                      endTime: e.target.value,
+                                    }))
+                                  }
+                                  className="input-field"
+                                  required
+                                />
+                              </div>
+                            </div>
+
+                            <p className="text-xs text-gray-500">
+                              Duração selecionada: {bookingData.durationLabel}
                             </p>
-                          )}
-                        </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <div>
+                              <label className="text-sm font-medium text-gray-700 mb-1 block">
+                                Data de início *
+                              </label>
+                              <select
+                                value={bookingForm.startDate}
+                                onChange={(e) => {
+                                  const startDate = e.target.value;
+                                  const suggestedEnd = getSuggestedEndDate(
+                                    new Date(startDate + 'T00:00:00'),
+                                    bookingData.durationKey,
+                                  );
+                                  const endDate = suggestedEnd.toISOString().split('T')[0];
+
+                                  setBookingForm((prev) => ({
+                                    ...prev,
+                                    startDate,
+                                    endDate,
+                                  }));
+
+                                  validateDateRange(startDate, endDate);
+                                }}
+                                className="input-field"
+                                required
+                              >
+                                <option value="">Selecione a data inicial</option>
+                                {availableDates
+                                  .filter((item) => item.isAvailable)
+                                  .sort((a, b) => a.date.localeCompare(b.date))
+                                  .map((item) => (
+                                    <option key={item.date} value={item.date}>
+                                      {new Date(item.date + 'T00:00:00').toLocaleDateString(
+                                        'pt-BR',
+                                        {
+                                          weekday: 'long',
+                                          day: '2-digit',
+                                          month: 'long',
+                                          year: 'numeric',
+                                        },
+                                      )}
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="text-sm font-medium text-gray-700 mb-1 block">
+                                Data de término
+                              </label>
+                              <input
+                                type="date"
+                                value={bookingForm.endDate}
+                                className="input-field bg-gray-100"
+                                readOnly
+                              />
+                            </div>
+
+                            {dateRangeError && (
+                              <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                                <p className="text-sm text-red-700">{dateRangeError}</p>
+                              </div>
+                            )}
+
+                            {isRangeAvailable && bookingForm.startDate && bookingForm.endDate && isMultiDayDuration(bookingData.durationKey) && (
+                              <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                                <p className="text-sm text-green-700">
+                                  O cuidador está disponível durante todo o período selecionado.
+                                </p>
+                              </div>
+                            )}
+
+                            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
+                              <p className="text-sm text-orange-700">
+                                Este pacote ocupa múltiplos dias consecutivos.
+                              </p>
+                              <p className="text-xs text-orange-600 mt-1">
+                                Duração selecionada: {bookingData.durationLabel}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        <SavedAddresses
+                          onSelect={(saved) =>
+                            setBookingForm((prev) => ({
+                              ...prev,
+                              cep: saved.cep || '',
+                              address: saved.address,
+                              lat: saved.lat || '',
+                              lon: saved.lon || '',
+                            }))
+                          }
+                        />
 
                         <AddressAutocomplete
                           value={bookingForm.address}
@@ -431,6 +688,8 @@ function CaregiverDetailContent() {
                               ...prev,
                               cep: data.cep ?? prev.cep,
                               address: data.address ?? prev.address,
+                              lat: data.lat ?? prev.lat,
+                              lon: data.lon ?? prev.lon,
                             }))
                           }
                         />
@@ -543,7 +802,11 @@ function CaregiverDetailContent() {
                     >
                       Cancelar
                     </button>
-                    <button type="submit" className="btn-primary flex-1 sm:flex-none sm:min-w-[200px]">
+                    <button
+                      type="submit"
+                      disabled={isMultiDayDuration(bookingData.durationKey) && !isRangeAvailable}
+                      className="btn-primary flex-1 sm:flex-none sm:min-w-[200px] disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                       Solicitar Agendamento
                     </button>
                   </div>
@@ -608,6 +871,7 @@ function CaregiverDetailContent() {
                   </p>
                   <AvailabilityCalendar
                     selectedDates={caregiver.availabilityCalendar}
+                    bookedDates={bookedDates}
                     readOnly
                   />
                 </>
@@ -743,9 +1007,11 @@ function CaregiverDetailContent() {
                       className="border-b border-gray-100 pb-4 last:border-0 last:pb-0"
                     >
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-sm font-bold text-white">
-                          {(review.clientId as any)?.name?.charAt(0)?.toUpperCase() || '?'}
-                        </div>
+                        <UserAvatar
+                          name={(review.clientId as any)?.name}
+                          avatar={(review.clientId as any)?.avatar}
+                          size={40}
+                        />
                         <div className="flex-1">
                           <p className="font-medium text-gray-900">
                             {(review.clientId as any)?.name || 'Cliente'}

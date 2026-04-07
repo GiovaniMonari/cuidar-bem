@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/services/api';
 import { AvailabilityCalendar } from '@/components/AvailabilityCalendar';
-import { SPECIALTIES, STATES } from '@/types';
+import { ServiceType, SPECIALTIES, STATES } from '@/types';
 import {
   Save,
   Loader2,
@@ -14,16 +14,7 @@ import {
   Plus,
   X,
 } from 'lucide-react';
-
-const DAYS_OPTIONS = [
-  { key: 'segunda', label: 'Segunda' },
-  { key: 'terca', label: 'Terça' },
-  { key: 'quarta', label: 'Quarta' },
-  { key: 'quinta', label: 'Quinta' },
-  { key: 'sexta', label: 'Sexta' },
-  { key: 'sabado', label: 'Sábado' },
-  { key: 'domingo', label: 'Domingo' },
-];
+import { deriveSpecialtiesFromServices } from '@/utils/serviceSpecialities';
 
 export default function CaregiverProfilePage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -31,6 +22,8 @@ export default function CaregiverProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [existingId, setExistingId] = useState<string | null>(null);
+  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
+  const [bookedDates, setBookedDates] = useState<string[]>([]);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [newCert, setNewCert] = useState('');
@@ -48,38 +41,67 @@ export default function CaregiverProfilePage() {
     isAvailable: true,
   });
 
-  useEffect(() => {
+   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push('/login');
       return;
     }
+
     if (!authLoading && user?.role !== 'caregiver') {
       router.push('/perfil');
       return;
     }
-    if (isAuthenticated) {
-      fetchProfile();
-    }
-  }, [authLoading, isAuthenticated]);
 
-  const fetchProfile = async () => {
+    if (isAuthenticated) {
+      fetchInitialData();
+    }
+  }, [authLoading, isAuthenticated, user]);
+
+    useEffect(() => {
+    const autoSpecialties = deriveSpecialtiesFromServices(form.servicePrices);
+
+    setForm((prev) => {
+      const same =
+        JSON.stringify([...prev.specialties].sort()) ===
+        JSON.stringify([...autoSpecialties].sort());
+
+      if (same) return prev;
+
+      return {
+        ...prev,
+        specialties: autoSpecialties,
+      };
+    });
+  }, [form.servicePrices]);
+  const fetchInitialData = async () => {
     try {
-      const data = await api.getMyCaregiverProfile();
-      setExistingId(data._id);
-                  setForm({
-        bio: data.bio,
-        specialties: data.specialties,
-        experienceYears: data.experienceYears,
-        hourlyRate: data.hourlyRate,
-        servicePrices: data.servicePrices || [],
-        city: data.city,
-        state: data.state,
-        availabilityCalendar: data.availabilityCalendar || [],
-        certifications: data.certifications || [],
-        isAvailable: data.isAvailable,
-      });
-    } catch {
-      // Profile doesn't exist yet
+      const services = await api.getServiceTypes();
+      setServiceTypes(services || []);
+
+      try {
+        const data = await api.getMyCaregiverProfile();
+        setExistingId(data._id);
+
+        const booked = await api.getCaregiverBookedDates(data._id);
+        setBookedDates(booked || []);
+
+        setForm({
+          bio: data.bio,
+          specialties: data.specialties,
+          experienceYears: data.experienceYears,
+          hourlyRate: data.hourlyRate,
+          servicePrices: data.servicePrices || [],
+          city: data.city,
+          state: data.state,
+          availabilityCalendar: data.availabilityCalendar || [],
+          certifications: data.certifications || [],
+          isAvailable: data.isAvailable,
+        });
+      } catch {
+        // Perfil ainda não existe
+      }
+    } catch (error) {
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -116,11 +138,25 @@ export default function CaregiverProfilePage() {
     setError('');
     setSaving(true);
 
+    const normalizedServicePrices = form.servicePrices.filter(
+      (item) => item.isAvailable && item.pricePerHour > 0,
+    );
+
+    const normalizedSpecialties = deriveSpecialtiesFromServices(
+      normalizedServicePrices,
+    );
+
     try {
+        const payload = {
+        ...form,
+        servicePrices: normalizedServicePrices,
+        specialties: normalizedSpecialties,
+      };
+
       if (existingId) {
-        await api.updateCaregiverProfile(existingId, form);
+        await api.updateCaregiverProfile(existingId, payload);
       } else {
-        const result = await api.createCaregiverProfile(form);
+        const result = await api.createCaregiverProfile(payload);
         setExistingId(result._id);
       }
       setSuccess(true);
@@ -130,6 +166,19 @@ export default function CaregiverProfilePage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const groupedServices = serviceTypes.reduce((acc, service) => {
+    if (!acc[service.category]) acc[service.category] = [];
+    acc[service.category].push(service);
+    return acc;
+  }, {} as Record<string, ServiceType[]>);
+
+  const categoryLabels: Record<string, string> = {
+    idoso: 'Cuidado de Idosos',
+    pcd: 'Cuidado para PcD',
+    enfermagem: 'Enfermagem',
+    acompanhamento: 'Acompanhamento',
   };
 
   if (authLoading || loading) {
@@ -260,100 +309,165 @@ export default function CaregiverProfilePage() {
           {/* Specialties */}
           <div className="card p-6">
             <h2 className="font-semibold text-gray-900 mb-4">
-              Especialidades
+              Especialidades Identificadas
             </h2>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(SPECIALTIES).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => toggleSpecialty(key)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                    form.specialties.includes(key)
-                      ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/25'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              Essas especialidades são geradas automaticamente com base nos serviços que você marcou como disponíveis.
+            </p>
+
+            {form.specialties.length === 0 ? (
+              <div className="text-sm text-gray-400 bg-gray-50 rounded-xl p-4">
+                Nenhuma especialidade identificada ainda. Selecione os serviços que você oferece.
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {form.specialties.map((spec) => (
+                  <span
+                    key={spec}
+                    className="px-4 py-2 rounded-xl text-sm font-medium bg-primary-50 text-primary-700 border border-primary-100"
+                  >
+                    {SPECIALTIES[spec] || spec}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="card p-6">
             <h2 className="font-semibold text-gray-900 mb-4">
-              Preços por Serviço
+              Serviços Oferecidos e Preços
             </h2>
-            <p className="text-sm text-gray-500 mb-4">
-              Defina quanto você cobra por hora em cada tipo de serviço.
+            <p className="text-sm text-gray-500 mb-5">
+              Selecione os serviços que você presta e personalize o valor por hora de cada um.
             </p>
 
-            <div className="space-y-3">
-              {Object.entries(SPECIALTIES).map(([key, label]) => {
-                const current = form.servicePrices.find((s) => s.serviceKey === key);
+            <div className="space-y-6">
+              {Object.entries(groupedServices).map(([category, services]) => (
+                <div key={category}>
+                  <h3 className="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wide">
+                    {categoryLabels[category] || category}
+                  </h3>
 
-                return (
-                  <div
-                    key={key}
-                    className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center border border-gray-100 rounded-xl p-3"
-                  >
-                    <div>
-                      <p className="font-medium text-gray-900">{label}</p>
-                    </div>
+                  <div className="space-y-3">
+                    {services.map((service) => {
+                      const current = form.servicePrices.find(
+                        (s) => s.serviceKey === service.key,
+                      );
 
-                    <input
-                      type="number"
-                      min={0}
-                      value={current?.pricePerHour || ''}
-                      onChange={(e) => {
-                        const value = Number(e.target.value);
-                        setForm((prev) => {
-                          const others = prev.servicePrices.filter((s) => s.serviceKey !== key);
-                          return {
-                            ...prev,
-                            servicePrices: [
-                              ...others,
-                              {
-                                serviceKey: key,
-                                pricePerHour: value,
-                                isAvailable: true,
-                              },
-                            ],
-                          };
-                        });
-                      }}
-                      className="input-field"
-                      placeholder="Preço por hora"
-                    />
+                      return (
+                        <div
+                          key={service.key}
+                          className="border border-gray-200 rounded-xl p-4 bg-white"
+                        >
+                          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-start gap-3">
+                                <input
+                                  type="checkbox"
+                                  checked={current?.isAvailable ?? false}
+                                  onChange={(e) => {
+                                    setForm((prev) => {
+                                      const others = prev.servicePrices.filter(
+                                        (s) => s.serviceKey !== service.key,
+                                      );
 
-                    <label className="flex items-center gap-2 text-sm text-gray-600">
-                      <input
-                        type="checkbox"
-                        checked={current?.isAvailable ?? false}
-                        onChange={(e) => {
-                          setForm((prev) => {
-                            const existing = prev.servicePrices.find((s) => s.serviceKey === key);
-                            const others = prev.servicePrices.filter((s) => s.serviceKey !== key);
+                                      return {
+                                        ...prev,
+                                        servicePrices: [
+                                          ...others,
+                                          {
+                                            serviceKey: service.key,
+                                            pricePerHour:
+                                              current?.pricePerHour || service.suggestedPrice,
+                                            isAvailable: e.target.checked,
+                                          },
+                                        ],
+                                      };
+                                    });
+                                  }}
+                                  className="mt-1 w-4 h-4 text-primary-600 rounded"
+                                />
 
-                            return {
-                              ...prev,
-                              servicePrices: [
-                                ...others,
-                                {
-                                  serviceKey: key,
-                                  pricePerHour: existing?.pricePerHour || prev.hourlyRate,
-                                  isAvailable: e.target.checked,
-                                },
-                              ],
-                            };
-                          });
-                        }}
-                      />
-                      Disponível neste serviço
-                    </label>
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-gray-900">
+                                    {service.name}
+                                  </h4>
+                                  <p className="text-sm text-gray-500 mt-1">
+                                    {service.description}
+                                  </p>
+
+                                  <div className="flex flex-wrap gap-2 mt-2">
+                                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">
+                                      Sugestão: R$ {service.suggestedPrice}/h
+                                    </span>
+                                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">
+                                      Faixa: R$ {service.basePriceMin} a R$ {service.basePriceMax}/h
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="w-full lg:w-52">
+                              <label className="text-sm font-medium text-gray-700 mb-1 block">
+                                Valor por hora
+                              </label>
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                disabled={!(current?.isAvailable ?? false)}
+                                value={current?.pricePerHour ?? ''}
+                                onChange={(e) => {
+                                  const value = Number(e.target.value);
+
+                                  setForm((prev) => {
+                                    const others = prev.servicePrices.filter(
+                                      (s) => s.serviceKey !== service.key,
+                                    );
+
+                                    return {
+                                      ...prev,
+                                      servicePrices: [
+                                        ...others,
+                                        {
+                                          serviceKey: service.key,
+                                          pricePerHour: value,
+                                          isAvailable: current?.isAvailable ?? true,
+                                        },
+                                      ],
+                                    };
+                                  });
+                                }}
+                                className="input-field disabled:bg-gray-100 disabled:text-gray-400"
+                                placeholder={`R$ ${service.suggestedPrice}`}
+                              />
+                            </div>
+                          </div>
+
+                          {service.requirements?.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-gray-100">
+                              <p className="text-xs font-medium text-gray-500 mb-1">
+                                Requisitos recomendados:
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {service.requirements.map((req, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="text-xs bg-yellow-50 text-yellow-700 px-2 py-1 rounded-lg"
+                                  >
+                                    {req}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           </div>
 
@@ -365,6 +479,7 @@ export default function CaregiverProfilePage() {
 
             <AvailabilityCalendar
               selectedDates={form.availabilityCalendar}
+              bookedDates={bookedDates}
               onChange={(dates) =>
                 setForm((prev) => ({ ...prev, availabilityCalendar: dates }))
               }

@@ -8,12 +8,6 @@ export interface User {
   avatar?: string;
 }
 
-export interface CaregiverServicePrice {
-  serviceKey: string;
-  pricePerHour: number;
-  isAvailable: boolean;
-}
-
 export interface AvailabilityDate {
   date: string;
   slots: ('manha' | 'tarde' | 'noite' | 'integral')[];
@@ -36,6 +30,12 @@ export interface Caregiver {
   reviewCount: number;
   isAvailable: boolean;
   profileImage?: string;
+}
+
+export interface CaregiverServicePrice {
+  serviceKey: string;
+  pricePerHour: number;
+  isAvailable: boolean;
 }
 
 export interface ServiceDuration {

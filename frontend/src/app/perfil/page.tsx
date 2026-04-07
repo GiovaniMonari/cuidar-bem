@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/services/api';
+import { UserAvatar } from '@/components/UserAvatar';
+import { Camera, Trash2 } from 'lucide-react';
 import {
   User,
   Mail,
@@ -15,13 +17,15 @@ import {
   Loader2,
   CheckCircle,
 } from 'lucide-react';
+import { maskPhone } from '@/utils/masks';
 
 export default function ProfilePage() {
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, updateUser } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '' });
 
@@ -46,6 +50,36 @@ export default function ProfilePage() {
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+    const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      const updated = await api.uploadAvatar(file);
+      setProfile(updated);
+      updateUser(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (error: any) {
+      alert(error.message || 'Erro ao enviar imagem');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+    const handleRemoveAvatar = async () => {
+    try {
+      const updated = await api.removeAvatar();
+      setProfile(updated);
+      updateUser(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (error: any) {
+      alert(error.message || 'Erro ao remover avatar');
     }
   };
 
@@ -83,9 +117,23 @@ export default function ProfilePage() {
 
         <div className="card p-8">
           <div className="flex items-center gap-6 mb-8">
-            <div className="w-20 h-20 bg-gradient-to-br from-primary-400 to-primary-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold">
-              {profile?.name?.charAt(0)?.toUpperCase()}
+            <div className="relative">
+              <UserAvatar
+                name={profile?.name}
+                avatar={profile?.avatar}
+                size={80}
+              />
+              <label className="absolute -bottom-1 -right-1 bg-primary-600 text-white p-2 rounded-full cursor-pointer hover:bg-primary-700 transition-colors shadow-lg">
+                <Camera className="w-4 h-4" />
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                />
+              </label>
             </div>
+
             <div>
               <h2 className="text-xl font-bold text-gray-900">
                 {profile?.name}
@@ -94,8 +142,33 @@ export default function ProfilePage() {
               <span className="inline-block mt-1 bg-primary-100 text-primary-700 text-xs px-3 py-1 rounded-full font-medium">
                 {profile?.role === 'caregiver' ? 'Cuidador' : 'Cliente'}
               </span>
+              {uploading && (
+                <p className="text-xs text-primary-600 mt-2">Enviando foto...</p>
+              )}
             </div>
           </div>
+              <div className="flex gap-2 mt-3">
+                <label className="text-xs text-primary-600 font-medium cursor-pointer hover:underline">
+                  Trocar foto
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    className="hidden"
+                    onChange={handleAvatarUpload}
+                  />
+                </label>
+
+                {profile?.avatar && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveAvatar}
+                    className="text-xs text-red-500 font-medium hover:underline flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    Remover
+                  </button>
+                )}
+              </div>
 
           <div className="space-y-5">
             <div>
@@ -143,7 +216,7 @@ export default function ProfilePage() {
                     type="tel"
                     value={form.phone}
                     onChange={(e) =>
-                      setForm((prev) => ({ ...prev, phone: e.target.value }))
+                      setForm((prev) => ({ ...prev, phone: maskPhone(e.target.value) }))
                     }
                     className="input-field !pl-10"
                     placeholder="(11) 99999-0000"

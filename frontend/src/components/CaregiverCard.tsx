@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Caregiver, SPECIALTIES, DAYS } from '@/types';
 import { StarRating } from './StarRating';
+import { UserAvatar } from './UserAvatar';
 import {
   MapPin,
   Clock,
@@ -23,9 +24,12 @@ export function CaregiverCard({ caregiver }: Props) {
       <div className="card-hover p-6 h-full flex flex-col">
         {/* Header */}
         <div className="flex items-start gap-4 mb-4">
-          <div className="w-16 h-16 bg-gradient-to-br from-primary-400 to-primary-600 rounded-2xl flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
-            {user?.name?.charAt(0)?.toUpperCase()}
-          </div>
+          <UserAvatar
+            name={user?.name}
+            avatar={user?.avatar}
+            size={64}
+            className="rounded-2xl flex-shrink-0"
+          />
           <div className="flex-1 min-w-0">
             <h3 className="font-bold text-lg text-gray-900 truncate">
               {user?.name}

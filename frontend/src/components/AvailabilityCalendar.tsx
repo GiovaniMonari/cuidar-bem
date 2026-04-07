@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
+  Lock,
 } from 'lucide-react';
 
 interface AvailabilityDate {
@@ -15,6 +16,7 @@ interface AvailabilityDate {
 
 interface Props {
   selectedDates: AvailabilityDate[];
+  bookedDates?: string[];
   onChange?: (dates: AvailabilityDate[]) => void;
   readOnly?: boolean;
 }
@@ -23,12 +25,9 @@ function formatDate(date: Date) {
   return date.toISOString().split('T')[0];
 }
 
-function sameMonth(date: Date, month: number, year: number) {
-  return date.getMonth() === month && date.getFullYear() === year;
-}
-
 export function AvailabilityCalendar({
   selectedDates,
+  bookedDates = [],
   onChange,
   readOnly = false,
 }: Props) {
@@ -41,6 +40,8 @@ export function AvailabilityCalendar({
     selectedDates.forEach((item) => map.set(item.date, item));
     return map;
   }, [selectedDates]);
+
+  const bookedSet = useMemo(() => new Set(bookedDates), [bookedDates]);
 
   const days = useMemo(() => {
     const firstDay = new Date(currentYear, currentMonth, 1);
@@ -64,6 +65,7 @@ export function AvailabilityCalendar({
 
   const toggleDate = (dateStr: string) => {
     if (readOnly || !onChange) return;
+    if (bookedSet.has(dateStr)) return;
 
     const dateObj = new Date(dateStr + 'T00:00:00');
     const now = new Date();
@@ -161,6 +163,7 @@ export function AvailabilityCalendar({
 
           const dateStr = formatDate(day);
           const isSelected = selectedMap.has(dateStr);
+          const isBooked = bookedSet.has(dateStr);
           const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
           const isToday = formatDate(day) === formatDate(new Date());
 
@@ -168,17 +171,26 @@ export function AvailabilityCalendar({
             <button
               key={dateStr}
               type="button"
-              disabled={isPast}
+              disabled={isPast || isBooked}
               onClick={() => toggleDate(dateStr)}
-              className={`h-12 rounded-xl text-sm font-medium transition-all border ${
-                isSelected
+              className={`h-12 rounded-xl text-sm font-medium transition-all border relative ${
+                isBooked
+                  ? 'bg-red-100 text-red-700 border-red-200 cursor-not-allowed'
+                  : isSelected
                   ? 'bg-primary-600 text-white border-primary-600'
                   : isToday
                   ? 'border-primary-300 text-primary-700 bg-primary-50'
                   : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 hover:bg-primary-50'
               } ${isPast ? 'opacity-30 cursor-not-allowed' : ''}`}
             >
-              {day.getDate()}
+              {isBooked ? (
+                <div className="flex items-center justify-center gap-1">
+                  <span>{day.getDate()}</span>
+                  <Lock className="w-3 h-3" />
+                </div>
+              ) : (
+                day.getDate()
+              )}
             </button>
           );
         })}
@@ -188,6 +200,10 @@ export function AvailabilityCalendar({
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded bg-primary-600 inline-block" />
           Disponível
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded bg-red-100 border border-red-200 inline-block" />
+          Ocupado
         </div>
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded bg-primary-50 border border-primary-300 inline-block" />

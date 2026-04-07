@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { api } from '@/services/api';
-import { ServiceType, ServiceDuration, CaregiverServicePrice } from '@/types';
+import { ServiceType, CaregiverServicePrice } from '@/types';
 import {
   Heart,
   Accessibility,
@@ -22,6 +22,7 @@ import {
   Timer,
   Calendar,
   CalendarDays,
+  AlertCircle,
 } from 'lucide-react';
 
 const SERVICE_ICONS: Record<string, any> = {
@@ -41,14 +42,14 @@ const SERVICE_ICONS: Record<string, any> = {
 const DURATION_ICONS: Record<string, any> = {
   '1h': Timer,
   '2h': Timer,
-  'turno': Clock,
-  'diaria': Calendar,
-  'noite': Moon,
+  turno: Clock,
+  diaria: Calendar,
+  noite: Moon,
   '24h': Calendar,
-  'semanal': CalendarDays,
-  'semanal_noite': CalendarDays,
-  'mensal': CalendarDays,
-  'mensal_noite': CalendarDays,
+  semanal: CalendarDays,
+  semanal_noite: CalendarDays,
+  mensal: CalendarDays,
+  mensal_noite: CalendarDays,
 };
 
 interface ServiceSelectorProps {
@@ -66,7 +67,11 @@ interface ServiceSelectorProps {
   }) => void;
 }
 
-export function ServiceSelector({ caregiverPrices = [], defaultPrice = 50, onSelect }: ServiceSelectorProps) {
+export function ServiceSelector({
+  caregiverPrices = [],
+  defaultPrice = 50,
+  onSelect,
+}: ServiceSelectorProps) {
   const [services, setServices] = useState<ServiceType[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedService, setSelectedService] = useState<ServiceType | null>(null);
@@ -85,12 +90,45 @@ export function ServiceSelector({ caregiverPrices = [], defaultPrice = 50, onSel
         setLoading(false);
       }
     };
+
     fetchServices();
   }, []);
 
+  const availableCaregiverServices = useMemo(() => {
+    return caregiverPrices.filter((item) => item.isAvailable);
+  }, [caregiverPrices]);
+
+  const availableServiceKeys = useMemo(() => {
+    return availableCaregiverServices.map((item) => item.serviceKey);
+  }, [availableCaregiverServices]);
+
+  const filteredServices = useMemo(() => {
+    if (!services.length) return [];
+
+    // só mostra os serviços realmente habilitados pelo cuidador
+    return services.filter((service) => availableServiceKeys.includes(service.key));
+  }, [services, availableServiceKeys]);
+
   const getCaregiverPrice = (serviceKey: string) => {
-    const price = caregiverPrices?.find((p) => p.serviceKey === serviceKey);
-    return price?.isAvailable !== false ? price?.pricePerHour : null;
+    const found = caregiverPrices.find(
+      (item) => item.serviceKey === serviceKey && item.isAvailable,
+    );
+    return found?.pricePerHour ?? null;
+  };
+
+  const groupedServices = useMemo(() => {
+    return filteredServices.reduce((acc, service) => {
+      if (!acc[service.category]) acc[service.category] = [];
+      acc[service.category].push(service);
+      return acc;
+    }, {} as Record<string, ServiceType[]>);
+  }, [filteredServices]);
+
+  const categoryLabels: Record<string, { label: string; icon: any }> = {
+    idoso: { label: 'Cuidado de Idosos', icon: Heart },
+    pcd: { label: 'Cuidado para PcD', icon: Accessibility },
+    enfermagem: { label: 'Enfermagem', icon: Stethoscope },
+    acompanhamento: { label: 'Acompanhamento', icon: Car },
   };
 
   const handleSelectService = (service: ServiceType) => {
@@ -102,16 +140,22 @@ export function ServiceSelector({ caregiverPrices = [], defaultPrice = 50, onSel
   const handleSelectDuration = async (duration: any) => {
     if (!selectedService) return;
 
+    const caregiverPrice = getCaregiverPrice(selectedService.key);
+    if (!caregiverPrice) {
+      alert('Este cuidador não definiu preço para este serviço.');
+      return;
+    }
+
     setSelectedDuration(duration);
     setCalculating(true);
 
     try {
-      const pricePerHour = getCaregiverPrice(selectedService.key) || defaultPrice;
       const result = await api.calculateServicePrice(
         selectedService.key,
         duration.key,
-        pricePerHour,
+        caregiverPrice,
       );
+
       setCalculation(result);
 
       onSelect({
@@ -139,23 +183,25 @@ export function ServiceSelector({ caregiverPrices = [], defaultPrice = 50, onSel
     );
   }
 
-  // Agrupar por categoria
-  const grouped = services.reduce((acc, service) => {
-    if (!acc[service.category]) acc[service.category] = [];
-    acc[service.category].push(service);
-    return acc;
-  }, {} as Record<string, ServiceType[]>);
-
-  const categoryLabels: Record<string, { label: string; icon: any }> = {
-    idoso: { label: 'Cuidado de Idosos', icon: Heart },
-    pcd: { label: 'Cuidado para PcD', icon: Accessibility },
-    enfermagem: { label: 'Enfermagem', icon: Stethoscope },
-    acompanhamento: { label: 'Acompanhamento', icon: Car },
-  };
+  if (filteredServices.length === 0) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
+        <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-yellow-800">
+            Nenhum serviço configurado
+          </p>
+          <p className="text-sm text-yellow-700 mt-1">
+            Este cuidador ainda não configurou os serviços e preços disponíveis.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Step 1: Selecionar Serviço */}
+      {/* Step 1 */}
       <div>
         <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
           <span className="bg-primary-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold">
@@ -165,25 +211,27 @@ export function ServiceSelector({ caregiverPrices = [], defaultPrice = 50, onSel
         </h3>
 
         <div className="space-y-4">
-          {Object.entries(grouped).map(([category, categoryServices]) => {
+          {Object.entries(groupedServices).map(([category, categoryServices]) => {
             const catInfo = categoryLabels[category] || { label: category, icon: Heart };
             const CatIcon = catInfo.icon;
-            
+
             return (
               <div key={category}>
                 <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-1.5">
                   <CatIcon className="w-4 h-4" />
                   {catInfo.label}
                 </h4>
+
                 <div className="grid gap-2">
                   {categoryServices.map((service) => {
                     const Icon = SERVICE_ICONS[service.icon] || Heart;
-                    const price = getCaregiverPrice(service.key) || service.suggestedPrice;
+                    const price = getCaregiverPrice(service.key);
                     const isSelected = selectedService?.key === service.key;
 
                     return (
                       <button
                         key={service.key}
+                        type="button"
                         onClick={() => handleSelectService(service)}
                         className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
                           isSelected
@@ -203,19 +251,23 @@ export function ServiceSelector({ caregiverPrices = [], defaultPrice = 50, onSel
                               }`}
                             />
                           </div>
+
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2">
                               <h5 className="font-semibold text-gray-900 text-sm">
                                 {service.name}
                               </h5>
+
                               <span className="text-primary-600 font-bold text-sm flex-shrink-0">
-                                R$ {price}/h
+                                {price !== null ? `R$ ${price}/h` : 'Sem preço'}
                               </span>
                             </div>
+
                             <p className="text-gray-500 text-xs mt-1 line-clamp-2">
                               {service.description}
                             </p>
                           </div>
+
                           {isSelected && (
                             <Check className="w-5 h-5 text-primary-600 flex-shrink-0" />
                           )}
@@ -230,7 +282,7 @@ export function ServiceSelector({ caregiverPrices = [], defaultPrice = 50, onSel
         </div>
       </div>
 
-      {/* Step 2: Selecionar Duração */}
+      {/* Step 2 */}
       {selectedService && (
         <div className="animate-fade-in">
           <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -240,7 +292,6 @@ export function ServiceSelector({ caregiverPrices = [], defaultPrice = 50, onSel
             Duração do Atendimento
           </h3>
 
-          {/* Serviço selecionado */}
           <div className="bg-gray-50 rounded-xl p-4 mb-4">
             <div className="flex items-center gap-2 mb-2">
               <Tag className="w-4 h-4 text-primary-600" />
@@ -248,8 +299,8 @@ export function ServiceSelector({ caregiverPrices = [], defaultPrice = 50, onSel
                 {selectedService.name}
               </span>
             </div>
-            
-            {selectedService.includes.length > 0 && (
+
+            {selectedService.includes?.length > 0 && (
               <div className="mt-3">
                 <p className="text-xs font-medium text-gray-500 mb-2">O que está incluído:</p>
                 <div className="grid grid-cols-2 gap-1.5">
@@ -264,11 +315,10 @@ export function ServiceSelector({ caregiverPrices = [], defaultPrice = 50, onSel
             )}
           </div>
 
-          {/* Opções de duração */}
           <div className="grid gap-2">
             {selectedService.durations.map((duration: any) => {
-              const pricePerHour = getCaregiverPrice(selectedService.key) || defaultPrice;
-              const baseTotal = pricePerHour * duration.hours;
+              const caregiverPrice = getCaregiverPrice(selectedService.key) || defaultPrice;
+              const baseTotal = caregiverPrice * duration.hours;
               const discountAmount = baseTotal * (1 - duration.multiplier);
               const finalPrice = baseTotal - discountAmount;
               const discountPercent = Math.round((1 - duration.multiplier) * 100);
@@ -278,6 +328,7 @@ export function ServiceSelector({ caregiverPrices = [], defaultPrice = 50, onSel
               return (
                 <button
                   key={duration.key}
+                  type="button"
                   onClick={() => handleSelectDuration(duration)}
                   disabled={calculating}
                   className={`w-full p-4 rounded-xl border-2 text-left transition-all relative ${
@@ -286,7 +337,6 @@ export function ServiceSelector({ caregiverPrices = [], defaultPrice = 50, onSel
                       : 'border-gray-200 hover:border-gray-300 bg-white hover:shadow-sm'
                   } ${calculating ? 'opacity-50' : ''}`}
                 >
-                  {/* Badge de desconto */}
                   {discountPercent > 0 && (
                     <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-0.5">
                       <Percent className="w-3 h-3" />
@@ -316,6 +366,7 @@ export function ServiceSelector({ caregiverPrices = [], defaultPrice = 50, onSel
                           ({duration.hours}h)
                         </span>
                       </div>
+
                       {duration.description && (
                         <p className="text-xs text-gray-500 mt-0.5">
                           {duration.description}
@@ -345,7 +396,7 @@ export function ServiceSelector({ caregiverPrices = [], defaultPrice = 50, onSel
         </div>
       )}
 
-      {/* Step 3: Resumo */}
+      {/* Step 3 - resumo */}
       {calculation && (
         <div className="animate-fade-in bg-gradient-to-br from-primary-50 to-accent-50 rounded-xl p-5 border border-primary-200">
           <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -360,23 +411,24 @@ export function ServiceSelector({ caregiverPrices = [], defaultPrice = 50, onSel
               <span className="text-gray-600">Serviço</span>
               <span className="font-medium text-gray-900">{calculation.service.name}</span>
             </div>
+
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Duração</span>
-              <span className="font-medium text-gray-900">
-                {calculation.duration.label}
-              </span>
+              <span className="font-medium text-gray-900">{calculation.duration.label}</span>
             </div>
+
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Horas totais</span>
               <span className="font-medium text-gray-900">{calculation.hours}h</span>
             </div>
+
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Valor/hora</span>
+              <span className="text-gray-600">Valor/hora do cuidador</span>
               <span className="font-medium text-gray-900">
                 R$ {calculation.pricePerHour.toFixed(2)}
               </span>
             </div>
-            
+
             {calculation.discount > 0 && (
               <>
                 <div className="flex justify-between text-sm">
@@ -385,10 +437,11 @@ export function ServiceSelector({ caregiverPrices = [], defaultPrice = 50, onSel
                     R$ {calculation.baseTotal.toFixed(2)}
                   </span>
                 </div>
+
                 <div className="flex justify-between text-sm text-green-600">
                   <span className="flex items-center gap-1">
                     <Percent className="w-3 h-3" />
-                    Desconto ({calculation.discountPercent}%)
+                    Desconto
                   </span>
                   <span className="font-medium">- R$ {calculation.discount.toFixed(2)}</span>
                 </div>
@@ -402,11 +455,6 @@ export function ServiceSelector({ caregiverPrices = [], defaultPrice = 50, onSel
                   R$ {calculation.totalAmount.toFixed(2)}
                 </span>
               </div>
-              {calculation.discount > 0 && (
-                <p className="text-xs text-green-600 text-right mt-1">
-                  Você economiza R$ {calculation.discount.toFixed(2)}
-                </p>
-              )}
             </div>
           </div>
         </div>

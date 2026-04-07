@@ -11,6 +11,7 @@ import { EmailModule } from './email/email.module';
 import { ServicesModule } from './services/services-module'; // NOVO
 import { BookingsService } from './bookings/bookings.service';
 import { PaymentsService } from './payments/payments.service';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -25,7 +26,8 @@ import { PaymentsService } from './payments/payments.service';
     BookingsModule,
     ReviewsModule,
     PaymentsModule,
-    ServicesModule, // NOVO
+    ServicesModule,
+    CloudinaryModule,
   ],
 })
 export class AppModule implements OnModuleInit {

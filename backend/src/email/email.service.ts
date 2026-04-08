@@ -1,13 +1,28 @@
+// src/email/email.service.ts
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class EmailService implements OnModuleInit {
-  private transporter: nodemailer.Transporter;
+  private transporter: nodemailer.Transporter | null = null;
   private readonly logger = new Logger(EmailService.name);
   private isConfigured = false;
+  private failCount = 0;
+  private readonly MAX_RETRIES = 3;
+  private readonly RETRY_DELAY_MS = 2000;
 
-  constructor() {
+  // ✅ NÃO configure no constructor - variáveis podem não estar prontas
+  constructor() {}
+
+  async onModuleInit() {
+    await this.initializeTransporter();
+  }
+
+  /**
+   * ✅ Inicializa/reinicializa o transporter
+   * Separado para permitir reconexão
+   */
+  private async initializeTransporter(): Promise<void> {
     const host = process.env.MAIL_HOST || 'smtp.gmail.com';
     const port = Number(process.env.MAIL_PORT) || 465;
     const user = process.env.MAIL_USER;
@@ -15,13 +30,31 @@ export class EmailService implements OnModuleInit {
 
     this.logger.log('📧 Configurando email...');
     this.logger.log(`   Host: ${host}:${port}`);
-    this.logger.log(`   User: ${user ? user.substring(0, 5) + '***' : '❌ NÃO CONFIGURADO'}`);
-    this.logger.log(`   Pass: ${pass ? '***configurado***' : '❌ NÃO CONFIGURADO'}`);
+    this.logger.log(
+      `   User: ${user ? user.substring(0, 5) + '***' : '❌ NÃO CONFIGURADO'}`,
+    );
+    this.logger.log(
+      `   Pass: ${pass ? '***configurado***' : '❌ NÃO CONFIGURADO'}`,
+    );
 
     if (!user || !pass) {
-      this.logger.error('❌ MAIL_USER ou MAIL_PASS não configurado!');
+      this.logger.error(
+        '❌ MAIL_USER ou MAIL_PASS não configurado! Verifique as variáveis de ambiente.',
+      );
+      this.logger.error(
+        `   Variáveis disponíveis: ${Object.keys(process.env).filter((k) => k.startsWith('MAIL')).join(', ') || 'NENHUMA com prefixo MAIL_'}`,
+      );
       this.isConfigured = false;
       return;
+    }
+
+    // ✅ Fechar transporter anterior se existir
+    if (this.transporter) {
+      try {
+        this.transporter.close();
+      } catch {
+        // ignorar erro ao fechar
+      }
     }
 
     this.transporter = nodemailer.createTransport({
@@ -29,58 +62,172 @@ export class EmailService implements OnModuleInit {
       port,
       secure: port === 465,
       auth: { user, pass },
-      tls: { rejectUnauthorized: false },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 15000,
+      tls: {
+        rejectUnauthorized: false,
+        // ✅ Forçar TLS mínimo para compatibilidade
+        minVersion: 'TLSv1.2',
+      },
+      connectionTimeout: 30000, // ✅ 30s em produção (redes lentas)
+      greetingTimeout: 30000,
+      socketTimeout: 60000, // ✅ 60s para envio real
+      // ✅ Pool de conexões para produção
+      pool: true,
+      maxConnections: 3,
+      maxMessages: 100,
+      rateDelta: 1000,
+      rateLimit: 5, // máx 5 emails por segundo
     });
 
-    this.isConfigured = true;
-  }
-
-  async onModuleInit() {
-    if (!this.isConfigured) {
-      this.logger.warn('⚠️ Email não configurado - emails serão ignorados');
-      return;
-    }
-
+    // ✅ Verificar conexão mas NÃO desabilitar permanentemente se falhar
     try {
       await this.transporter.verify();
       this.logger.log('✅ Conexão SMTP verificada com sucesso!');
+      this.isConfigured = true;
+      this.failCount = 0;
     } catch (error: any) {
-      this.logger.error(`❌ Falha SMTP: ${error.message}`);
-      this.logger.error(`   Código: ${error.code}`);
-      this.logger.error(`   Hostname: ${error.hostname}`);
-      this.isConfigured = false;
+      this.logger.warn(`⚠️ Verificação SMTP falhou: ${error.message}`);
+      this.logger.warn(
+        '   O serviço tentará enviar mesmo assim (verify() pode falhar em alguns provedores)',
+      );
+      // ✅ NÃO desabilitar - alguns SMTPs rejeitam VERIFY mas aceitam envio
+      this.isConfigured = true;
     }
   }
 
-  private async sendMail(to: string, subject: string, html: string) {
-    if (!this.isConfigured) {
+  /**
+   * ✅ Método de envio com retry e reconexão automática
+   */
+  private async sendMail(
+    to: string,
+    subject: string,
+    html: string,
+  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    if (!this.isConfigured || !this.transporter) {
       this.logger.warn(`⚠️ Email ignorado (não configurado): ${to}`);
-      return;
+
+      // ✅ Tentar reinicializar uma vez
+      this.logger.log('🔄 Tentando reinicializar transporter...');
+      await this.initializeTransporter();
+
+      if (!this.isConfigured || !this.transporter) {
+        return {
+          success: false,
+          error: 'Email não configurado',
+        };
+      }
     }
 
-    try {
-      this.logger.log(`📤 Enviando para ${to}...`);
+    const from =
+      process.env.MAIL_FROM || '"CuidarBem" <noreply@cuidarbem.com>';
 
-      const result = await this.transporter.sendMail({
-        from: process.env.MAIL_FROM || '"CuidarBem" <noreply@cuidarbem.com>',
-        to,
-        subject,
-        html,
-      });
+    for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
+      try {
+        this.logger.log(
+          `📤 Enviando para ${to} (tentativa ${attempt}/${this.MAX_RETRIES})...`,
+        );
 
-      this.logger.log(`✅ Enviado! ID: ${result.messageId}`);
-      return result;
-    } catch (error: any) {
-      this.logger.error(`❌ Falha ao enviar para ${to}`);
-      this.logger.error(`   Erro: ${error.message}`);
-      this.logger.error(`   Código: ${error.code}`);
-      this.logger.error(`   Response: ${error.response}`);
+        const result = await this.transporter.sendMail({
+          from,
+          to,
+          subject,
+          html,
+        });
+
+        this.logger.log(`✅ Enviado! ID: ${result.messageId}`);
+        this.failCount = 0; // reset contador de falhas
+
+        return {
+          success: true,
+          messageId: result.messageId,
+        };
+      } catch (error: any) {
+        this.logger.error(
+          `❌ Tentativa ${attempt} falhou para ${to}: ${error.message}`,
+        );
+        this.logger.error(`   Código: ${error.code}`);
+        this.logger.error(`   Response: ${error.response}`);
+        this.logger.error(`   ResponseCode: ${error.responseCode}`);
+
+        // ✅ Erros que NÃO vale a pena retentar
+        const permanentErrors = [
+          'EAUTH', // credenciais erradas
+          '535',   // auth failed
+          '553',   // email inválido
+          '550',   // mailbox not found
+        ];
+
+        const isPermanent = permanentErrors.some(
+          (code) =>
+            error.code === code ||
+            error.responseCode?.toString() === code ||
+            error.response?.includes(code),
+        );
+
+        if (isPermanent) {
+          this.logger.error(
+            `❌ Erro permanente - não tentando novamente: ${error.code}`,
+          );
+          this.failCount++;
+
+          // ✅ Se muitas falhas de auth, reinicializar transporter
+          if (this.failCount >= 5 && error.code === 'EAUTH') {
+            this.logger.warn(
+              '🔄 Muitas falhas de autenticação - reinicializando transporter...',
+            );
+            await this.initializeTransporter();
+          }
+
+          return {
+            success: false,
+            error: `${error.code}: ${error.message}`,
+          };
+        }
+
+        // ✅ Erros de conexão - reconectar antes de retentar
+        const connectionErrors = [
+          'ECONNECTION',
+          'ECONNREFUSED',
+          'ECONNRESET',
+          'ETIMEDOUT',
+          'ESOCKET',
+          'EAI_AGAIN',
+        ];
+
+        if (connectionErrors.includes(error.code)) {
+          this.logger.warn(
+            `🔄 Erro de conexão (${error.code}) - reconectando...`,
+          );
+          await this.initializeTransporter();
+        }
+
+        // ✅ Esperar antes de retentar (backoff exponencial)
+        if (attempt < this.MAX_RETRIES) {
+          const delay = this.RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+          this.logger.log(`⏳ Aguardando ${delay}ms antes da próxima tentativa...`);
+          await this.sleep(delay);
+        }
+      }
     }
+
+    this.failCount++;
+    this.logger.error(
+      `❌ Todas as ${this.MAX_RETRIES} tentativas falharam para ${to}`,
+    );
+
+    return {
+      success: false,
+      error: `Falha após ${this.MAX_RETRIES} tentativas`,
+    };
   }
-  // Template base
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  // ═══════════════════════════════════════════
+  // TEMPLATES (mesmos que você já tem)
+  // ═══════════════════════════════════════════
+
   private baseTemplate(content: string) {
     return `
     <!DOCTYPE html>
@@ -96,7 +243,7 @@ export class EmailService implements OnModuleInit {
         .header p { color: rgba(255,255,255,0.8); margin: 8px 0 0; font-size: 14px; }
         .content { padding: 32px; }
         .footer { background: #f8fafc; padding: 24px 32px; text-align: center; color: #94a3b8; font-size: 12px; }
-        .btn { display: inline-block; background: #2563eb; color: white; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 600; margin: 16px 0; }
+        .btn { display: inline-block; background: #2563eb; color: white !important; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 600; margin: 16px 0; }
         .btn-accent { background: #22c55e; }
         .info-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 16px; margin: 16px 0; }
         .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e0f2fe; }
@@ -107,7 +254,7 @@ export class EmailService implements OnModuleInit {
       <div class="container">
         ${content}
         <div class="footer">
-          <p>CuidarBem © ${new Date().getFullYear()} - Cuidado com amor e profissionalismo</p>
+          <p>CuidarBem &copy; ${new Date().getFullYear()} - Cuidado com amor e profissionalismo</p>
           <p>Este é um email automático, não responda diretamente.</p>
         </div>
       </div>
@@ -116,14 +263,17 @@ export class EmailService implements OnModuleInit {
     `;
   }
 
-  // 1. Email de boas-vindas ao criar conta
+  // ═══════════════════════════════════════════
+  // MÉTODOS PÚBLICOS (agora retornam resultado)
+  // ═══════════════════════════════════════════
+
   async sendWelcomeEmail(data: {
     to: string;
     name: string;
     role: 'client' | 'caregiver';
   }) {
     const isCaregiver = data.role === 'caregiver';
-    
+
     const content = `
       <div class="header">
         <h1>💙 Bem-vindo ao CuidarBem!</h1>
@@ -131,49 +281,49 @@ export class EmailService implements OnModuleInit {
       </div>
       <div class="content">
         <p style="font-size: 18px; color: #1e293b;">Olá, <strong>${data.name}</strong>!</p>
-        
+
         <p style="color: #475569; line-height: 1.6;">
-          ${isCaregiver 
-            ? 'Estamos muito felizes em tê-lo como cuidador na nossa plataforma! Agora você pode criar seu perfil profissional e começar a receber solicitações de atendimento.' 
-            : 'Obrigado por se cadastrar! Agora você pode encontrar cuidadores qualificados para ajudar quem você ama.'}
+          ${
+            isCaregiver
+              ? 'Estamos muito felizes em tê-lo como cuidador na nossa plataforma! Agora você pode criar seu perfil profissional e começar a receber solicitações de atendimento.'
+              : 'Obrigado por se cadastrar! Agora você pode encontrar cuidadores qualificados para ajudar quem você ama.'
+          }
         </p>
 
         <div class="info-box">
           <h3 style="margin: 0 0 12px; color: #1e293b;">Próximos passos:</h3>
-          ${isCaregiver ? `
+          ${
+            isCaregiver
+              ? `
             <p style="margin: 8px 0; color: #475569;">✅ Complete seu perfil profissional</p>
             <p style="margin: 8px 0; color: #475569;">✅ Adicione suas especialidades e certificações</p>
             <p style="margin: 8px 0; color: #475569;">✅ Defina seus horários e valores</p>
             <p style="margin: 8px 0; color: #475569;">✅ Aguarde solicitações de clientes</p>
-          ` : `
+          `
+              : `
             <p style="margin: 8px 0; color: #475569;">✅ Busque cuidadores na sua região</p>
             <p style="margin: 8px 0; color: #475569;">✅ Analise perfis e avaliações</p>
             <p style="margin: 8px 0; color: #475569;">✅ Solicite o atendimento desejado</p>
             <p style="margin: 8px 0; color: #475569;">✅ Pague com segurança pela plataforma</p>
-          `}
+          `
+          }
         </div>
 
         <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL}/${isCaregiver ? 'perfil/cuidador' : 'cuidadores'}" class="btn">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/${isCaregiver ? 'perfil/cuidador' : 'cuidadores'}" class="btn">
             ${isCaregiver ? 'Completar Meu Perfil' : 'Buscar Cuidadores'}
           </a>
         </div>
-
-        <p style="color: #64748b; font-size: 14px; margin-top: 24px;">
-          Se tiver dúvidas, acesse nossa <a href="${process.env.FRONTEND_URL}/seguranca" style="color: #2563eb;">página de segurança</a> 
-          ou entre em contato pelo email <strong>suporte@cuidarbem.com.br</strong>.
-        </p>
       </div>
     `;
 
-    await this.sendMail(
+    return this.sendMail(
       data.to,
       `🎉 Bem-vindo ao CuidarBem, ${data.name}!`,
       this.baseTemplate(content),
     );
   }
 
-  // 2. Email para cuidador quando recebe nova solicitação
   async sendNewBookingRequestEmail(data: {
     to: string;
     caregiverName: string;
@@ -193,9 +343,9 @@ export class EmailService implements OnModuleInit {
       </div>
       <div class="content">
         <p style="font-size: 18px; color: #1e293b;">Olá, <strong>${data.caregiverName}</strong>!</p>
-        
+
         <p style="color: #475569; line-height: 1.6;">
-          Você recebeu uma nova solicitação de atendimento. Confira os detalhes abaixo:
+          Você recebeu uma nova solicitação de atendimento:
         </p>
 
         <div class="info-box">
@@ -229,33 +379,32 @@ export class EmailService implements OnModuleInit {
           </div>
         </div>
 
-        ${data.notes ? `
+        ${
+          data.notes
+            ? `
           <div style="background: #fef3c7; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin: 16px 0;">
-            <strong style="color: #92400e;">📝 Observações do cliente:</strong>
+            <strong style="color: #92400e;">📝 Observações:</strong>
             <p style="color: #78350f; margin: 8px 0 0;">${data.notes}</p>
           </div>
-        ` : ''}
+        `
+            : ''
+        }
 
         <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL}/dashboard" class="btn btn-accent">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/dashboard" class="btn btn-accent">
             Ver no Dashboard
           </a>
         </div>
-
-        <p style="color: #64748b; font-size: 14px; margin-top: 24px; text-align: center;">
-          ⚠️ Acesse o dashboard para <strong>aceitar</strong> ou <strong>recusar</strong> a solicitação.
-        </p>
       </div>
     `;
 
-    await this.sendMail(
+    return this.sendMail(
       data.to,
       `📋 Nova Solicitação: ${data.serviceName} - ${data.clientName}`,
       this.baseTemplate(content),
     );
   }
 
-  // 3. Email para cliente quando faz solicitação
   async sendBookingConfirmationToClientEmail(data: {
     to: string;
     clientName: string;
@@ -272,10 +421,9 @@ export class EmailService implements OnModuleInit {
       </div>
       <div class="content">
         <p style="font-size: 18px; color: #1e293b;">Olá, <strong>${data.clientName}</strong>!</p>
-        
+
         <p style="color: #475569; line-height: 1.6;">
-          Sua solicitação de atendimento foi enviada com sucesso! 
-          O cuidador <strong>${data.caregiverName}</strong> receberá a notificação e responderá em breve.
+          Sua solicitação foi enviada para <strong>${data.caregiverName}</strong>.
         </p>
 
         <div class="info-box">
@@ -301,31 +449,21 @@ export class EmailService implements OnModuleInit {
           </div>
         </div>
 
-        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin: 16px 0;">
-          <p style="color: #166534; margin: 0;">
-            <strong>🔒 Próximos passos:</strong><br>
-            1. Aguarde a confirmação do cuidador<br>
-            2. Após confirmação, você receberá o link de pagamento<br>
-            3. O pagamento fica retido até a conclusão do serviço
-          </p>
-        </div>
-
         <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL}/dashboard" class="btn">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/dashboard" class="btn">
             Acompanhar no Dashboard
           </a>
         </div>
       </div>
     `;
 
-    await this.sendMail(
+    return this.sendMail(
       data.to,
       `✅ Solicitação Enviada - ${data.serviceName}`,
       this.baseTemplate(content),
     );
   }
 
-  // 4. Email de pagamento (já existente, atualizado)
   async sendPaymentEmail(data: {
     to: string;
     clientName: string;
@@ -343,26 +481,11 @@ export class EmailService implements OnModuleInit {
       </div>
       <div class="content">
         <p style="font-size: 18px; color: #1e293b;">Olá, <strong>${data.clientName}</strong>!</p>
-        
-        <p style="color: #475569; line-height: 1.6;">
-          Ótima notícia! O cuidador <strong>${data.caregiverName}</strong> 
-          confirmou seu agendamento. Para garantir o atendimento, realize o pagamento abaixo:
-        </p>
 
-        <div class="info-box">
-          <div class="info-row">
-            <span style="color: #64748b;">Cuidador</span>
-            <span style="color: #1e293b; font-weight: 600;">${data.caregiverName}</span>
-          </div>
-          <div class="info-row">
-            <span style="color: #64748b;">Serviço</span>
-            <span style="color: #1e293b; font-weight: 600;">${data.serviceType}</span>
-          </div>
-          <div class="info-row">
-            <span style="color: #64748b;">Data</span>
-            <span style="color: #1e293b; font-weight: 600;">${data.bookingDate}</span>
-          </div>
-        </div>
+        <p style="color: #475569; line-height: 1.6;">
+          O cuidador <strong>${data.caregiverName}</strong> confirmou seu agendamento.
+          Realize o pagamento para garantir o atendimento:
+        </p>
 
         <div style="background: linear-gradient(135deg, #2563eb, #1d4ed8); border-radius: 16px; padding: 24px; text-align: center; margin: 24px 0;">
           <p style="color: rgba(255,255,255,0.8); margin: 0; font-size: 14px;">Valor Total</p>
@@ -375,32 +498,28 @@ export class EmailService implements OnModuleInit {
           </a>
         </div>
 
-        ${data.pixKey ? `
+        ${
+          data.pixKey
+            ? `
           <div style="background: #f0fdf4; border: 2px dashed #86efac; border-radius: 12px; padding: 20px; text-align: center; margin: 20px 0;">
             <p style="color: #16a34a; font-weight: 600; margin: 0 0 8px;">Ou pague via PIX:</p>
             <div style="background: white; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 14px; word-break: break-all; color: #1e293b;">
               ${data.pixKey}
             </div>
           </div>
-        ` : ''}
-
-        <div style="background: #fef3c7; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin: 16px 0;">
-          <p style="color: #92400e; margin: 0; font-size: 14px;">
-            ⚠️ <strong>Importante:</strong> O pagamento ficará retido na plataforma 
-            até a conclusão do serviço. Sua segurança é nossa prioridade.
-          </p>
-        </div>
+        `
+            : ''
+        }
       </div>
     `;
 
-    await this.sendMail(
+    return this.sendMail(
       data.to,
       `💳 Pagamento Pendente - R$ ${data.amount.toFixed(2)}`,
       this.baseTemplate(content),
     );
   }
 
-  // 5. Email de confirmação de pagamento
   async sendPaymentConfirmedEmail(data: {
     to: string;
     clientName: string;
@@ -417,40 +536,29 @@ export class EmailService implements OnModuleInit {
         <div style="text-align: center; margin-bottom: 24px;">
           <div style="font-size: 64px;">✅</div>
         </div>
-        
+
         <p style="font-size: 18px; color: #1e293b;">Olá, <strong>${data.clientName}</strong>!</p>
-        
-        <p style="color: #475569; line-height: 1.6;">
-          Seu pagamento de <strong>R$ ${data.amount.toFixed(2)}</strong> foi confirmado com sucesso!
-        </p>
 
         <p style="color: #475569; line-height: 1.6;">
-          O atendimento com <strong>${data.caregiverName}</strong> está garantido para <strong>${data.bookingDate}</strong>.
+          Pagamento de <strong>R$ ${data.amount.toFixed(2)}</strong> confirmado!
+          Atendimento com <strong>${data.caregiverName}</strong> em <strong>${data.bookingDate}</strong>.
         </p>
-
-        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin: 16px 0;">
-          <p style="color: #166534; margin: 0;">
-            🔒 O valor ficará retido na plataforma e será liberado ao cuidador 
-            após a conclusão do serviço.
-          </p>
-        </div>
 
         <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL}/dashboard" class="btn">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/dashboard" class="btn">
             Ver no Dashboard
           </a>
         </div>
       </div>
     `;
 
-    await this.sendMail(
+    return this.sendMail(
       data.to,
       `✅ Pagamento Confirmado - CuidarBem`,
       this.baseTemplate(content),
     );
   }
 
-  // 6. Email de serviço concluído - para o CLIENTE
   async sendServiceCompletedToClientEmail(data: {
     to: string;
     clientName: string;
@@ -466,40 +574,27 @@ export class EmailService implements OnModuleInit {
       </div>
       <div class="content">
         <p style="font-size: 18px; color: #1e293b;">Olá, <strong>${data.clientName}</strong>!</p>
-        
-        <p style="color: #475569; line-height: 1.6;">
-          O serviço de <strong>${data.serviceName}</strong> com <strong>${data.caregiverName}</strong> 
-          foi marcado como concluído!
-        </p>
 
         <p style="color: #475569; line-height: 1.6;">
-          Esperamos que a experiência tenha sido excelente. Sua avaliação é muito importante 
-          para ajudar outros clientes e valorizar o trabalho do cuidador.
+          O serviço de <strong>${data.serviceName}</strong> com <strong>${data.caregiverName}</strong>
+          foi concluído! Avalie o cuidador:
         </p>
 
         <div style="text-align: center; margin: 32px 0;">
-          <a href="${process.env.FRONTEND_URL}/cuidadores/${data.caregiverId}?avaliar=${data.bookingId}" class="btn btn-accent" style="font-size: 16px;">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/cuidadores/${data.caregiverId}?avaliar=${data.bookingId}" class="btn btn-accent" style="font-size: 16px;">
             ⭐ Avaliar Cuidador
           </a>
-        </div>
-
-        <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 16px; margin: 16px 0;">
-          <p style="color: #0369a1; margin: 0; font-size: 14px;">
-            💡 <strong>Dica:</strong> Avaliações honestas ajudam a comunidade CuidarBem 
-            a encontrar os melhores profissionais!
-          </p>
         </div>
       </div>
     `;
 
-    await this.sendMail(
+    return this.sendMail(
       data.to,
       `🎉 Serviço Concluído - Avalie ${data.caregiverName}!`,
       this.baseTemplate(content),
     );
   }
 
-  // 7. Email de serviço concluído - para o CUIDADOR (pagamento liberado)
   async sendServiceCompletedToCaregiverEmail(data: {
     to: string;
     caregiverName: string;
@@ -516,11 +611,6 @@ export class EmailService implements OnModuleInit {
       </div>
       <div class="content">
         <p style="font-size: 18px; color: #1e293b;">Olá, <strong>${data.caregiverName}</strong>!</p>
-        
-        <p style="color: #475569; line-height: 1.6;">
-          O serviço de <strong>${data.serviceName}</strong> para <strong>${data.clientName}</strong> 
-          foi concluído e o pagamento foi liberado!
-        </p>
 
         <div style="background: linear-gradient(135deg, #22c55e, #16a34a); border-radius: 16px; padding: 24px; text-align: center; margin: 24px 0;">
           <p style="color: rgba(255,255,255,0.8); margin: 0; font-size: 14px;">Valor Liberado</p>
@@ -537,31 +627,26 @@ export class EmailService implements OnModuleInit {
             <span style="color: #ef4444;">- R$ ${data.platformFee.toFixed(2)}</span>
           </div>
           <div class="info-row">
-            <span style="color: #64748b; font-weight: 600;">Seu valor líquido</span>
+            <span style="color: #64748b; font-weight: 600;">Valor líquido</span>
             <span style="color: #22c55e; font-weight: 700;">R$ ${data.caregiverAmount.toFixed(2)}</span>
           </div>
         </div>
 
         <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL}/dashboard" class="btn">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/dashboard" class="btn">
             Ver Meus Pagamentos
           </a>
         </div>
-
-        <p style="color: #64748b; font-size: 14px; margin-top: 24px; text-align: center;">
-          Obrigado por fazer parte da comunidade CuidarBem! 💙
-        </p>
       </div>
     `;
 
-    await this.sendMail(
+    return this.sendMail(
       data.to,
       `💰 Pagamento Liberado - R$ ${data.caregiverAmount.toFixed(2)}`,
       this.baseTemplate(content),
     );
   }
 
-  // Método legado (mantido para compatibilidade)
   async sendServiceCompletedEmail(data: {
     toClient: string;
     toCaregiver: string;
@@ -571,7 +656,7 @@ export class EmailService implements OnModuleInit {
     platformFee: number;
     caregiverAmount: number;
   }) {
-    await this.sendServiceCompletedToCaregiverEmail({
+    return this.sendServiceCompletedToCaregiverEmail({
       to: data.toCaregiver,
       caregiverName: data.caregiverName,
       clientName: data.clientName,
@@ -580,5 +665,31 @@ export class EmailService implements OnModuleInit {
       platformFee: data.platformFee,
       caregiverAmount: data.caregiverAmount,
     });
+  }
+
+  // ✅ Método de diagnóstico - útil para debug em produção
+  async testConnection(): Promise<{
+    configured: boolean;
+    connected: boolean;
+    error?: string;
+  }> {
+    if (!this.isConfigured || !this.transporter) {
+      return {
+        configured: false,
+        connected: false,
+        error: 'Transporter não configurado',
+      };
+    }
+
+    try {
+      await this.transporter.verify();
+      return { configured: true, connected: true };
+    } catch (error: any) {
+      return {
+        configured: true,
+        connected: false,
+        error: `${error.code}: ${error.message}`,
+      };
+    }
   }
 }

@@ -150,7 +150,7 @@ export default function TermsPage() {
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-primary-600 mt-1">•</span>
-                    <span>Cancelamentos após pagamento: reembolso integral em até 5 dias úteis.</span>
+                    <span>Cancelamentos após pagamento: reembolso integral em até 5 dias úteis, quando aplicável.</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-primary-600 mt-1">•</span>

@@ -168,17 +168,17 @@ export class PaymentsService {
         payment.mpStatus = mpPayment.status;
 
         if (mpPayment.status === 'approved') {
-          payment.status = 'held';
-          payment.paidAt = new Date();
-          payment.history.push({
-            status: 'held',
-            date: new Date(),
-            description: 'Pagamento aprovado - valor retido na plataforma',
-          });
-
           const booking = await this.bookingsService.findOne(
             payment.bookingId.toString(),
           );
+
+          payment.status = 'held';
+          payment.paidAt = new Date();
+          payment.history.push({
+            status: payment.status,
+            date: new Date(),
+            description: 'Pagamento aprovado - valor retido na plataforma',
+          });
 
           const clientUser = booking?.clientId as any;
           const caregiver = booking?.caregiverId as any;
@@ -298,19 +298,20 @@ export class PaymentsService {
     const payment = await this.paymentModel.findOne({ bookingId });
     if (!payment) throw new NotFoundException('Pagamento não encontrado');
 
+    const booking = await this.bookingsService.findOne(bookingId);
+
     payment.status = 'held';
     payment.paidAt = new Date();
     payment.mpStatus = 'approved';
     payment.mpPaymentId = `SIM-${Date.now()}`;
     payment.history.push({
-      status: 'held',
+      status: payment.status,
       date: new Date(),
       description: '(Simulado) Pagamento aprovado e retido',
     });
 
     await payment.save();
 
-    const booking = await this.bookingsService.findOne(bookingId);
     const clientUser = booking?.clientId as any;
     const caregiver = booking?.caregiverId as any;
 

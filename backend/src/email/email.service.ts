@@ -305,8 +305,8 @@ export class EmailService implements OnModuleInit {
           <p style="color: #166534; margin: 0;">
             <strong>🔒 Próximos passos:</strong><br>
             1. Aguarde a confirmação do cuidador<br>
-            2. Após confirmação, você receberá o link de pagamento<br>
-            3. O pagamento fica retido até a conclusão do serviço
+            2. Após a confirmação, o atendimento seguirá normalmente, sem cobrança neste momento<br>
+            3. O pagamento será solicitado por email somente após o término do serviço
           </p>
         </div>
 
@@ -342,14 +342,14 @@ export class EmailService implements OnModuleInit {
     const content = `
       <div class="header" style="background: linear-gradient(135deg, #2563eb, #1d4ed8);">
         <h1>💳 Pagamento Pendente</h1>
-        <p>Seu agendamento foi confirmado!</p>
+        <p>Seu serviço foi finalizado</p>
       </div>
       <div class="content">
         <p style="font-size: 18px; color: #1e293b;">Olá, <strong>${data.clientName}</strong>!</p>
         
         <p style="color: #475569; line-height: 1.6;">
-          Ótima notícia! O cuidador <strong>${data.caregiverName}</strong> 
-          confirmou seu agendamento. Para garantir o atendimento, realize o pagamento:
+          O atendimento com <strong>${data.caregiverName}</strong> foi concluído.
+          Como o pagamento é feito somente após o término do serviço, agora falta apenas quitar este atendimento na plataforma:
         </p>
 
         <div class="info-box">
@@ -389,9 +389,15 @@ export class EmailService implements OnModuleInit {
 
         <div style="background: #fef3c7; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin: 16px 0;">
           <p style="color: #92400e; margin: 0; font-size: 14px;">
-            ⚠️ <strong>Importante:</strong> O pagamento ficará retido na plataforma 
-            até a conclusão do serviço. Sua segurança é nossa prioridade.
+            ⚠️ <strong>Importante:</strong> Assim que o pagamento for aprovado,
+            a plataforma registra a quitação do serviço concluído e processa o repasse ao cuidador.
           </p>
+        </div>
+
+        <div style="text-align: center;">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/dashboard" class="btn">
+            Acompanhar no Dashboard
+          </a>
         </div>
       </div>
     `;
@@ -417,7 +423,7 @@ export class EmailService implements OnModuleInit {
     const content = `
       <div class="header" style="background: linear-gradient(135deg, #22c55e, #16a34a);">
         <h1>✅ Pagamento Confirmado!</h1>
-        <p>Seu atendimento está garantido</p>
+        <p>Pagamento do serviço concluído com sucesso</p>
       </div>
       <div class="content">
         <div style="text-align: center; margin-bottom: 24px;">
@@ -427,14 +433,13 @@ export class EmailService implements OnModuleInit {
         <p style="font-size: 18px; color: #1e293b;">Olá, <strong>${data.clientName}</strong>!</p>
         
         <p style="color: #475569; line-height: 1.6;">
-          Seu pagamento de <strong>R$ ${data.amount.toFixed(2)}</strong> foi confirmado com sucesso!
-          O atendimento com <strong>${data.caregiverName}</strong> está garantido para <strong>${data.bookingDate}</strong>.
+          Seu pagamento de <strong>R$ ${data.amount.toFixed(2)}</strong> foi confirmado com sucesso.
+          Este pagamento se refere ao atendimento já concluído com <strong>${data.caregiverName}</strong>, realizado em <strong>${data.bookingDate}</strong>.
         </p>
 
         <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin: 16px 0;">
           <p style="color: #166534; margin: 0;">
-            🔒 O valor ficará retido na plataforma e será liberado ao cuidador 
-            após a conclusão do serviço.
+            ✅ O pagamento foi aprovado e o serviço foi quitado com sucesso na plataforma.
           </p>
         </div>
 
@@ -453,6 +458,69 @@ export class EmailService implements OnModuleInit {
     );
   }
 
+  async sendBookingApprovedEmail(data: {
+    to: string;
+    clientName: string;
+    caregiverName: string;
+    serviceName: string;
+    bookingDate: string;
+    amount: number;
+  }) {
+    const content = `
+      <div class="header">
+        <h1>✅ Agendamento Confirmado!</h1>
+        <p>Seu cuidador confirmou o atendimento</p>
+      </div>
+      <div class="content">
+        <p style="font-size: 18px; color: #1e293b;">Olá, <strong>${data.clientName}</strong>!</p>
+        
+        <p style="color: #475569; line-height: 1.6;">
+          O cuidador <strong>${data.caregiverName}</strong> confirmou seu atendimento de
+          <strong> ${data.serviceName}</strong> para <strong>${data.bookingDate}</strong>.
+        </p>
+
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin: 16px 0;">
+          <p style="color: #166534; margin: 0;">
+            ✅ O agendamento está confirmado.<br>
+            💡 Não é necessário realizar pagamento agora.<br>
+            📩 O link de pagamento será enviado por email somente após o término do serviço.
+          </p>
+        </div>
+
+        <div class="info-box">
+          <div class="info-row">
+            <span style="color: #64748b;">Cuidador</span>
+            <span style="color: #1e293b; font-weight: 600;">${data.caregiverName}</span>
+          </div>
+          <div class="info-row">
+            <span style="color: #64748b;">Serviço</span>
+            <span style="color: #1e293b; font-weight: 600;">${data.serviceName}</span>
+          </div>
+          <div class="info-row">
+            <span style="color: #64748b;">Data</span>
+            <span style="color: #1e293b; font-weight: 600;">${data.bookingDate}</span>
+          </div>
+          <div class="info-row">
+            <span style="color: #64748b;">Valor</span>
+            <span style="color: #2563eb; font-weight: 700;">R$ ${data.amount.toFixed(2)}</span>
+          </div>
+        </div>
+
+        <div style="text-align: center;">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/dashboard" class="btn">
+            Ver no Dashboard
+          </a>
+        </div>
+      </div>
+    `;
+
+    return this.sendMail(
+      data.to,
+      `✅ Agendamento Confirmado - ${data.serviceName}`,
+      this.baseTemplate(content),
+    );
+  }
+
   // ═══════════════════════════════════════════
   // 6. SERVIÇO CONCLUÍDO (CLIENTE)
   // ═══════════════════════════════════════════
@@ -464,6 +532,7 @@ export class EmailService implements OnModuleInit {
     serviceName: string;
     caregiverId: string;
     bookingId: string;
+    paymentCreated?: boolean;
   }) {
     const content = `
       <div class="header" style="background: linear-gradient(135deg, #22c55e, #16a34a);">
@@ -477,6 +546,14 @@ export class EmailService implements OnModuleInit {
           O serviço de <strong>${data.serviceName}</strong> com <strong>${data.caregiverName}</strong> 
           foi marcado como concluído! Sua avaliação é muito importante.
         </p>
+
+        ${data.paymentCreated ? `
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 16px; margin: 16px 0;">
+            <p style="color: #1d4ed8; margin: 0;">
+              📩 Também enviamos o email com o link para pagamento deste atendimento concluído.
+            </p>
+          </div>
+        ` : ''}
 
         <div style="text-align: center; margin: 32px 0;">
           <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/cuidadores/${data.caregiverId}?avaliar=${data.bookingId}" class="btn btn-accent" style="font-size: 16px;">

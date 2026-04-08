@@ -263,9 +263,9 @@ export class BookingsService {
     // AÇÕES PÓS-ATUALIZAÇÃO
     // ═══════════════════════════════════════════
 
-    // ✅ CONFIRMED: Criar pagamento + chat
+    // ✅ CONFIRMED: Criar chat + emails
     if (status === 'confirmed' && previousStatus !== 'confirmed') {
-      await this.handleBookingConfirmed(booking, id, userId);
+      await this.handleBookingConfirmed(booking, id, userId, client, caregiverUser);
     }
 
     // ✅ CANCELLED: Reembolso + fechar chat
@@ -295,12 +295,27 @@ export class BookingsService {
     booking: BookingDocument,
     bookingId: string,
     userId: string,
+    client: any,
+    caregiverUser: any,
   ) {
     try {
-      // Criar pagamento
-      if (this.paymentsService) {
-        await this.paymentsService.createPayment(bookingId);
-        this.logger.log(`💳 Pagamento criado para booking ${bookingId}`);
+      if (client?.email) {
+        await this.sendEmailSafely(
+          'Confirmação do agendamento',
+          client.email,
+          () =>
+            this.emailService.sendBookingApprovedEmail({
+              to: client.email,
+              clientName: client.name || booking.clientName || 'Cliente',
+              caregiverName: caregiverUser?.name || 'Cuidador',
+              serviceName:
+                booking.serviceName || booking.serviceType || 'Atendimento',
+              bookingDate: new Date(booking.startDate).toLocaleDateString(
+                'pt-BR',
+              ),
+              amount: booking.totalAmount || 0,
+            }),
+        );
       }
 
       // Criar conversa
@@ -372,20 +387,39 @@ export class BookingsService {
     caregiverUser: any,
   ) {
     try {
+      let paymentReleased = false;
       let paymentData = {
         amount: booking.totalAmount || 0,
         platformFee: 0,
         caregiverAmount: 0,
       };
 
-      // Liberar pagamento
       if (this.paymentsService) {
         const payment = await this.paymentsService.findByBooking(bookingId);
-        if (payment && ['held', 'paid'].includes(payment.status)) {
+        if (!payment) {
+          const createdPayment =
+            await this.paymentsService.createPayment(bookingId);
+          this.logger.log(
+            `💳 Pagamento criado após conclusão para booking ${bookingId}`,
+          );
+
+          paymentData = {
+            amount: createdPayment.amount || booking.totalAmount,
+            platformFee: createdPayment.platformFee || 0,
+            caregiverAmount:
+              createdPayment.caregiverAmount ||
+              Math.max(
+                (createdPayment.amount || booking.totalAmount) -
+                  (createdPayment.platformFee || 0),
+                0,
+              ),
+          };
+        } else if (['held', 'paid'].includes(payment.status)) {
           const released = await this.paymentsService.releasePayment(bookingId);
           this.logger.log(
             `💰 Pagamento liberado para booking ${bookingId}`,
           );
+          paymentReleased = true;
 
           // Pegar valores do pagamento para o email
           if (released) {
@@ -396,6 +430,14 @@ export class BookingsService {
                 released.caregiverAmount || released.amount * 0.9,
             };
           }
+        } else {
+          paymentData = {
+            amount: payment.amount || booking.totalAmount,
+            platformFee: payment.platformFee || 0,
+            caregiverAmount:
+              payment.caregiverAmount ||
+              Math.max((payment.amount || booking.totalAmount) - (payment.platformFee || 0), 0),
+          };
         }
       }
 
@@ -416,13 +458,14 @@ export class BookingsService {
                   booking.serviceName || booking.serviceType || 'Atendimento',
                 caregiverId: caregiver._id.toString(),
                 bookingId: booking._id.toString(),
+                paymentCreated: true,
               }),
           ),
         );
       }
 
-      // ✅ Email para CUIDADOR (pagamento liberado) - FALTAVA!
-      if (caregiverUser?.email) {
+      // ✅ Email para CUIDADOR apenas quando o pagamento tiver sido realmente liberado
+      if (caregiverUser?.email && paymentReleased) {
         emailPromises.push(
           this.sendEmailSafely(
             'Pagamento Liberado (cuidador)',

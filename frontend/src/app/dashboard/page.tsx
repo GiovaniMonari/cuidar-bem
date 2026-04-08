@@ -152,7 +152,7 @@ export default function DashboardPage() {
     .reduce((sum: number, p: any) => sum + (user?.role === 'caregiver' ? p.caregiverAmount : p.amount), 0);
 
   const pendingAmount = Object.values(payments)
-    .filter((p: any) => ['held', 'paid'].includes(p.status))
+    .filter((p: any) => ['pending', 'held', 'paid'].includes(p.status))
     .reduce((sum: number, p: any) => sum + (user?.role === 'caregiver' ? p.caregiverAmount : p.amount), 0);
 
   return (
@@ -198,7 +198,9 @@ export default function DashboardPage() {
             <div className="text-2xl font-bold text-orange-600">
               R$ {pendingAmount.toFixed(0)}
             </div>
-            <div className="text-sm text-gray-500">Retido</div>
+            <div className="text-sm text-gray-500">
+              {user?.role === 'caregiver' ? 'A receber' : 'A pagar'}
+            </div>
           </div>
         </div>
 
@@ -350,6 +352,7 @@ export default function DashboardPage() {
                       {/* Payment link for client */}
                       {!isCaregiver &&
                         payment &&
+                        booking.status === 'completed' &&
                         payment.status === 'pending' &&
                         payment.paymentUrl &&
                         payment.paymentUrl !== '#' && (
@@ -366,7 +369,10 @@ export default function DashboardPage() {
                         )}
 
                       {/* Simulate payment (for testing) */}
-                      {!isCaregiver && payment && payment.status === 'pending' && (
+                      {!isCaregiver &&
+                        payment &&
+                        booking.status === 'completed' &&
+                        payment.status === 'pending' && (
                         <button
                           onClick={() => handleSimulatePayment(booking._id)}
                           disabled={actionLoading === booking._id}
@@ -436,25 +442,21 @@ export default function DashboardPage() {
 
                         {booking.status === 'confirmed' && isCaregiver && (
                           <>
-                            {payment?.status === 'held' && (
-                              <button
-                                onClick={() => handleStatusUpdate(booking._id, 'completed')}
-                                disabled={actionLoading === booking._id}
-                                className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors flex items-center gap-1.5"
-                              >
-                                {actionLoading === booking._id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <ArrowRight className="w-4 h-4" />
-                                )}
-                                Concluir e Receber
-                              </button>
-                            )}
-                            {!payment?.status || payment?.status === 'pending' ? (
-                              <span className="text-sm text-yellow-600 bg-yellow-50 px-3 py-2 rounded-lg">
-                                Aguardando pagamento do cliente
-                              </span>
-                            ) : null}
+                            <button
+                              onClick={() => handleStatusUpdate(booking._id, 'completed')}
+                              disabled={actionLoading === booking._id}
+                              className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors flex items-center gap-1.5"
+                            >
+                              {actionLoading === booking._id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <ArrowRight className="w-4 h-4" />
+                              )}
+                              Concluir Serviço
+                            </button>
+                            <span className="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
+                              O pagamento será solicitado ao cliente após a conclusão
+                            </span>
                           </>
                         )}
 
@@ -466,6 +468,27 @@ export default function DashboardPage() {
                           >
                             Cancelar
                           </button>
+                        )}
+
+                        {booking.status === 'completed' && isCaregiver && (
+                          <>
+                            {payment?.status === 'pending' && (
+                              <span className="text-sm text-yellow-600 bg-yellow-50 px-3 py-2 rounded-lg">
+                                Aguardando pagamento do cliente
+                              </span>
+                            )}
+                            {payment?.status === 'released' && (
+                              <span className="text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg">
+                                Pagamento recebido com sucesso
+                              </span>
+                            )}
+                          </>
+                        )}
+
+                        {booking.status === 'completed' && !isCaregiver && payment?.status === 'pending' && (
+                          <span className="text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-lg">
+                            Serviço concluído. Falta apenas realizar o pagamento.
+                          </span>
                         )}
                       </div>
                     </div>

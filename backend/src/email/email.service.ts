@@ -1,6 +1,7 @@
 // src/email/email.service.ts
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 @Injectable()
 export class EmailService implements OnModuleInit {
@@ -57,26 +58,21 @@ export class EmailService implements OnModuleInit {
       }
     }
 
+    // email.service.ts
     this.transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
+      host: process.env.MAIL_HOST || 'smtp.gmail.com',
+      port: Number(process.env.MAIL_PORT) || 465,
+      secure: true,
+      auth: {
+        user: process.env.MAIL_USER,
+        pass: process.env.MAIL_PASS,
+      },
+      family: 4,
       tls: {
         rejectUnauthorized: false,
-        // ✅ Forçar TLS mínimo para compatibilidade
         minVersion: 'TLSv1.2',
       },
-      connectionTimeout: 30000, // ✅ 30s em produção (redes lentas)
-      greetingTimeout: 30000,
-      socketTimeout: 60000, // ✅ 60s para envio real
-      // ✅ Pool de conexões para produção
-      pool: true,
-      maxConnections: 3,
-      maxMessages: 100,
-      rateDelta: 1000,
-      rateLimit: 5, // máx 5 emails por segundo
-    });
+    } as SMTPTransport.Options);
 
     // ✅ Verificar conexão mas NÃO desabilitar permanentemente se falhar
     try {

@@ -6,6 +6,7 @@ import { Payment, PaymentSchema } from './schemas/payment.schema';
 import { BookingsModule } from '../bookings/bookings.module';
 import { CaregiversModule } from '../caregivers/caregivers.module';
 import { UsersModule } from '../users/users.module';
+import { EmailModule } from 'src/email/email.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { UsersModule } from '../users/users.module';
     BookingsModule,
     CaregiversModule,
     UsersModule,
+    EmailModule,
   ],
   controllers: [PaymentsController],
   providers: [PaymentsService],

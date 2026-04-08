@@ -1,45 +1,115 @@
-export interface ViaCepResponse {
-  cep: string;
-  logradouro: string;
-  complemento: string;
-  bairro: string;
-  localidade: string;
-  uf: string;
-  erro?: boolean;
-}
-
-export interface NominatimAddress {
-  display_name: string;
-  lat: string;
-  lon: string;
-}
+// services/address.ts
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 class AddressService {
-  async searchByCep(cep: string): Promise<ViaCepResponse | null> {
+  // ⬇️ NOVO: Cache no frontend também
+  private cache = new Map<string, any>();
+
+  async searchByCep(cep: string) {
     const cleanCep = cep.replace(/\D/g, '');
+    
+    if (cleanCep.length !== 8) {
+      return null;
+    }
 
-    if (cleanCep.length !== 8) return null;
+    // Verificar cache
+    const cacheKey = `cep:${cleanCep}`;
+    if (this.cache.has(cacheKey)) {
+      console.log('📦 Frontend cache hit (CEP)');
+      return this.cache.get(cacheKey);
+    }
 
-    const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
-    const data = await res.json();
+    try {
+      const response = await fetch(`${API_URL}/geocoding/cep?cep=${cleanCep}`);
+      
+      if (!response.ok) {
+        return null;
+      }
 
-    if (data.erro) return null;
-    return data;
+      const data = await response.json();
+      
+      const result = {
+        cep: data.cep || cleanCep,
+        logradouro: data.logradouro || data.address?.road || '',
+        bairro: data.bairro || data.address?.suburb || '',
+        localidade: data.localidade || data.address?.city || '',
+        uf: data.uf || data.address?.state || '',
+      };
+
+      // Salvar no cache
+      this.cache.set(cacheKey, result);
+      
+      return result;
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      return null;
+    }
   }
 
-  async searchByText(query: string): Promise<NominatimAddress[]> {
-    if (!query || query.trim().length < 3) return [];
+  async searchByText(query: string) {
+    if (!query || query.trim().length < 4) {
+      return [];
+    }
 
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=br&limit=5&q=${encodeURIComponent(query)}`,
-      {
-        headers: {
-          'Accept-Language': 'pt-BR',
-        },
-      },
-    );
+    // Verificar cache
+    const cacheKey = `search:${query.trim().toLowerCase()}`;
+    if (this.cache.has(cacheKey)) {
+      console.log('📦 Frontend cache hit (search)');
+      return this.cache.get(cacheKey);
+    }
 
-    return res.json();
+    try {
+      const response = await fetch(
+        `${API_URL}/geocoding/search?q=${encodeURIComponent(query.trim())}`
+      );
+
+      if (!response.ok) {
+        return [];
+      }
+
+      const data = await response.json();
+      
+      // Salvar no cache
+      if (data && data.length > 0) {
+        this.cache.set(cacheKey, data);
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Erro ao buscar endereço:', error);
+      return [];
+    }
+  }
+
+  async reverseGeocode(lat: number, lon: number) {
+    const cacheKey = `reverse:${lat.toFixed(4)},${lon.toFixed(4)}`;
+    
+    if (this.cache.has(cacheKey)) {
+      return this.cache.get(cacheKey);
+    }
+
+    try {
+      const response = await fetch(
+        `${API_URL}/geocoding/reverse?lat=${lat}&lon=${lon}`
+      );
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+      this.cache.set(cacheKey, data);
+      
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar coordenadas:', error);
+      return null;
+    }
+  }
+
+  // ⬇️ NOVO: Limpar cache se necessário
+  clearCache() {
+    this.cache.clear();
   }
 }
 

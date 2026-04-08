@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '@/services/api';
 import { getSocket } from '@/services/socket';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,10 +10,14 @@ import {
   Send,
   MessageCircle,
   Loader2,
+  Search,
+  Calendar,
+  Heart,
 } from 'lucide-react';
 
 function ChatContent() {
   const { user } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const conversationIdFromUrl = searchParams.get('conversation');
 
@@ -23,7 +27,7 @@ function ChatContent() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [hasAutoOpened, setHasAutoOpened] = useState(false); // ⬅️ NOVO
+  const [hasAutoOpened, setHasAutoOpened] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -71,13 +75,12 @@ function ChatContent() {
     };
   }, []);
 
-  // ⬇️ CORRIGIDO: Adicionar flag hasAutoOpened
   useEffect(() => {
     if (conversationIdFromUrl && conversations.length > 0 && !hasAutoOpened) {
       const found = conversations.find((c) => c._id === conversationIdFromUrl);
       if (found) {
         openConversation(found);
-        setHasAutoOpened(true); // ⬅️ Marca que já abriu automaticamente
+        setHasAutoOpened(true);
       }
     }
   }, [conversationIdFromUrl, conversations, hasAutoOpened]);
@@ -101,9 +104,12 @@ function ChatContent() {
   const openConversation = async (conversation: any) => {
     if (!conversation?._id) return;
 
-    // ⬇️ PROTEÇÃO: Se já é a conversa selecionada, não faz nada
     if (selectedConversation?._id === conversation._id) {
-      console.log('⚠️ Conversa já está aberta, ignorando');
+      return;
+    }
+
+    if (conversation.isActive === false) {
+      alert('Esta conversa foi encerrada.');
       return;
     }
 
@@ -117,16 +123,24 @@ function ChatContent() {
       const socket = getSocket();
       socket.emit('joinConversation', { conversationId: conversation._id });
 
-      // limpar badge localmente
       setConversations((prev) =>
         prev.map((conv) =>
-          conv._id === conversation._id
-            ? { ...conv, unreadCount: 0 }
-            : conv,
+          conv._id === conversation._id ? { ...conv, unreadCount: 0 } : conv,
         ),
       );
-    } catch (error) {
-      console.error('Erro ao carregar mensagens:', error);
+    } catch (error: any) {
+      if (
+        error.message?.includes('encerrada') ||
+        error.message?.includes('fechada')
+      ) {
+        alert(error.message);
+        setConversations((prev) =>
+          prev.filter((c) => c._id !== conversation._id),
+        );
+        setSelectedConversation(null);
+      } else {
+        console.error('Erro ao carregar mensagens:', error);
+      }
     } finally {
       setLoadingMessages(false);
       scrollToBottom();
@@ -156,7 +170,9 @@ function ChatContent() {
     const caregiver = conversation.caregiverUserId;
 
     const clientId =
-      typeof client === 'object' ? String(client?._id || client?.id || '') : String(client || '');
+      typeof client === 'object'
+        ? String(client?._id || client?.id || '')
+        : String(client || '');
 
     const caregiverId =
       typeof caregiver === 'object'
@@ -171,13 +187,114 @@ function ChatContent() {
       return typeof client === 'object' ? client : null;
     }
 
-    return typeof caregiver === 'object' ? caregiver : typeof client === 'object' ? client : null;
+    return typeof caregiver === 'object'
+      ? caregiver
+      : typeof client === 'object'
+        ? client
+        : null;
   };
 
   if (loading) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
+      </div>
+    );
+  }
+
+  // ⬇️ NOVO: Tela quando não há conversas
+  if (conversations.length === 0) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full">
+          <div className="card p-8 text-center">
+            {/* Ícone */}
+            <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-primary-200 rounded-full flex items-center justify-center mx-auto mb-6">
+              <MessageCircle className="w-10 h-10 text-primary-600" />
+            </div>
+
+            {/* Título */}
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              Nenhuma conversa ainda
+            </h2>
+
+            {/* Descrição */}
+            <p className="text-gray-500 mb-6 leading-relaxed">
+              {user?.role === 'caregiver' ? (
+                <>
+                  Você ainda não possui conversas com clientes. Quando um cliente
+                  solicitar um atendimento e você aceitar, a conversa será
+                  liberada automaticamente!
+                </>
+              ) : (
+                <>
+                  Para conversar com um cuidador, primeiro você precisa solicitar
+                  um atendimento. É simples e rápido!
+                </>
+              )}
+            </p>
+
+            {/* Passos */}
+            {user?.role !== 'caregiver' && (
+              <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
+                <p className="text-sm font-medium text-gray-700 mb-3">
+                  Como funciona:
+                </p>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+                      1
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Encontre um cuidador que atenda às suas necessidades
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+                      2
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Solicite um atendimento informando data e local
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+                      3
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Após a solicitação, o chat será liberado automaticamente!
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Botão de ação */}
+            {user?.role === 'caregiver' ? (
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="btn-primary w-full flex items-center justify-center gap-2"
+              >
+                <Calendar className="w-4 h-4" />
+                Ver meus atendimentos
+              </button>
+            ) : (
+              <button
+                onClick={() => router.push('/cuidadores')}
+                className="btn-primary w-full flex items-center justify-center gap-2"
+              >
+                <Search className="w-4 h-4" />
+                Buscar Cuidadores
+              </button>
+            )}
+
+            {/* Mensagem de incentivo */}
+            <p className="text-xs text-gray-400 mt-4 flex items-center justify-center gap-1">
+              <Heart className="w-3 h-3 text-red-400" />
+              Cuidar de quem amamos é um ato de amor
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -196,53 +313,47 @@ function ChatContent() {
             </div>
 
             <div className="flex-1 overflow-y-auto">
-              {conversations.length === 0 ? (
-                <div className="p-6 text-center text-gray-400 text-sm">
-                  Nenhuma conversa ainda.
-                </div>
-              ) : (
-                conversations.map((conversation) => {
-                  const otherUser = getOtherUser(conversation);
+              {conversations.map((conversation) => {
+                const otherUser = getOtherUser(conversation);
 
-                  return (
-                    <button
-                      key={conversation._id}
-                      onClick={() => openConversation(conversation)}
-                      className={`w-full text-left p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                        selectedConversation?._id === conversation._id
-                          ? 'bg-primary-50'
-                          : ''
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <UserAvatar
-                          name={otherUser?.name || 'Usuário'}
-                          avatar={otherUser?.avatar}
-                          size={44}
-                        />
+                return (
+                  <button
+                    key={conversation._id}
+                    onClick={() => openConversation(conversation)}
+                    className={`w-full text-left p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                      selectedConversation?._id === conversation._id
+                        ? 'bg-primary-50'
+                        : ''
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <UserAvatar
+                        name={otherUser?.name || 'Usuário'}
+                        avatar={otherUser?.avatar}
+                        size={44}
+                      />
 
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="font-medium text-gray-900 truncate">
-                              {otherUser?.name || 'Usuário'}
-                            </p>
-
-                            {conversation.unreadCount > 0 && (
-                              <span className="bg-primary-600 text-white text-xs font-bold min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center">
-                                {conversation.unreadCount}
-                              </span>
-                            )}
-                          </div>
-
-                          <p className="text-xs text-gray-500 truncate mt-1">
-                            {conversation.lastMessage || 'Sem mensagens'}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium text-gray-900 truncate">
+                            {otherUser?.name || 'Usuário'}
                           </p>
+
+                          {conversation.unreadCount > 0 && (
+                            <span className="bg-primary-600 text-white text-xs font-bold min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center">
+                              {conversation.unreadCount}
+                            </span>
+                          )}
                         </div>
+
+                        <p className="text-xs text-gray-500 truncate mt-1">
+                          {conversation.lastMessage || 'Sem mensagens'}
+                        </p>
                       </div>
-                    </button>
-                  );
-                })
-              )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -253,7 +364,9 @@ function ChatContent() {
                 <div>
                   <MessageCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                   <p className="font-medium">Selecione uma conversa</p>
-                  <p className="text-sm mt-1">Escolha uma conversa ao lado para começar</p>
+                  <p className="text-sm mt-1">
+                    Escolha uma conversa ao lado para começar
+                  </p>
                 </div>
               </div>
             ) : (
@@ -287,7 +400,9 @@ function ChatContent() {
                     </div>
                   ) : (
                     messages.map((msg) => {
-                      const senderId = String(msg.senderId?._id || msg.senderId?.id || '');
+                      const senderId = String(
+                        msg.senderId?._id || msg.senderId?.id || '',
+                      );
                       const isMine = senderId === currentUserId;
 
                       return (
@@ -309,10 +424,13 @@ function ChatContent() {
                               }`}
                             >
                               {msg.createdAt
-                                ? new Date(msg.createdAt).toLocaleTimeString('pt-BR', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  })
+                                ? new Date(msg.createdAt).toLocaleTimeString(
+                                    'pt-BR',
+                                    {
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    },
+                                  )
                                 : ''}
                             </p>
                           </div>

@@ -34,6 +34,8 @@ export class AuthService {
         name: user.name,
         email: user.email,
         role: user.role,
+        phone: user.phone,
+        avatar: user.avatar, // ⬅️ ADICIONADO
       },
       access_token: this.jwtService.sign(payload),
     };
@@ -58,6 +60,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         phone: user.phone,
+        avatar: user.avatar, // ⬅️ ADICIONADO
       },
       access_token: this.jwtService.sign(payload),
     };

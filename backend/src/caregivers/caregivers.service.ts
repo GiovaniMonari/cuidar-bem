@@ -94,14 +94,18 @@ export class CaregiversService {
       .populate('userId', 'name email phone avatar');
   }
 
-  async updateRating(caregiverId: string, newRating: number) {
-    const caregiver = await this.caregiverModel.findById(caregiverId);
-    if (!caregiver) return;
+  async updateRating(caregiverId: string, avgRating: number, reviewCount?: number) {
+    const updateData: any = { rating: avgRating };
+    
+    if (reviewCount !== undefined) {
+      updateData.reviewCount = reviewCount;
+    }
 
-    const totalRating = caregiver.rating * caregiver.reviewCount + newRating;
-    caregiver.reviewCount += 1;
-    caregiver.rating = Math.round((totalRating / caregiver.reviewCount) * 10) / 10;
-    await caregiver.save();
+    return this.caregiverModel.findByIdAndUpdate(
+      caregiverId,
+      updateData,
+      { new: true }
+    );
   }
 
    async getAvailability(id: string) {

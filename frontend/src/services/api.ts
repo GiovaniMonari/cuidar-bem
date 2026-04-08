@@ -167,7 +167,18 @@ class ApiService {
   }
 
   async canReviewCaregiver(caregiverId: string) {
-    return this.request<{ canReview: boolean; bookingId?: string }>(
+    return this.request<{ 
+      canReview: boolean; 
+      bookingId?: string;
+      bookings?: Array<{
+        _id: string;
+        serviceName: string;
+        startDate: string;
+        endDate: string;
+        totalAmount: number;
+        durationLabel?: string;
+      }>;
+    }>(
       `/reviews/can-review/${caregiverId}`,
       { headers: this.headers(true) },
     );

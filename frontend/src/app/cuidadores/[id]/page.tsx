@@ -57,9 +57,11 @@ function CaregiverDetailContent() {
   // Estados de avaliação
   const [showReview, setShowReview] = useState(false);
   const [canReview, setCanReview] = useState(false);
-  const [reviewBookingId, setReviewBookingId] = useState<string | null>(null);
+  const [reviewableBookings, setReviewableBookings] = useState<any[]>([]);
+  const [selectedBookingForReview, setSelectedBookingForReview] = useState<string | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewSuccess, setReviewSuccess] = useState(false);
+
 
   // Parâmetro de URL para abrir avaliação automaticamente
   const avaliarBookingId = searchParams.get('avaliar');
@@ -76,7 +78,7 @@ function CaregiverDetailContent() {
     discount: 0,
   });
 
-      const [bookingForm, setBookingForm] = useState({
+    const [bookingForm, setBookingForm] = useState({
     startDate: '',
     endDate: '',
     startTime: '',
@@ -84,6 +86,9 @@ function CaregiverDetailContent() {
     notes: '',
     cep: '',
     address: '',
+    number: '',
+    complement: '',
+    fullAddress: '',
     lat: '',
     lon: '',
     patientName: '',
@@ -123,31 +128,44 @@ function CaregiverDetailContent() {
   }, [id]);
 
   // Verificar se o usuário pode avaliar este cuidador
-  useEffect(() => {
-    const checkCanReview = async () => {
-      if (!isAuthenticated || user?.role !== 'client' || !caregiver) {
-        setCanReview(false);
-        return;
-      }
+  // Verificar se o usuário pode avaliar este cuidador - SUBSTITUIR
+useEffect(() => {
+  const checkCanReview = async () => {
+    if (!isAuthenticated || user?.role !== 'client' || !caregiver) {
+      setCanReview(false);
+      setReviewableBookings([]);
+      return;
+    }
 
-      try {
-        const result = await api.canReviewCaregiver(id as string);
-        setCanReview(result.canReview);
-        setReviewBookingId(result.bookingId || null);
+    try {
+      const result = await api.canReviewCaregiver(id as string);
+      setCanReview(result.canReview);
+      setReviewableBookings(result.bookings || []);
 
-        // Se veio do email de conclusão com parâmetro avaliar, abrir formulário
-        if (avaliarBookingId && result.canReview) {
+      // Se veio do email com parâmetro avaliar
+      if (avaliarBookingId && result.canReview) {
+        const bookingExists = result.bookings?.some(
+          (b: any) => b._id === avaliarBookingId
+        );
+        if (bookingExists) {
+          setSelectedBookingForReview(avaliarBookingId);
           setShowReview(true);
-          setReviewBookingId(avaliarBookingId);
         }
-      } catch (error) {
-        console.error('Erro ao verificar permissão de avaliação:', error);
-        setCanReview(false);
       }
-    };
 
-    checkCanReview();
-  }, [id, isAuthenticated, user, caregiver, avaliarBookingId]);
+      // Auto-selecionar se só tiver um booking
+      if (result.bookings?.length === 1) {
+        setSelectedBookingForReview(result.bookings[0]._id);
+      }
+    } catch (error) {
+      console.error('Erro ao verificar permissão de avaliação:', error);
+      setCanReview(false);
+      setReviewableBookings([]);
+    }
+  };
+
+  checkCanReview();
+}, [id, isAuthenticated, user, caregiver, avaliarBookingId]);
 
   // Submeter agendamento
     const handleBooking = async (e: React.FormEvent) => {
@@ -224,7 +242,7 @@ function CaregiverDetailContent() {
         notes: bookingForm.notes,
         clientName: user?.name,
         clientPhone: user?.phone,
-        address: bookingForm.address,
+        address: bookingForm.fullAddress || bookingForm.address,
         patientName: bookingForm.patientName,
         patientAge: bookingForm.patientAge ? Number(bookingForm.patientAge) : undefined,
         patientCondition: bookingForm.patientCondition,
@@ -264,6 +282,9 @@ function CaregiverDetailContent() {
         notes: '',
         cep: '',
         address: '',
+        number: '',
+        complement: '',
+        fullAddress: '',
         lat: '',
         lon: '',
         patientName: '',
@@ -278,44 +299,47 @@ function CaregiverDetailContent() {
   };
 
     useEffect(() => {
-    const checkChatAvailability = async () => {
-      if (!isAuthenticated || user?.role !== 'client') {
-        setCanChat(false);
-        setChatBookingId(null);
-        return;
-      }
+  const checkChatAvailability = async () => {
+    if (!isAuthenticated || user?.role !== 'client') {
+      setCanChat(false);
+      setChatBookingId(null);
+      return;
+    }
 
-      try {
-        const bookings = await api.getMyBookings();
+    try {
+      const bookings = await api.getMyBookings();
 
-        const relatedBooking = bookings.find((booking: any) => {
-          const caregiverBookingId =
-            typeof booking.caregiverId === 'string'
-              ? booking.caregiverId
-              : booking.caregiverId?._id;
+      // ⬇️ CORREÇÃO: Apenas bookings ATIVOS permitem chat
+      const relatedBooking = bookings.find((booking: any) => {
+        const caregiverBookingId =
+          typeof booking.caregiverId === 'string'
+            ? booking.caregiverId
+            : booking.caregiverId?._id;
 
-          return (
-            String(caregiverBookingId) === String(id) &&
-            ['pending', 'confirmed', 'in_progress', 'completed'].includes(booking.status)
-          );
-        });
+        // ⬇️ Removido 'completed' - chat fecha quando completa
+        const isActiveStatus = ['pending', 'confirmed', 'in_progress'].includes(booking.status);
 
-        if (relatedBooking) {
-          setCanChat(true);
-          setChatBookingId(relatedBooking._id);
-        } else {
-          setCanChat(false);
-          setChatBookingId(null);
-        }
-      } catch (error) {
-        console.error('Erro ao verificar disponibilidade do chat:', error);
+        return (
+          String(caregiverBookingId) === String(id) && isActiveStatus
+        );
+      });
+
+      if (relatedBooking) {
+        setCanChat(true);
+        setChatBookingId(relatedBooking._id);
+      } else {
         setCanChat(false);
         setChatBookingId(null);
       }
-    };
+    } catch (error) {
+      console.error('Erro ao verificar disponibilidade do chat:', error);
+      setCanChat(false);
+      setChatBookingId(null);
+    }
+  };
 
-    checkChatAvailability();
-  }, [id, isAuthenticated, user]);
+  checkChatAvailability();
+}, [id, isAuthenticated, user]);
 
     const handleStartChat = async () => {
   if (!chatBookingId) {
@@ -371,41 +395,64 @@ function CaregiverDetailContent() {
   };
 
   // Submeter avaliação
-  const handleReview = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setReviewLoading(true);
+  // Submeter avaliação - SUBSTITUIR
+const handleReview = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    try {
-      const newReview = await api.createReview({
-        caregiverId: id,
-        bookingId: reviewBookingId || avaliarBookingId,
-        rating: reviewForm.rating,
-        comment: reviewForm.comment,
-      });
+  if (!selectedBookingForReview) {
+    alert('Por favor, selecione qual atendimento você deseja avaliar.');
+    return;
+  }
 
-      setReviews((prev) => [newReview, ...prev]);
-      setShowReview(false);
-      setCanReview(false); // Não pode mais avaliar este serviço
-      setReviewForm({ rating: 5, comment: '' });
-      setReviewSuccess(true);
-      setTimeout(() => setReviewSuccess(false), 5000);
+  setReviewLoading(true);
 
-      // Atualizar rating do cuidador localmente
-      if (caregiver) {
-        const totalRating = caregiver.rating * caregiver.reviewCount + reviewForm.rating;
-        const newCount = caregiver.reviewCount + 1;
-        setCaregiver({
-          ...caregiver,
-          rating: totalRating / newCount,
-          reviewCount: newCount,
-        });
-      }
-    } catch (error: any) {
-      alert(error.message);
-    } finally {
-      setReviewLoading(false);
+  try {
+    const newReview = await api.createReview({
+      caregiverId: id,
+      bookingId: selectedBookingForReview,
+      rating: reviewForm.rating,
+      comment: reviewForm.comment,
+    });
+
+    setReviews((prev) => [newReview, ...prev]);
+    setShowReview(false);
+    
+    // Remover o booking avaliado da lista
+    const remainingBookings = reviewableBookings.filter(
+      (b) => b._id !== selectedBookingForReview
+    );
+    setReviewableBookings(remainingBookings);
+    
+    // Se não houver mais bookings para avaliar, desabilitar
+    if (remainingBookings.length === 0) {
+      setCanReview(false);
+    } else if (remainingBookings.length === 1) {
+      // Auto-selecionar o próximo
+      setSelectedBookingForReview(remainingBookings[0]._id);
+    } else {
+      setSelectedBookingForReview(null);
     }
-  };
+    
+    setReviewForm({ rating: 5, comment: '' });
+    setReviewSuccess(true);
+    setTimeout(() => setReviewSuccess(false), 5000);
+
+    // Atualizar rating do cuidador localmente
+    if (caregiver) {
+      const totalRating = caregiver.rating * caregiver.reviewCount + reviewForm.rating;
+      const newCount = caregiver.reviewCount + 1;
+      setCaregiver({
+        ...caregiver,
+        rating: totalRating / newCount,
+        reviewCount: newCount,
+      });
+    }
+  } catch (error: any) {
+    alert(error.message);
+  } finally {
+    setReviewLoading(false);
+  }
+};
 
   if (loading) {
     return (
@@ -748,6 +795,9 @@ function CaregiverDetailContent() {
                               ...prev,
                               cep: data.cep ?? prev.cep,
                               address: data.address ?? prev.address,
+                              number: data.number ?? prev.number,
+                              complement: data.complement ?? prev.complement,
+                              fullAddress: data.fullAddress ?? prev.fullAddress,
                               lat: data.lat ?? prev.lat,
                               lon: data.lon ?? prev.lon,
                             }))
@@ -942,30 +992,37 @@ function CaregiverDetailContent() {
               )}
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-700">
-              O chat com o cuidador é liberado após a solicitação de atendimento.
-            </div>
-            
             {/* Reviews */}
             <div className="card p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold text-gray-900">
                   Avaliações ({reviews.length})
                 </h2>
-                
-                {/* Botão de avaliar - só aparece se pode avaliar */}
-                {isAuthenticated && user?.role === 'client' && canReview && (
+              </div>
+
+              {/* Mensagem se PODE avaliar - mostra antes do formulário */}
+              {isAuthenticated && user?.role === 'client' && canReview && !showReview && (
+                <div className="bg-green-50 rounded-xl p-4 mb-4 flex items-start gap-3 border border-green-200">
+                  <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm text-green-700 font-medium">
+                      Você tem {reviewableBookings.length} atendimento{reviewableBookings.length > 1 ? 's' : ''} para avaliar!
+                    </p>
+                    <p className="text-sm text-green-600 mt-1">
+                      Sua avaliação ajuda outros clientes a encontrar o cuidador ideal.
+                    </p>
+                  </div>
                   <button
-                    onClick={() => setShowReview(!showReview)}
-                    className="btn-accent !py-2 !px-4 text-sm flex items-center gap-1.5"
+                    onClick={() => setShowReview(true)}
+                    className="btn-accent !py-2 !px-4 text-sm flex items-center gap-1.5 flex-shrink-0"
                   >
                     <Star className="w-3.5 h-3.5" />
                     Avaliar
                   </button>
-                )}
-              </div>
+                </div>
+              )}
 
-              {/* Mensagem se não pode avaliar */}
+              {/* Mensagem se NÃO pode avaliar */}
               {isAuthenticated && user?.role === 'client' && !canReview && (
                 <div className="bg-blue-50 rounded-xl p-4 mb-4 flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
@@ -975,7 +1032,7 @@ function CaregiverDetailContent() {
                     </p>
                     <p className="text-sm text-blue-600 mt-1">
                       Você poderá avaliar este cuidador após contratar um serviço e ele ser concluído.
-                      Isso garante que as avaliações sejam de clientes reais.
+                      Cada atendimento pode ser avaliado apenas uma vez.
                     </p>
                   </div>
                 </div>
@@ -987,6 +1044,61 @@ function CaregiverDetailContent() {
                   onSubmit={handleReview}
                   className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-5 mb-6 space-y-4 border border-yellow-200"
                 >
+                  {/* Seletor de booking - mostra se tem mais de um */}
+                  {reviewableBookings.length > 1 && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 mb-2 block">
+                        Qual atendimento você deseja avaliar?
+                      </label>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {reviewableBookings.map((booking) => (
+                          <label
+                            key={booking._id}
+                            className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                              selectedBookingForReview === booking._id
+                                ? 'border-primary-500 bg-primary-50 shadow-sm'
+                                : 'border-gray-200 hover:border-gray-300 bg-white'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="bookingForReview"
+                              value={booking._id}
+                              checked={selectedBookingForReview === booking._id}
+                              onChange={(e) => setSelectedBookingForReview(e.target.value)}
+                              className="w-4 h-4 text-primary-600"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-900 text-sm truncate">
+                                {booking.serviceName}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {new Date(booking.startDate).toLocaleDateString('pt-BR')}
+                                {booking.durationLabel && ` • ${booking.durationLabel}`}
+                                {booking.totalAmount && ` • R$ ${booking.totalAmount.toFixed(2)}`}
+                              </p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mostrar qual booking será avaliado (se só tem um) */}
+                  {reviewableBookings.length === 1 && (
+                    <div className="bg-white rounded-xl p-3 border border-gray-200">
+                      <p className="text-xs text-gray-500 mb-1">Avaliando o atendimento:</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {reviewableBookings[0].serviceName}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(reviewableBookings[0].startDate).toLocaleDateString('pt-BR')}
+                        {reviewableBookings[0].durationLabel && ` • ${reviewableBookings[0].durationLabel}`}
+                        {reviewableBookings[0].totalAmount && ` • R$ ${reviewableBookings[0].totalAmount.toFixed(2)}`}
+                      </p>
+                    </div>
+                  )}
+
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-2 block">
                       Como você avalia o atendimento?
@@ -1028,8 +1140,8 @@ function CaregiverDetailContent() {
                   <div className="flex gap-2">
                     <button 
                       type="submit" 
-                      disabled={reviewLoading}
-                      className="btn-primary flex items-center gap-1.5"
+                      disabled={reviewLoading || !selectedBookingForReview}
+                      className="btn-primary flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {reviewLoading ? (
                         <>
@@ -1045,7 +1157,12 @@ function CaregiverDetailContent() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowReview(false)}
+                      onClick={() => {
+                        setShowReview(false);
+                        if (reviewableBookings.length > 1) {
+                          setSelectedBookingForReview(null);
+                        }
+                      }}
                       className="btn-secondary"
                     >
                       Cancelar

@@ -187,76 +187,6 @@ export class BookingsService {
       .sort({ createdAt: -1 });
   }
 
-  async updateStatus(id: string, userId: string, status: string, role: string) {
-    const booking = await this.bookingModel
-      .findById(id)
-      .populate({
-        path: 'caregiverId',
-        populate: { path: 'userId', select: 'name email phone avatar role' },
-      })
-      .populate('clientId', 'name email phone avatar role');
-
-    if (!booking) throw new NotFoundException('Agendamento não encontrado');
-
-    const isClient = (booking.clientId as any)?._id?.toString() === userId;
-    const isCaregiver = (booking.caregiverId as any)?.userId?._id?.toString() === userId;
-
-    if (!isClient && !isCaregiver) {
-      throw new ForbiddenException('Sem permissão');
-    }
-
-    if (role === 'client' && status !== 'cancelled') {
-      throw new ForbiddenException('Clientes só podem cancelar agendamentos');
-    }
-
-    booking.status = status;
-    const saved = await booking.save();
-
-    try {
-      if (status === 'confirmed') {
-        if (this.paymentsService) {
-          await this.paymentsService.createPayment(id);
-        }
-
-        const conversation = await this.chatService.getOrCreateConversation(id, userId);
-        console.log(`💬 Conversa criada automaticamente para booking ${id}:`, conversation?._id);
-      } else if (status === 'completed') {
-        if (this.paymentsService) {
-          const payment = await this.paymentsService.findByBooking(id);
-          if (payment && ['held', 'paid'].includes(payment.status)) {
-            await this.paymentsService.releasePayment(id);
-          }
-        }
-
-        const caregiver = booking.caregiverId as any;
-        const caregiverUser = caregiver?.userId;
-        const client = booking.clientId as any;
-
-        if (client?.email) {
-          await this.emailService.sendServiceCompletedToClientEmail({
-            to: client.email,
-            clientName: client.name,
-            caregiverName: caregiverUser?.name || 'Cuidador',
-            serviceName: booking.serviceName || booking.serviceType || 'Atendimento',
-            caregiverId: caregiver._id.toString(),
-            bookingId: booking._id.toString(),
-          });
-        }
-      } else if (status === 'cancelled') {
-        if (this.paymentsService) {
-          const payment = await this.paymentsService.findByBooking(id);
-          if (payment && ['held', 'paid'].includes(payment.status)) {
-            await this.paymentsService.refundPayment(id);
-          }
-        }
-      }
-    } catch (error: any) {
-      console.error('Erro na integração:', error.message);
-    }
-
-    return saved;
-  }
-
   async findOne(id: string) {
     return this.bookingModel
       .findById(id)
@@ -288,4 +218,130 @@ export class BookingsService {
       status: 'completed',
     }).sort({ createdAt: -1 });
   }
+
+  async getActiveBookingsBetween(clientId: string, caregiverUserId: string) {
+  // Primeiro precisamos encontrar o caregiverId pelo usereId do cuidador
+  const caregiverModelAny: any = this.bookingModel.db.model('Caregiver');
+  const caregiver = await caregiverModelAny.findOne({ userId: caregiverUserId });
+  
+  if (!caregiver) {
+    return [];
+  }
+
+  const now = new Date();
+  
+  return this.bookingModel.find({
+    clientId: clientId,
+    caregiverId: caregiver._id,
+    status: { $in: ['pending', 'confirmed', 'in_progress'] },
+    endDate: { $gte: now }, // Ainda não passou a data final
+  });
+}
+
+// ⬇️ MODIFICAR o método updateStatus para fechar chat quando cancelar
+async updateStatus(id: string, userId: string, status: string, role: string) {
+  const booking = await this.bookingModel
+    .findById(id)
+    .populate({
+      path: 'caregiverId',
+      populate: { path: 'userId', select: 'name email phone avatar role' },
+    })
+    .populate('clientId', 'name email phone avatar role');
+
+  if (!booking) throw new NotFoundException('Agendamento não encontrado');
+
+  const isClient = (booking.clientId as any)?._id?.toString() === userId;
+  const isCaregiver = (booking.caregiverId as any)?.userId?._id?.toString() === userId;
+
+  if (!isClient && !isCaregiver) {
+    throw new ForbiddenException('Sem permissão');
+  }
+
+  if (role === 'client' && status !== 'cancelled') {
+    throw new ForbiddenException('Clientes só podem cancelar agendamentos');
+  }
+
+  const previousStatus = booking.status;
+  booking.status = status;
+  const saved = await booking.save();
+
+  try {
+    if (status === 'confirmed' && previousStatus !== 'confirmed') {
+      if (this.paymentsService) {
+        await this.paymentsService.createPayment(id);
+      }
+
+      const conversation = await this.chatService.getOrCreateConversation(id, userId);
+      console.log(`💬 Conversa criada automaticamente para booking ${id}:`, conversation?._id);
+    } 
+    
+    // ⬇️ NOVO: Fechar chat quando cancelar
+    else if (status === 'cancelled' && previousStatus !== 'cancelled') {
+      if (this.paymentsService) {
+        const payment = await this.paymentsService.findByBooking(id);
+        if (payment && ['held', 'paid'].includes(payment.status)) {
+          await this.paymentsService.refundPayment(id);
+        }
+      }
+
+      // Verificar se há outros bookings ativos entre este cliente e cuidador
+      const clientId = (booking.clientId as any)?._id?.toString();
+      const caregiverUserId = (booking.caregiverId as any)?.userId?._id?.toString();
+      
+      if (clientId && caregiverUserId) {
+        const hasOtherActive = await this.chatService.hasActiveBooking(clientId, caregiverUserId);
+        
+        if (!hasOtherActive) {
+          // Não há outros bookings ativos, fechar o chat
+          await this.chatService.closeConversation(clientId, caregiverUserId, 'cancelled');
+          console.log(`🔒 Chat fechado entre ${clientId} e ${caregiverUserId}`);
+        } else {
+          console.log(`💬 Mantendo chat aberto - há outros bookings ativos`);
+        }
+      }
+    }
+    
+    else if (status === 'completed' && previousStatus !== 'completed') {
+      if (this.paymentsService) {
+        const payment = await this.paymentsService.findByBooking(id);
+        if (payment && ['held', 'paid'].includes(payment.status)) {
+          await this.paymentsService.releasePayment(id);
+        }
+      }
+
+      const caregiver = booking.caregiverId as any;
+      const caregiverUser = caregiver?.userId;
+      const client = booking.clientId as any;
+
+      if (client?.email) {
+        await this.emailService.sendServiceCompletedToClientEmail({
+          to: client.email,
+          clientName: client.name,
+          caregiverName: caregiverUser?.name || 'Cuidador',
+          serviceName: booking.serviceName || booking.serviceType || 'Atendimento',
+          caregiverId: caregiver._id.toString(),
+          bookingId: booking._id.toString(),
+        });
+      }
+
+      // ⬇️ NOVO: Verificar se deve fechar o chat após completar
+      const clientId = client?._id?.toString();
+      const caregiverUserId = caregiverUser?._id?.toString();
+      
+      if (clientId && caregiverUserId) {
+        const hasOtherActive = await this.chatService.hasActiveBooking(clientId, caregiverUserId);
+        
+        if (!hasOtherActive) {
+          // Não há outros bookings ativos, fechar o chat
+          await this.chatService.closeConversation(clientId, caregiverUserId, 'completed');
+          console.log(`🔒 Chat fechado (serviço concluído) entre ${clientId} e ${caregiverUserId}`);
+        }
+      }
+    }
+  } catch (error: any) {
+    console.error('Erro na integração:', error.message);
+  }
+
+  return saved;
+}
 }

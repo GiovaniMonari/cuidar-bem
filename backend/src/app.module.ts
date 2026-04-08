@@ -13,6 +13,7 @@ import { BookingsService } from './bookings/bookings.service';
 import { PaymentsService } from './payments/payments.service';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { ChatModule } from './chat/chat.module';
+import { GeocodingModule } from './geocoding/geocoding.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { ChatModule } from './chat/chat.module';
     ServicesModule,
     CloudinaryModule,
     ChatModule,
+    GeocodingModule,
   ],
 })
 export class AppModule implements OnModuleInit {

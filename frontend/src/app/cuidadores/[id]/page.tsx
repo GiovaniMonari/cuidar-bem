@@ -53,6 +53,7 @@ function CaregiverDetailContent() {
   const [bookedDates, setBookedDates] = useState<string[]>([]);
   const [dateRangeError, setDateRangeError] = useState('');
   const [isRangeAvailable, setIsRangeAvailable] = useState(true);
+  const [bookingLoading, setBookingLoading] = useState(false);
 
   // Estados de avaliação
   const [showReview, setShowReview] = useState(false);
@@ -171,6 +172,13 @@ useEffect(() => {
     const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (bookingLoading) return;
+
+    if (!bookingData.serviceType || !bookingData.durationKey) {
+      alert('Por favor, selecione o tipo de serviço e duração');
+      return;
+    }
+
     if (!bookingData.serviceType || !bookingData.durationKey) {
       alert('Por favor, selecione o tipo de serviço e duração');
       return;
@@ -225,6 +233,8 @@ useEffect(() => {
         return;
       }
     }
+
+    setBookingLoading(true); 
 
     try {
       await api.createBooking({
@@ -294,9 +304,11 @@ useEffect(() => {
 
       setTimeout(() => setBookingSuccess(false), 5000);
     } catch (error: any) {
-      alert(error.message);
-    }
-  };
+    alert(error.message);
+  } finally {
+    setBookingLoading(false); // ⬅️ ADICIONAR
+  }
+};
 
     useEffect(() => {
   const checkChatAvailability = async () => {
@@ -908,16 +920,27 @@ const handleReview = async (e: React.FormEvent) => {
                     <button
                       type="button"
                       onClick={() => setShowBooking(false)}
-                      className="btn-secondary flex-1 sm:flex-none"
+                      disabled={bookingLoading}
+                      className="btn-secondary flex-1 sm:flex-none disabled:opacity-50"
                     >
                       Cancelar
                     </button>
                     <button
                       type="submit"
-                      disabled={isMultiDayDuration(bookingData.durationKey) && !isRangeAvailable}
-                      className="btn-primary flex-1 sm:flex-none sm:min-w-[200px] disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={
+                        bookingLoading ||
+                        (isMultiDayDuration(bookingData.durationKey) && !isRangeAvailable)
+                      }
+                      className="btn-primary flex-1 sm:flex-none sm:min-w-[200px] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                      Solicitar Agendamento
+                      {bookingLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Enviando solicitação...
+                        </>
+                      ) : (
+                        'Solicitar Agendamento'
+                      )}
                     </button>
                   </div>
                 )}

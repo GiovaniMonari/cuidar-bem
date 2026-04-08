@@ -1,46 +1,85 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
-export class EmailService {
+export class EmailService implements OnModuleInit {
   private transporter: nodemailer.Transporter;
   private readonly logger = new Logger(EmailService.name);
   private isConfigured = false;
-  
-  constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: process.env.MAIL_HOST || 'smtp.gmail.com',
-      port: Number(process.env.MAIL_PORT) || 465,
-      secure: true,
-      auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASS,
-      },
-    tls: {
-      rejectUnauthorized: false, // ⬇️ Para ambientes com SSL restrito
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
-  });
 
-  this.isConfigured = true;
-}
+  constructor() {
+    const host = process.env.MAIL_HOST || 'smtp.gmail.com';
+    const port = Number(process.env.MAIL_PORT) || 465;
+    const user = process.env.MAIL_USER;
+    const pass = process.env.MAIL_PASS;
+
+    this.logger.log('📧 Configurando email...');
+    this.logger.log(`   Host: ${host}:${port}`);
+    this.logger.log(`   User: ${user ? user.substring(0, 5) + '***' : '❌ NÃO CONFIGURADO'}`);
+    this.logger.log(`   Pass: ${pass ? '***configurado***' : '❌ NÃO CONFIGURADO'}`);
+
+    if (!user || !pass) {
+      this.logger.error('❌ MAIL_USER ou MAIL_PASS não configurado!');
+      this.isConfigured = false;
+      return;
+    }
+
+    this.transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass },
+      tls: { rejectUnauthorized: false },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+    });
+
+    this.isConfigured = true;
+  }
+
+  async onModuleInit() {
+    if (!this.isConfigured) {
+      this.logger.warn('⚠️ Email não configurado - emails serão ignorados');
+      return;
+    }
+
+    try {
+      await this.transporter.verify();
+      this.logger.log('✅ Conexão SMTP verificada com sucesso!');
+    } catch (error: any) {
+      this.logger.error(`❌ Falha SMTP: ${error.message}`);
+      this.logger.error(`   Código: ${error.code}`);
+      this.logger.error(`   Hostname: ${error.hostname}`);
+      this.isConfigured = false;
+    }
+  }
 
   private async sendMail(to: string, subject: string, html: string) {
+    if (!this.isConfigured) {
+      this.logger.warn(`⚠️ Email ignorado (não configurado): ${to}`);
+      return;
+    }
+
     try {
-      await this.transporter.sendMail({
+      this.logger.log(`📤 Enviando para ${to}...`);
+
+      const result = await this.transporter.sendMail({
         from: process.env.MAIL_FROM || '"CuidarBem" <noreply@cuidarbem.com>',
         to,
         subject,
         html,
       });
-      this.logger.log(`📧 Email enviado para ${to}: ${subject}`);
-    } catch (error) {
-      this.logger.error(`❌ Erro ao enviar email para ${to}`);
+
+      this.logger.log(`✅ Enviado! ID: ${result.messageId}`);
+      return result;
+    } catch (error: any) {
+      this.logger.error(`❌ Falha ao enviar para ${to}`);
+      this.logger.error(`   Erro: ${error.message}`);
+      this.logger.error(`   Código: ${error.code}`);
+      this.logger.error(`   Response: ${error.response}`);
     }
   }
-
   // Template base
   private baseTemplate(content: string) {
     return `

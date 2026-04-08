@@ -23,6 +23,7 @@ function ChatContent() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [hasAutoOpened, setHasAutoOpened] = useState(false); // ⬅️ NOVO
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -70,20 +71,22 @@ function ChatContent() {
     };
   }, []);
 
+  // ⬇️ CORRIGIDO: Adicionar flag hasAutoOpened
   useEffect(() => {
-    if (conversationIdFromUrl && conversations.length > 0) {
+    if (conversationIdFromUrl && conversations.length > 0 && !hasAutoOpened) {
       const found = conversations.find((c) => c._id === conversationIdFromUrl);
       if (found) {
         openConversation(found);
+        setHasAutoOpened(true); // ⬅️ Marca que já abriu automaticamente
       }
     }
-  }, [conversationIdFromUrl, conversations]);
+  }, [conversationIdFromUrl, conversations, hasAutoOpened]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-    const fetchConversations = async () => {
+  const fetchConversations = async () => {
     try {
       const data = await api.getConversations();
       console.log('📨 conversas recebidas:', data);
@@ -97,6 +100,12 @@ function ChatContent() {
 
   const openConversation = async (conversation: any) => {
     if (!conversation?._id) return;
+
+    // ⬇️ PROTEÇÃO: Se já é a conversa selecionada, não faz nada
+    if (selectedConversation?._id === conversation._id) {
+      console.log('⚠️ Conversa já está aberta, ignorando');
+      return;
+    }
 
     setSelectedConversation(conversation);
     setLoadingMessages(true);
@@ -139,32 +148,31 @@ function ChatContent() {
   };
 
   const getOtherUser = (conversation: any) => {
-  if (!conversation || !user) return null;
+    if (!conversation || !user) return null;
 
-  const currentId = String(user?.id || user?._id || '');
+    const currentId = String(user?.id || user?._id || '');
 
-  const client = conversation.clientId;
-  const caregiver = conversation.caregiverUserId;
+    const client = conversation.clientId;
+    const caregiver = conversation.caregiverUserId;
 
-  // se vier populado
-  const clientId =
-    typeof client === 'object' ? String(client?._id || client?.id || '') : String(client || '');
+    const clientId =
+      typeof client === 'object' ? String(client?._id || client?.id || '') : String(client || '');
 
-  const caregiverId =
-    typeof caregiver === 'object'
-      ? String(caregiver?._id || caregiver?.id || '')
-      : String(caregiver || '');
+    const caregiverId =
+      typeof caregiver === 'object'
+        ? String(caregiver?._id || caregiver?.id || '')
+        : String(caregiver || '');
 
-  if (clientId === currentId) {
-    return typeof caregiver === 'object' ? caregiver : null;
-  }
+    if (clientId === currentId) {
+      return typeof caregiver === 'object' ? caregiver : null;
+    }
 
-  if (caregiverId === currentId) {
-    return typeof client === 'object' ? client : null;
-  }
+    if (caregiverId === currentId) {
+      return typeof client === 'object' ? client : null;
+    }
 
-  return typeof caregiver === 'object' ? caregiver : typeof client === 'object' ? client : null;
-};
+    return typeof caregiver === 'object' ? caregiver : typeof client === 'object' ? client : null;
+  };
 
   if (loading) {
     return (
@@ -194,9 +202,7 @@ function ChatContent() {
                 </div>
               ) : (
                 conversations.map((conversation) => {
-                    const otherUser = getOtherUser(conversation);
-                    console.log('💬 conversation:', conversation);
-                    console.log('👤 otherUser:', otherUser);
+                  const otherUser = getOtherUser(conversation);
 
                   return (
                     <button
@@ -264,7 +270,7 @@ function ChatContent() {
                         {getOtherUser(selectedConversation)?.name || 'Usuário'}
                       </p>
                       <p className="text-xs text-gray-500">
-                        Conversa vinculada ao agendamento
+                        Conversa com este profissional
                       </p>
                     </div>
                   </div>

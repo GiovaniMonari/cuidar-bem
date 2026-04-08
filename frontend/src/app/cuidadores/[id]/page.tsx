@@ -25,6 +25,7 @@ import {
   X,
   AlertCircle,
   Star,
+  MessageCircle,
 } from 'lucide-react';
 import { saveAddress } from '@/utils/savedAddresses';
 import { SavedAddresses } from '@/components/SavedAddress';
@@ -44,6 +45,7 @@ function CaregiverDetailContent() {
   const [availableDates, setAvailableDates] = useState<{ date: string; slots: string[]; isAvailable: boolean }[]>([]);
   const [canChat, setCanChat] = useState(false);
   const [chatBookingId, setChatBookingId] = useState<string | null>(null);
+  const [chatLoading, setChatLoading] = useState(false);
 
   // Estados do modal de agendamento
   const [showBooking, setShowBooking] = useState(false);
@@ -316,18 +318,21 @@ function CaregiverDetailContent() {
   }, [id, isAuthenticated, user]);
 
     const handleStartChat = async () => {
-    if (!chatBookingId) {
-      alert('Para conversar com este cuidador, primeiro solicite um atendimento.');
-      return;
-    }
+  if (!chatBookingId) {
+    alert('Para conversar com este cuidador, primeiro solicite um atendimento.');
+    return;
+  }
 
-    try {
-      const conversation = await api.getOrCreateConversation(chatBookingId);
-      router.push(`/chat?conversation=${conversation._id}`);
-    } catch (error: any) {
-      alert(error.message || 'Erro ao iniciar chat');
-    }
-  };
+  setChatLoading(true);  // Start loading
+  try {
+    const conversation = await api.getOrCreateConversation(chatBookingId);
+    router.push(`/chat?conversation=${conversation._id}`);
+  } catch (error: any) {
+    alert(error.message || 'Erro ao iniciar chat');
+  } finally {
+    setChatLoading(false);  // Always stop loading
+  }
+};
 
     const validateDateRange = (startDate: string, endDate: string) => {
     if (!startDate || !endDate) {
@@ -1140,10 +1145,20 @@ function CaregiverDetailContent() {
                         </p>
                         <button
                           onClick={handleStartChat}
-                          className="btn-secondary w-full flex items-center justify-center gap-2"
+                          disabled={chatLoading}  // Now correctly uses the boolean state
+                          className="btn-secondary w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <MessageSquare className="w-4 h-4" />
-                          Iniciar Chat
+                          {chatLoading ? (  // Conditional rendering based on the boolean
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Abrindo...
+                            </>
+                          ) : (
+                            <>
+                              <MessageCircle className="w-4 h-4" />
+                              Iniciar Chat
+                            </>
+                          )}
                         </button>
                       </div>
                     ) : (

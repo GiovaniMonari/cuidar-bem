@@ -13,6 +13,8 @@ import { BookingsService } from '../bookings/bookings.service';
 
 @Injectable()
 export class ChatService {
+  private conversationLocks = new Map<string, Promise<ConversationDocument>>();
+
   constructor(
     @InjectModel(Conversation.name)
     private conversationModel: Model<ConversationDocument>,
@@ -28,7 +30,6 @@ export class ChatService {
     console.log('userId:', userId);
 
     const booking = await this.bookingsService.findOne(bookingId);
-    console.log('booking encontrado?', !!booking);
 
     if (!booking) {
       throw new NotFoundException('Agendamento não encontrado');
@@ -37,34 +38,83 @@ export class ChatService {
     const caregiver = booking.caregiverId as any;
     const client = booking.clientId as any;
 
-    const clientId = client?._id?.toString();
-    const caregiverUserId = caregiver?.userId?._id?.toString();
+    // ⬇️ CORREÇÃO: Extrair e converter para string primeiro
+    const clientIdStr = client?._id?.toString();
+    const caregiverUserIdStr = caregiver?.userId?._id?.toString();
 
-    console.log('clientId:', clientId);
-    console.log('caregiverUserId:', caregiverUserId);
+    console.log('clientIdStr:', clientIdStr);
+    console.log('caregiverUserIdStr:', caregiverUserIdStr);
 
-    if (!clientId || !caregiverUserId) {
+    if (!clientIdStr || !caregiverUserIdStr) {
       throw new NotFoundException('Participantes da conversa não encontrados');
     }
 
     const isParticipant =
-      String(clientId) === String(userId) ||
-      String(caregiverUserId) === String(userId);
-
-    console.log('isParticipant:', isParticipant);
+      clientIdStr === userId || caregiverUserIdStr === userId;
 
     if (!isParticipant) {
       throw new ForbiddenException('Você não participa desta conversa');
     }
 
+    // Lock por par cliente/cuidador
+    const lockKey = `${clientIdStr}_${caregiverUserIdStr}`;
+
+    const existingLock = this.conversationLocks.get(lockKey);
+    if (existingLock) {
+      console.log(`⏳ Aguardando criação em andamento para par ${lockKey}`);
+      return existingLock;
+    }
+
+    const promise = this._getOrCreateConversation(
+      clientIdStr,
+      caregiverUserIdStr,
+      bookingId,
+    ).finally(() => {
+      this.conversationLocks.delete(lockKey);
+    });
+
+    this.conversationLocks.set(lockKey, promise);
+    return promise;
+  }
+
+  private async _getOrCreateConversation(
+    clientIdStr: string,
+    caregiverUserIdStr: string,
+    bookingIdStr: string,
+  ) {
+    // ⬇️ CORREÇÃO: Criar ObjectId aqui dentro
+    const clientId = new Types.ObjectId(clientIdStr);
+    const caregiverUserId = new Types.ObjectId(caregiverUserIdStr);
+    const bookingId = new Types.ObjectId(bookingIdStr);
+
+    console.log('🔍 Buscando conversa existente...');
+    console.log('clientId (ObjectId):', clientId);
+    console.log('caregiverUserId (ObjectId):', caregiverUserId);
+
+    // ⬇️ BUSCA DIRETA - Deve encontrar a conversa existente
+    const existing = await this.conversationModel.findOne({
+      clientId: clientId,
+      caregiverUserId: caregiverUserId,
+    });
+
+    if (existing) {
+      console.log('✅ Conversa já existe:', existing._id);
+      return existing;
+    }
+
+    console.log('🆕 Nenhuma conversa encontrada, criando nova...');
+
     try {
       const conversation = await this.conversationModel.findOneAndUpdate(
-        { bookingId: booking._id },
+        {
+          clientId: clientId,
+          caregiverUserId: caregiverUserId,
+        },
         {
           $setOnInsert: {
-            bookingId: booking._id,
-            clientId: client._id,
-            caregiverUserId: caregiver.userId._id,
+            clientId: clientId,
+            caregiverUserId: caregiverUserId,
+            bookingId: bookingId,
             isActive: true,
             lastMessage: '',
             lastMessageAt: null,
@@ -76,19 +126,23 @@ export class ChatService {
         },
       );
 
-      console.log('✅ conversa criada/encontrada:', conversation?._id);
-
+      console.log('✅ Conversa criada:', conversation?._id);
       return conversation;
     } catch (error: any) {
-      console.error('❌ erro ao criar conversa:', error);
+      console.error('❌ Erro ao criar conversa:', error.message);
 
+      // Fallback: Se der E11000, busca novamente
       if (error.code === 11000) {
-        const existing = await this.conversationModel.findOne({
-          bookingId: booking._id,
+        console.log('🔄 Conflito de duplicação, buscando existente...');
+
+        const fallback = await this.conversationModel.findOne({
+          clientId: clientId,
+          caregiverUserId: caregiverUserId,
         });
-        if (existing) {
-          console.log('♻️ conversa já existia:', existing._id);
-          return existing;
+
+        if (fallback) {
+          console.log('♻️ Conversa encontrada após conflito:', fallback._id);
+          return fallback;
         }
       }
 
@@ -103,8 +157,8 @@ export class ChatService {
     }
 
     const isParticipant =
-      conversation.clientId.toString() === String(senderId) ||
-      conversation.caregiverUserId.toString() === String(senderId);
+      conversation.clientId.toString() === senderId ||
+      conversation.caregiverUserId.toString() === senderId;
 
     if (!isParticipant) {
       throw new ForbiddenException('Sem permissão para enviar mensagem');
@@ -133,8 +187,8 @@ export class ChatService {
     }
 
     const isParticipant =
-      conversation.clientId.toString() === String(userId) ||
-      conversation.caregiverUserId.toString() === String(userId);
+      conversation.clientId.toString() === userId ||
+      conversation.caregiverUserId.toString() === userId;
 
     if (!isParticipant) {
       throw new ForbiddenException('Sem acesso a esta conversa');
@@ -174,11 +228,6 @@ export class ChatService {
           unreadCount,
         };
       }),
-    );
-
-    console.log(
-      '💬 conversationsWithUnread:',
-      JSON.stringify(conversationsWithUnread, null, 2),
     );
 
     return conversationsWithUnread;

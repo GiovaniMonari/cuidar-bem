@@ -1,3 +1,4 @@
+// conversation.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
@@ -5,7 +6,8 @@ export type ConversationDocument = Conversation & Document;
 
 @Schema({ timestamps: true })
 export class Conversation {
-  @Prop({ type: Types.ObjectId, ref: 'Booking', required: true, unique: true })
+  // ⬇️ REMOVIDO o unique do bookingId
+  @Prop({ type: Types.ObjectId, ref: 'Booking' })
   bookingId: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
@@ -25,3 +27,5 @@ export class Conversation {
 }
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);
+
+ConversationSchema.index({ clientId: 1, caregiverUserId: 1 }, { unique: true });

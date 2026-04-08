@@ -49,6 +49,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<string>('all');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [chatLoading, setChatLoading] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -115,14 +116,24 @@ export default function DashboardPage() {
     }
   };
 
-    const openChat = async (bookingId: string) => {
-    try {
-      const conversation = await api.getOrCreateConversation(bookingId);
-      router.push(`/chat?conversation=${conversation._id}`);
-    } catch (error: any) {
-      alert(error.message || 'Erro ao abrir conversa');
-    }
-  };
+  const openChat = async (bookingId: string) => {
+  // ⬇️ PROTEÇÃO: Evita cliques múltiplos
+  if (chatLoading === bookingId) {
+    console.log('⏳ Já abrindo chat, aguarde...');
+    return;
+  }
+
+  setChatLoading(bookingId);
+
+  try {
+    const conversation = await api.getOrCreateConversation(bookingId);
+    router.push(`/chat?conversation=${conversation._id}`);
+  } catch (error: any) {
+    alert(error.message || 'Erro ao abrir conversa');
+  } finally {
+    setChatLoading(null);
+  }
+};
 
   if (authLoading || loading) {
     return (
@@ -405,10 +416,20 @@ export default function DashboardPage() {
                             </button>
                             <button
                               onClick={() => openChat(booking._id)}
-                              className="bg-primary-100 text-primary-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-200 transition-colors flex items-center gap-1.5"
+                              disabled={chatLoading === booking._id} // ⬅️ ADICIONAR
+                              className="bg-primary-100 text-primary-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-200 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              <MessageCircle className="w-4 h-4" />
-                              Abrir Chat
+                              {chatLoading === booking._id ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Abrindo...
+                                </>
+                              ) : (
+                                <>
+                                  <MessageCircle className="w-4 h-4" />
+                                  Abrir Chat
+                                </>
+                              )}
                             </button>
                           </>
                         )}

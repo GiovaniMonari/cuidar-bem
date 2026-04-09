@@ -108,6 +108,14 @@ class ApiService {
     });
   }
 
+  async checkInBooking(id: string, latitude: number, longitude: number) {
+    return this.request<any>(`/bookings/${id}/check-in`, {
+      method: 'POST',
+      headers: this.headers(true),
+      body: JSON.stringify({ latitude, longitude }),
+    });
+  }
+
   // Reviews
   async getReviews(caregiverId: string) {
     return this.request<any>(`/reviews/caregiver/${caregiverId}`, {

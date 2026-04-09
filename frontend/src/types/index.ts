@@ -92,6 +92,12 @@ export interface Booking {
   clientName?: string;
   clientPhone?: string;
   address?: string;
+  addressLat?: number;
+  addressLon?: number;
+  checkInAt?: string;
+  checkInLat?: number;
+  checkInLon?: number;
+  checkInDistanceMeters?: number;
   patientName?: string;
   patientAge?: number;
   patientCondition?: string;

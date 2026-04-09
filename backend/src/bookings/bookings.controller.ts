@@ -12,6 +12,7 @@ import {
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CheckInBookingDto } from './dto/check-in-booking.dto';
 
 @Controller('bookings')
 @UseGuards(JwtAuthGuard)
@@ -39,6 +40,17 @@ export class BookingsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.bookingsService.findOne(id);
+  }
+
+  @Post(':id/check-in')
+  checkIn(@Param('id') id: string, @Request() req, @Body() dto: CheckInBookingDto) {
+    return this.bookingsService.checkIn(
+      id,
+      req.user.userId,
+      req.user.role,
+      dto.latitude,
+      dto.longitude,
+    );
   }
 
   @Put(':id/status')

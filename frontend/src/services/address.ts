@@ -34,6 +34,8 @@ class AddressService {
         bairro: data.bairro || data.address?.suburb || '',
         localidade: data.localidade || data.address?.city || '',
         uf: data.uf || data.address?.state || '',
+        lat: data.lat || '',
+        lon: data.lon || '',
       };
 
       // Salvar no cache

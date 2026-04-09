@@ -64,6 +64,24 @@ export class Booking {
   address: string;
 
   @Prop()
+  addressLat: number;
+
+  @Prop()
+  addressLon: number;
+
+  @Prop()
+  checkInAt: Date;
+
+  @Prop()
+  checkInLat: number;
+
+  @Prop()
+  checkInLon: number;
+
+  @Prop()
+  checkInDistanceMeters: number;
+
+  @Prop()
   patientName: string;
 
   @Prop()

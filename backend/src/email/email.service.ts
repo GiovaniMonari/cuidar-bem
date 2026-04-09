@@ -521,6 +521,69 @@ export class EmailService implements OnModuleInit {
     );
   }
 
+  async sendCaregiverCheckInEmail(data: {
+    to: string;
+    clientName: string;
+    caregiverName: string;
+    serviceName: string;
+    address: string;
+    checkInAt: string;
+    distanceMeters?: number;
+  }) {
+    const distanceText =
+      typeof data.distanceMeters === 'number'
+        ? `${data.distanceMeters}m do local combinado`
+        : 'próximo ao local combinado';
+
+    const content = `
+      <div class="header" style="background: linear-gradient(135deg, #16a34a, #15803d);">
+        <h1>📍 Cuidador no Local</h1>
+        <p>O atendimento acaba de ser iniciado</p>
+      </div>
+      <div class="content">
+        <p style="font-size: 18px; color: #1e293b;">Olá, <strong>${data.clientName}</strong>!</p>
+
+        <p style="color: #475569; line-height: 1.6;">
+          O cuidador <strong>${data.caregiverName}</strong> realizou o check-in e já está
+          <strong> ${distanceText}</strong>.
+        </p>
+
+        <div class="info-box">
+          <div class="info-row">
+            <span style="color: #64748b;">Serviço</span>
+            <span style="color: #1e293b; font-weight: 600;">${data.serviceName}</span>
+          </div>
+          <div class="info-row">
+            <span style="color: #64748b;">Check-in</span>
+            <span style="color: #1e293b; font-weight: 600;">${data.checkInAt}</span>
+          </div>
+          <div class="info-row">
+            <span style="color: #64748b;">Endereço</span>
+            <span style="color: #1e293b; font-weight: 600;">${data.address}</span>
+          </div>
+        </div>
+
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 16px; margin: 16px 0;">
+          <p style="color: #1d4ed8; margin: 0;">
+            💬 Se precisar alinhar qualquer detalhe do atendimento, acompanhe a conversa pelo dashboard.
+          </p>
+        </div>
+
+        <div style="text-align: center;">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/dashboard" class="btn btn-accent">
+            Acompanhar Atendimento
+          </a>
+        </div>
+      </div>
+    `;
+
+    return this.sendMail(
+      data.to,
+      `📍 ${data.caregiverName} realizou o check-in`,
+      this.baseTemplate(content),
+    );
+  }
+
   // ═══════════════════════════════════════════
   // 6. SERVIÇO CONCLUÍDO (CLIENTE)
   // ═══════════════════════════════════════════

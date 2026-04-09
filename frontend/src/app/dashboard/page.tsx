@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/services/api';
-import { Booking, SPECIALTIES } from '@/types';
+import { Booking } from '@/types';
 import {
   Calendar,
   Clock,
@@ -24,9 +24,12 @@ import {
 } from 'lucide-react';
 import { BookingCalendar } from '@/components/BookingCalendar';
 
+const CHECK_IN_EARLY_WINDOW_MS = 2 * 60 * 60 * 1000;
+
 const STATUS_MAP: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
   confirmed: { label: 'Confirmado', color: 'bg-blue-100 text-blue-700', icon: CheckCircle },
+  in_progress: { label: 'Em andamento', color: 'bg-emerald-100 text-emerald-700', icon: MapPin },
   completed: { label: 'Concluído', color: 'bg-green-100 text-green-700', icon: CheckCircle },
   cancelled: { label: 'Cancelado', color: 'bg-red-100 text-red-700', icon: XCircle },
 };
@@ -44,7 +47,7 @@ const PAYMENT_STATUS_MAP: Record<string, { label: string; color: string }> = {
 export default function DashboardPage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [bookings, setBookings] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [payments, setPayments] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<string>('all');
@@ -98,6 +101,106 @@ export default function DashboardPage() {
       await fetchData();
     } catch (error: any) {
       alert(error.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const requestCurrentLocation = async () => {
+    const isLocalEnvironment = ['localhost', '127.0.0.1', '::1'].includes(
+      window.location.hostname,
+    );
+
+    if (!window.isSecureContext && !isLocalEnvironment) {
+      throw new Error(
+        'A localização do navegador só funciona em páginas seguras (HTTPS). Abra a plataforma em HTTPS para fazer o check-in.',
+      );
+    }
+
+    const getPosition = (options: PositionOptions) =>
+      new Promise<GeolocationPosition>((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('Seu navegador não suporta geolocalização.'));
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          options,
+        );
+      });
+
+    try {
+      return await getPosition({
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      });
+    } catch (error: any) {
+      if (
+        error?.code === error?.PERMISSION_DENIED ||
+        error?.code === 1
+      ) {
+        throw new Error(
+          'Permita o acesso à localização para realizar o check-in.',
+        );
+      }
+
+      try {
+        return await getPosition({
+          enableHighAccuracy: false,
+          timeout: 12000,
+          maximumAge: 300000,
+        });
+      } catch (fallbackError: any) {
+        if (
+          fallbackError?.code === fallbackError?.PERMISSION_DENIED ||
+          fallbackError?.code === 1
+        ) {
+          throw new Error(
+            'Permita o acesso à localização para realizar o check-in.',
+          );
+        }
+
+        if (
+          fallbackError?.code === fallbackError?.POSITION_UNAVAILABLE ||
+          fallbackError?.code === 2
+        ) {
+          throw new Error(
+            'Não foi possível identificar sua localização atual. Ative a localização do dispositivo e tente novamente.',
+          );
+        }
+
+        if (
+          fallbackError?.code === fallbackError?.TIMEOUT ||
+          fallbackError?.code === 3
+        ) {
+          throw new Error(
+            'A localização demorou demais para responder. Tente novamente em um local com melhor sinal.',
+          );
+        }
+
+        throw new Error(
+          'Não foi possível obter sua localização atual para o check-in.',
+        );
+      }
+    }
+  };
+
+  const handleCheckIn = async (bookingId: string) => {
+    setActionLoading(bookingId);
+    try {
+      const position = await requestCurrentLocation();
+      await api.checkInBooking(
+        bookingId,
+        position.coords.latitude,
+        position.coords.longitude,
+      );
+      await fetchData();
+      alert('Check-in realizado com sucesso. Atendimento marcado como em andamento.');
+    } catch (error: any) {
+      alert(error.message || 'Não foi possível realizar o check-in.');
     } finally {
       setActionLoading(null);
     }
@@ -182,9 +285,9 @@ export default function DashboardPage() {
           </div>
           <div className="card p-4">
             <div className="text-2xl font-bold text-blue-600">
-              {bookings.filter((b) => b.status === 'confirmed').length}
+              {bookings.filter((b) => ['confirmed', 'in_progress'].includes(b.status)).length}
             </div>
-            <div className="text-sm text-gray-500">Confirmados</div>
+            <div className="text-sm text-gray-500">Ativos</div>
           </div>
           <div className="card p-4">
             <div className="text-2xl font-bold text-green-600">
@@ -216,6 +319,7 @@ export default function DashboardPage() {
             { key: 'all', label: 'Todos' },
             { key: 'pending', label: 'Pendentes' },
             { key: 'confirmed', label: 'Confirmados' },
+            { key: 'in_progress', label: 'Em andamento' },
             { key: 'completed', label: 'Concluídos' },
             { key: 'cancelled', label: 'Cancelados' },
           ].map((t) => (
@@ -249,6 +353,12 @@ export default function DashboardPage() {
               const paymentStatus = payment
                 ? PAYMENT_STATUS_MAP[payment.status] || PAYMENT_STATUS_MAP.pending
                 : null;
+              const canCheckInNow =
+                new Date(booking.startDate).getTime() - CHECK_IN_EARLY_WINDOW_MS <=
+                Date.now();
+              const checkInWindowLabel = new Date(
+                new Date(booking.startDate).getTime() - CHECK_IN_EARLY_WINDOW_MS,
+              ).toLocaleString('pt-BR');
 
               return (
                 <div key={booking._id} className="card p-6">
@@ -326,6 +436,19 @@ export default function DashboardPage() {
                           <p className="mt-3 text-sm text-gray-500 bg-gray-50 rounded-lg p-3">
                             {booking.notes}
                           </p>
+                        )}
+
+                        {booking.checkInAt && (
+                          <div className="mt-3 flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 rounded-lg p-3">
+                            <MapPin className="w-4 h-4 flex-shrink-0" />
+                            <span>
+                              Check-in realizado em{' '}
+                              {new Date(booking.checkInAt).toLocaleString('pt-BR')}
+                              {typeof booking.checkInDistanceMeters === 'number'
+                                ? ` a ${Math.round(booking.checkInDistanceMeters)}m do local combinado`
+                                : ''}
+                            </span>
+                          </div>
                         )}
                       </div>
 
@@ -443,6 +566,43 @@ export default function DashboardPage() {
                         {booking.status === 'confirmed' && isCaregiver && (
                           <>
                             <button
+                              onClick={() => handleCheckIn(booking._id)}
+                              disabled={actionLoading === booking._id || !canCheckInNow}
+                              className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {actionLoading === booking._id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <MapPin className="w-4 h-4" />
+                              )}
+                              Fazer Check-in
+                            </button>
+                            <span className="text-sm text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg">
+                              {canCheckInNow
+                                ? 'Ao chegar no endereço combinado, use o check-in para iniciar o atendimento'
+                                : `Check-in liberado a partir de ${checkInWindowLabel}`}
+                            </span>
+                          </>
+                        )}
+
+                        {booking.status === 'confirmed' && !isCaregiver && (
+                          <>
+                            <button
+                              onClick={() => handleStatusUpdate(booking._id, 'cancelled')}
+                              disabled={actionLoading === booking._id}
+                              className="bg-red-100 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
+                            >
+                              Cancelar
+                            </button>
+                            <span className="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
+                              O cuidador fará o check-in quando chegar ao local do atendimento
+                            </span>
+                          </>
+                        )}
+
+                        {booking.status === 'in_progress' && isCaregiver && (
+                          <>
+                            <button
                               onClick={() => handleStatusUpdate(booking._id, 'completed')}
                               disabled={actionLoading === booking._id}
                               className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors flex items-center gap-1.5"
@@ -460,14 +620,10 @@ export default function DashboardPage() {
                           </>
                         )}
 
-                        {booking.status === 'confirmed' && !isCaregiver && (
-                          <button
-                            onClick={() => handleStatusUpdate(booking._id, 'cancelled')}
-                            disabled={actionLoading === booking._id}
-                            className="bg-red-100 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
-                          >
-                            Cancelar
-                          </button>
+                        {booking.status === 'in_progress' && !isCaregiver && (
+                          <span className="text-sm text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg">
+                            O cuidador já realizou o check-in e o atendimento está em andamento
+                          </span>
                         )}
 
                         {booking.status === 'completed' && isCaregiver && (

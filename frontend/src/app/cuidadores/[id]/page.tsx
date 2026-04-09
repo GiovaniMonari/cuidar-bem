@@ -54,6 +54,7 @@ function CaregiverDetailContent() {
   const [dateRangeError, setDateRangeError] = useState('');
   const [isRangeAvailable, setIsRangeAvailable] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [isAddressValidated, setIsAddressValidated] = useState(false);
 
   // Estados de avaliação
   const [showReview, setShowReview] = useState(false);
@@ -189,6 +190,28 @@ useEffect(() => {
       return;
     }
 
+    if (!bookingForm.cep || bookingForm.cep.replace(/\D/g, '').length !== 8) {
+      alert('Informe um CEP válido para o endereço do atendimento.');
+      return;
+    }
+
+    if (!bookingForm.fullAddress && !bookingForm.address) {
+      alert('Informe o endereço completo do atendimento.');
+      return;
+    }
+
+    if (!isAddressValidated) {
+      alert('Valide o endereço pelo CEP antes de solicitar o atendimento.');
+      return;
+    }
+
+    if (!bookingForm.lat || !bookingForm.lon) {
+      alert(
+        'Confirme o endereço no mapa ou pelo CEP para habilitar o check-in do cuidador no local combinado.',
+      );
+      return;
+    }
+
     let finalStartDate = '';
     let finalEndDate = '';
 
@@ -253,6 +276,8 @@ useEffect(() => {
         clientName: user?.name,
         clientPhone: user?.phone,
         address: bookingForm.fullAddress || bookingForm.address,
+        addressLat: Number(bookingForm.lat),
+        addressLon: Number(bookingForm.lon),
         patientName: bookingForm.patientName,
         patientAge: bookingForm.patientAge ? Number(bookingForm.patientAge) : undefined,
         patientCondition: bookingForm.patientCondition,
@@ -263,7 +288,7 @@ useEffect(() => {
           label: bookingForm.patientName
             ? `Atendimento - ${bookingForm.patientName}`
             : 'Endereço de atendimento',
-          address: bookingForm.address,
+          address: bookingForm.fullAddress || bookingForm.address,
           cep: bookingForm.cep,
           lat: bookingForm.lat,
           lon: bookingForm.lon,
@@ -301,6 +326,7 @@ useEffect(() => {
         patientAge: '',
         patientCondition: '',
       });
+      setIsAddressValidated(false);
 
       setTimeout(() => setBookingSuccess(false), 5000);
     } catch (error: any) {
@@ -788,20 +814,31 @@ const handleReview = async (e: React.FormEvent) => {
                         )}
 
                         <SavedAddresses
-                          onSelect={(saved) =>
+                          onSelect={(saved) => {
                             setBookingForm((prev) => ({
                               ...prev,
                               cep: saved.cep || '',
                               address: saved.address,
+                              number: '',
+                              complement: '',
+                              fullAddress: saved.address,
                               lat: saved.lat || '',
                               lon: saved.lon || '',
-                            }))
-                          }
+                            }));
+                            setIsAddressValidated(
+                              Boolean(saved.cep && saved.lat && saved.lon),
+                            );
+                          }}
                         />
 
                         <AddressAutocomplete
                           value={bookingForm.address}
                           cep={bookingForm.cep}
+                          number={bookingForm.number}
+                          complement={bookingForm.complement}
+                          lat={bookingForm.lat}
+                          lon={bookingForm.lon}
+                          isValidated={isAddressValidated}
                           onChange={(data) =>
                             setBookingForm((prev) => ({
                               ...prev,
@@ -814,6 +851,7 @@ const handleReview = async (e: React.FormEvent) => {
                               lon: data.lon ?? prev.lon,
                             }))
                           }
+                          onValidationChange={setIsAddressValidated}
                         />
 
                         <div className="bg-gray-50 rounded-xl p-4 space-y-3">

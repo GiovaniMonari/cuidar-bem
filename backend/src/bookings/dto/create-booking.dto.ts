@@ -7,6 +7,7 @@ import {
   IsArray,
   Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateBookingDto {
   @IsString()
@@ -67,6 +68,16 @@ export class CreateBookingDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  addressLat?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  addressLon?: number;
 
   @IsOptional()
   @IsString()

@@ -17,6 +17,9 @@ interface Props {
   cep: string;
   number?: string;
   complement?: string;
+  lat?: string;
+  lon?: string;
+  isValidated?: boolean;
   onChange: (data: {
     cep?: string;
     address?: string;
@@ -26,17 +29,32 @@ interface Props {
     lat?: string;
     lon?: string;
   }) => void;
+  onValidationChange?: (isValidated: boolean) => void;
 }
 
-export function AddressAutocomplete({ value, cep, number = '', complement = '', onChange }: Props) {
+export function AddressAutocomplete({
+  value,
+  cep,
+  number = '',
+  complement = '',
+  lat = '',
+  lon = '',
+  isValidated = false,
+  onChange,
+  onValidationChange,
+}: Props) {
   const [cepLoading, setCepLoading] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [selectedCoords, setSelectedCoords] = useState<{ lat: string; lon: string } | null>(null);
   const [localNumber, setLocalNumber] = useState(number);
   const [localComplement, setLocalComplement] = useState(complement);
+  const [isResolvingLocation, setIsResolvingLocation] = useState(false);
+  const [hasResolvedCep, setHasResolvedCep] = useState(false);
+  const [cepBaseAddress, setCepBaseAddress] = useState('');
   
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const validationRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sincronizar props com estado local
   useEffect(() => {
@@ -46,6 +64,26 @@ export function AddressAutocomplete({ value, cep, number = '', complement = '', 
   useEffect(() => {
     setLocalComplement(complement);
   }, [complement]);
+
+  useEffect(() => {
+    if (lat && lon) {
+      setSelectedCoords({ lat, lon });
+      return;
+    }
+
+    setSelectedCoords(null);
+  }, [lat, lon]);
+
+  useEffect(() => {
+    const cleanCep = cep.replace(/\D/g, '');
+
+    if (cleanCep.length === 8 && (isValidated || (lat && lon))) {
+      setHasResolvedCep(true);
+      if (value.trim()) {
+        setCepBaseAddress(value.trim());
+      }
+    }
+  }, [cep, isValidated, lat, lon, value]);
 
   const mapUrl = useMemo(() => {
     if (!selectedCoords) return null;
@@ -57,34 +95,155 @@ export function AddressAutocomplete({ value, cep, number = '', complement = '', 
     }%2C${Number(selectedCoords.lat) + 0.005}&layer=mapnik&marker=${selectedCoords.lat}%2C${selectedCoords.lon}`;
   }, [selectedCoords]);
 
+  const formatCep = useCallback((rawCep?: string) => {
+    if (!rawCep) {
+      return '';
+    }
+
+    return maskCep(rawCep);
+  }, []);
+
   // Montar endereço completo
   const buildFullAddress = useCallback((baseAddress: string, num: string, comp: string) => {
-    let full = baseAddress;
-    
+    const trimmedBase = baseAddress.trim();
+
+    if (!trimmedBase) {
+      return '';
+    }
+
+    const parts = trimmedBase
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    const street = parts[0] || trimmedBase;
+    const remainder = parts.slice(1).join(', ');
+    let streetLine = street;
+
     if (num) {
-      // Inserir número após a rua (antes da primeira vírgula)
-      const parts = baseAddress.split(',');
-      if (parts.length > 0) {
-        parts[0] = `${parts[0].trim()}, ${num}`;
-        full = parts.join(',');
-      } else {
-        full = `${baseAddress}, ${num}`;
-      }
+      streetLine = `${streetLine}, ${num}`;
     }
-    
+
     if (comp) {
-      // Adicionar complemento após o número
-      const parts = full.split(',');
-      if (parts.length > 1) {
-        parts[1] = ` ${comp}${parts[1]}`;
-        full = parts.join(',');
-      } else {
-        full = `${full} - ${comp}`;
-      }
+      streetLine = `${streetLine} - ${comp}`;
     }
-    
-    return full;
+
+    return remainder ? `${streetLine}, ${remainder}` : streetLine;
   }, []);
+
+  const stripCepFromQuery = useCallback((query: string, rawCep: string) => {
+    const cleanCep = rawCep.replace(/\D/g, '');
+
+    if (!query.trim()) {
+      return '';
+    }
+
+    const formattedCep =
+      cleanCep.length === 8 ? cleanCep.replace(/(\d{5})(\d{3})/, '$1-$2') : '';
+
+    return query
+      .replace(formattedCep, '')
+      .replace(cleanCep, '')
+      .replace(/\s+,/g, ',')
+      .replace(/,\s*,/g, ', ')
+      .replace(/,\s*$/, '')
+      .trim();
+  }, []);
+
+  const resolveCoordinates = useCallback(
+    async (baseAddress: string, fullAddress: string, rawCep: string) => {
+      const queries = Array.from(
+        new Set(
+          [
+            fullAddress,
+            `${fullAddress}, Brasil`,
+            stripCepFromQuery(fullAddress, rawCep),
+            `${stripCepFromQuery(fullAddress, rawCep)}, Brasil`,
+            baseAddress,
+            `${baseAddress}, Brasil`,
+            stripCepFromQuery(baseAddress, rawCep),
+            `${stripCepFromQuery(baseAddress, rawCep)}, Brasil`,
+          ]
+            .map((item) => item.trim())
+            .filter(Boolean),
+        ),
+      );
+
+      for (const query of queries) {
+        const results = await addressService.searchByText(query);
+        if (results.length > 0) {
+          return results[0];
+        }
+      }
+
+      return null;
+    },
+    [stripCepFromQuery],
+  );
+
+  useEffect(() => {
+    if (validationRef.current) {
+      clearTimeout(validationRef.current);
+    }
+
+    const cleanCep = cep.replace(/\D/g, '');
+    const baseAddress = value.trim() || cepBaseAddress.trim();
+
+    if (cleanCep.length === 8 && lat && lon && isValidated) {
+      setIsResolvingLocation(false);
+      return;
+    }
+
+    if (!hasResolvedCep || cleanCep.length !== 8 || baseAddress.length < 4) {
+      setIsResolvingLocation(false);
+      return;
+    }
+
+    const fullAddress = buildFullAddress(baseAddress, localNumber, localComplement);
+
+    setIsResolvingLocation(true);
+
+    validationRef.current = setTimeout(async () => {
+      const resolved = await resolveCoordinates(baseAddress, fullAddress, cleanCep);
+
+      if (resolved) {
+        setSelectedCoords({ lat: resolved.lat, lon: resolved.lon });
+        onChange({
+          address: baseAddress,
+          fullAddress,
+          lat: resolved.lat,
+          lon: resolved.lon,
+        });
+        onValidationChange?.(true);
+      } else {
+        setSelectedCoords(null);
+        onChange({
+          address: baseAddress,
+          fullAddress,
+          lat: '',
+          lon: '',
+        });
+        onValidationChange?.(false);
+      }
+
+      setIsResolvingLocation(false);
+    }, 700);
+
+    return () => {
+      if (validationRef.current) {
+        clearTimeout(validationRef.current);
+      }
+    };
+  }, [
+    cep,
+    value,
+    localNumber,
+    localComplement,
+    hasResolvedCep,
+    cepBaseAddress,
+    buildFullAddress,
+    resolveCoordinates,
+  ]);
 
   const handleCepSearch = async () => {
     if (!cep || cep.replace(/\D/g, '').length < 8) {
@@ -96,46 +255,63 @@ export function AddressAutocomplete({ value, cep, number = '', complement = '', 
     try {
       const result = await addressService.searchByCep(cep);
       if (result) {
+        const formattedCep = formatCep(result.cep);
         const baseAddress = [
           result.logradouro,
           result.bairro,
           result.localidade,
           result.uf,
-          result.cep,
         ]
           .filter(Boolean)
           .join(', ');
 
         const fullAddress = buildFullAddress(baseAddress, localNumber, localComplement);
+        setHasResolvedCep(true);
+        setCepBaseAddress(baseAddress);
+        setSelectedCoords(null);
+        onValidationChange?.(false);
 
         onChange({
-          cep: result.cep,
+          cep: formattedCep,
           address: baseAddress,
           number: localNumber,
           complement: localComplement,
           fullAddress,
+          lat: '',
+          lon: '',
         });
 
-        // Buscar coordenadas pelo endereço completo
-        const geo = await addressService.searchByText(baseAddress);
-        if (geo.length > 0) {
-          setSelectedCoords({ lat: geo[0].lat, lon: geo[0].lon });
-          onChange({ 
-            cep: result.cep,
+        if (result.lat && result.lon) {
+          setSelectedCoords({ lat: result.lat, lon: result.lon });
+          onChange({
+            cep: formattedCep,
             address: baseAddress,
             number: localNumber,
             complement: localComplement,
             fullAddress,
-            lat: geo[0].lat, 
-            lon: geo[0].lon 
+            lat: result.lat,
+            lon: result.lon,
           });
+          onValidationChange?.(true);
+          setSuggestions([]);
+          return;
         }
         
         setSuggestions([]);
       } else {
+        setHasResolvedCep(false);
+        setCepBaseAddress('');
+        setSelectedCoords(null);
+        onChange({ lat: '', lon: '' });
+        onValidationChange?.(false);
         alert('CEP não encontrado.');
       }
     } catch {
+      setHasResolvedCep(false);
+      setCepBaseAddress('');
+      setSelectedCoords(null);
+      onChange({ lat: '', lon: '' });
+      onValidationChange?.(false);
       alert('Erro ao buscar CEP.');
     } finally {
       setCepLoading(false);
@@ -169,14 +345,22 @@ export function AddressAutocomplete({ value, cep, number = '', complement = '', 
 
   const handleTextSearch = (text: string) => {
     const fullAddress = buildFullAddress(text, localNumber, localComplement);
-    onChange({ address: text, fullAddress });
+    setSelectedCoords(null);
+    onChange({ address: text, fullAddress, lat: '', lon: '' });
+    onValidationChange?.(false);
+    if (hasResolvedCep) {
+      setCepBaseAddress(text);
+    }
     debouncedSearch(text);
   };
 
   const handleSelectSuggestion = (item: any) => {
     const fullAddress = buildFullAddress(item.display_name, localNumber, localComplement);
+    const suggestionCep = formatCep(item.address?.postcode);
+    const hasSuggestionCep = suggestionCep.replace(/\D/g, '').length === 8;
     
     onChange({
+      cep: hasSuggestionCep ? suggestionCep : undefined,
       address: item.display_name,
       number: localNumber,
       complement: localComplement,
@@ -185,25 +369,36 @@ export function AddressAutocomplete({ value, cep, number = '', complement = '', 
       lon: item.lon,
     });
     setSelectedCoords({ lat: item.lat, lon: item.lon });
+    setCepBaseAddress(item.display_name);
+    setHasResolvedCep(hasSuggestionCep || hasResolvedCep);
+    onValidationChange?.(hasSuggestionCep || hasResolvedCep);
     setSuggestions([]);
   };
 
   const handleNumberChange = (newNumber: string) => {
     setLocalNumber(newNumber);
     const fullAddress = buildFullAddress(value, newNumber, localComplement);
+    setSelectedCoords(null);
     onChange({ 
       number: newNumber, 
-      fullAddress 
+      fullAddress,
+      lat: '',
+      lon: '',
     });
+    onValidationChange?.(false);
   };
 
   const handleComplementChange = (newComplement: string) => {
     setLocalComplement(newComplement);
     const fullAddress = buildFullAddress(value, localNumber, newComplement);
+    setSelectedCoords(null);
     onChange({ 
       complement: newComplement, 
-      fullAddress 
+      fullAddress,
+      lat: '',
+      lon: '',
     });
+    onValidationChange?.(false);
   };
 
   return (
@@ -217,7 +412,17 @@ export function AddressAutocomplete({ value, cep, number = '', complement = '', 
           <input
             type="text"
             value={cep}
-            onChange={(e) => onChange({ cep: maskCep(e.target.value) })}
+            onChange={(e) => {
+              setSelectedCoords(null);
+              setHasResolvedCep(false);
+              setCepBaseAddress('');
+              onChange({
+                cep: maskCep(e.target.value),
+                lat: '',
+                lon: '',
+              });
+              onValidationChange?.(false);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -237,10 +442,27 @@ export function AddressAutocomplete({ value, cep, number = '', complement = '', 
             {cepLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              'Buscar CEP'
+              'Validar CEP'
             )}
           </button>
         </div>
+        {isValidated ? (
+          <p className="text-xs text-green-600 mt-2">
+            Endereço validado com sucesso pelo CEP.
+          </p>
+        ) : isResolvingLocation ? (
+          <p className="text-xs text-blue-600 mt-2">
+            Validando a localização do atendimento para o check-in...
+          </p>
+        ) : hasResolvedCep ? (
+          <p className="text-xs text-amber-600 mt-2">
+            CEP encontrado. Revise número/complemento e aguarde a validação da localização.
+          </p>
+        ) : (
+          <p className="text-xs text-amber-600 mt-2">
+            Preencha o endereço e clique em `Validar CEP` para carregar o local correto do atendimento.
+          </p>
+        )}
       </div>
 
       {/* Busca por endereço */}
@@ -286,7 +508,7 @@ export function AddressAutocomplete({ value, cep, number = '', complement = '', 
         {/* Nenhum resultado */}
         {!searchLoading && value.length >= 4 && suggestions.length === 0 && (
           <p className="text-xs text-gray-500 mt-1">
-            Digite mais detalhes do endereço para encontrar sugestões
+            Digite mais detalhes do endereço para encontrar sugestões. Se editar algo depois, a localização será recalculada.
           </p>
         )}
       </div>

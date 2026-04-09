@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
   Inject,
   forwardRef,
   Logger,
@@ -17,6 +18,8 @@ import { getDatesInRange } from '../common/utils/date-range';
 @Injectable()
 export class BookingsService {
   private readonly logger = new Logger(BookingsService.name);
+  private readonly checkInRadiusMeters = 200;
+  private readonly earlyCheckInWindowMs = 2 * 60 * 60 * 1000;
   private paymentsService: any;
 
   constructor(
@@ -59,6 +62,37 @@ export class BookingsService {
     }
   }
 
+  private isValidCoordinate(value: unknown): value is number {
+    return typeof value === 'number' && Number.isFinite(value);
+  }
+
+  private toRadians(value: number): number {
+    return (value * Math.PI) / 180;
+  }
+
+  private calculateDistanceMeters(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ): number {
+    const earthRadiusMeters = 6371000;
+    const deltaLat = this.toRadians(lat2 - lat1);
+    const deltaLon = this.toRadians(lon2 - lon1);
+    const lat1Rad = this.toRadians(lat1);
+    const lat2Rad = this.toRadians(lat2);
+
+    const a =
+      Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+      Math.sin(deltaLon / 2) *
+        Math.sin(deltaLon / 2) *
+        Math.cos(lat1Rad) *
+        Math.cos(lat2Rad);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return earthRadiusMeters * c;
+  }
+
   // ═══════════════════════════════════════════
   // CREATE BOOKING
   // ═══════════════════════════════════════════
@@ -77,6 +111,21 @@ export class BookingsService {
     if (end < start) {
       throw new ForbiddenException(
         'A data final não pode ser anterior à inicial.',
+      );
+    }
+
+    if (!dto.address?.trim()) {
+      throw new ForbiddenException(
+        'Informe o endereço do atendimento para permitir o check-in do cuidador.',
+      );
+    }
+
+    if (
+      !this.isValidCoordinate(dto.addressLat) ||
+      !this.isValidCoordinate(dto.addressLon)
+    ) {
+      throw new ForbiddenException(
+        'Confirme o endereço no mapa para habilitar o check-in do cuidador.',
       );
     }
 
@@ -223,6 +272,130 @@ export class BookingsService {
   }
 
   // ═══════════════════════════════════════════
+  // CHECK-IN
+  // ═══════════════════════════════════════════
+  async checkIn(
+    id: string,
+    userId: string,
+    role: string,
+    latitude: number,
+    longitude: number,
+  ) {
+    if (role !== 'caregiver') {
+      throw new ForbiddenException(
+        'Apenas cuidadores podem realizar o check-in.',
+      );
+    }
+
+    if (
+      !this.isValidCoordinate(latitude) ||
+      !this.isValidCoordinate(longitude)
+    ) {
+      throw new BadRequestException(
+        'Coordenadas inválidas para o check-in.',
+      );
+    }
+
+    const booking = await this.bookingModel
+      .findById(id)
+      .populate({
+        path: 'caregiverId',
+        populate: { path: 'userId', select: 'name email phone avatar role' },
+      })
+      .populate('clientId', 'name email phone avatar role');
+
+    if (!booking) {
+      throw new NotFoundException('Agendamento não encontrado');
+    }
+
+    const caregiver = booking.caregiverId as any;
+    const caregiverUser = caregiver?.userId;
+    const isCaregiver = caregiverUser?._id?.toString() === userId;
+
+    if (!isCaregiver) {
+      throw new ForbiddenException('Sem permissão');
+    }
+
+    if (booking.status === 'in_progress' && booking.checkInAt) {
+      return booking;
+    }
+
+    if (booking.status !== 'confirmed') {
+      throw new ForbiddenException(
+        'O check-in só pode ser feito em atendimentos confirmados.',
+      );
+    }
+
+    if (
+      !this.isValidCoordinate(booking.addressLat) ||
+      !this.isValidCoordinate(booking.addressLon)
+    ) {
+      throw new ForbiddenException(
+        'Este agendamento ainda não possui uma localização validada para check-in.',
+      );
+    }
+
+    const checkInWindowStart = new Date(
+      new Date(booking.startDate).getTime() - this.earlyCheckInWindowMs,
+    );
+
+    if (new Date() < checkInWindowStart) {
+      throw new ForbiddenException(
+        `O check-in só pode ser feito a partir de ${checkInWindowStart.toLocaleString('pt-BR')}.`,
+      );
+    }
+
+    const distanceMeters = this.calculateDistanceMeters(
+      latitude,
+      longitude,
+      booking.addressLat,
+      booking.addressLon,
+    );
+
+    if (distanceMeters > this.checkInRadiusMeters) {
+      throw new ForbiddenException(
+        `Você está a ${Math.round(distanceMeters)}m do local combinado. Aproxime-se até ${this.checkInRadiusMeters}m para realizar o check-in.`,
+      );
+    }
+
+    booking.status = 'in_progress';
+    booking.checkInAt = new Date();
+    booking.checkInLat = latitude;
+    booking.checkInLon = longitude;
+    booking.checkInDistanceMeters = Math.round(distanceMeters);
+
+    const saved = await booking.save();
+
+    this.logger.log(
+      `📍 Check-in realizado no booking ${id} a ${saved.checkInDistanceMeters}m do local combinado`,
+    );
+
+    const client = booking.clientId as any;
+
+    if (client?.email) {
+      await this.sendEmailSafely(
+        'Check-in do cuidador',
+        client.email,
+        () =>
+          this.emailService.sendCaregiverCheckInEmail({
+            to: client.email,
+            clientName: client.name || booking.clientName || 'Cliente',
+            caregiverName: caregiverUser?.name || 'Cuidador',
+            serviceName:
+              booking.serviceName || booking.serviceType || 'Atendimento',
+            address: booking.address || 'Endereço informado no agendamento',
+            checkInAt: saved.checkInAt
+              ? new Date(saved.checkInAt).toLocaleString('pt-BR')
+              : new Date().toLocaleString('pt-BR'),
+            distanceMeters: saved.checkInDistanceMeters,
+          }),
+      );
+    }
+
+    return saved;
+  }
+
+  // ═══════════════════════════════════════════
   // UPDATE STATUS
   // ═══════════════════════════════════════════
   async updateStatus(id: string, userId: string, status: string, role: string) {
@@ -247,11 +420,36 @@ export class BookingsService {
       throw new ForbiddenException('Sem permissão');
     }
 
+    if (
+      !['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'].includes(
+        status,
+      )
+    ) {
+      throw new BadRequestException('Status inválido para o agendamento.');
+    }
+
     if (role === 'client' && status !== 'cancelled') {
       throw new ForbiddenException('Clientes só podem cancelar agendamentos');
     }
 
     const previousStatus = booking.status;
+
+    if (status === previousStatus) {
+      return booking;
+    }
+
+    if (status === 'in_progress') {
+      throw new ForbiddenException(
+        'Use a ação de check-in para iniciar o atendimento.',
+      );
+    }
+
+    if (status === 'completed' && previousStatus !== 'in_progress') {
+      throw new ForbiddenException(
+        'Realize o check-in antes de concluir o atendimento.',
+      );
+    }
+
     booking.status = status;
     const saved = await booking.save();
 

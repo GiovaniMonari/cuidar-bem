@@ -56,6 +56,21 @@ export class GeocodingService {
     }
   }
 
+  private async geocodeCandidates(queries: string[]) {
+    const uniqueQueries = Array.from(
+      new Set(queries.map((query) => query.trim()).filter(Boolean)),
+    );
+
+    for (const query of uniqueQueries) {
+      const results = await this.searchAddress(query);
+      if (Array.isArray(results) && results.length > 0) {
+        return results[0];
+      }
+    }
+
+    return null;
+  }
+
   async searchAddress(query: string) {
     if (!query || query.trim().length < 3) {
       return [];
@@ -187,6 +202,13 @@ export class GeocodingService {
         throw new HttpException('CEP não encontrado', HttpStatus.NOT_FOUND);
       }
 
+      const geocoded = await this.geocodeCandidates([
+        `${cleanCEP}, Brasil`,
+        `${data.logradouro || ''}, ${data.localidade}, ${data.uf}, Brasil`,
+        `${data.logradouro || ''}, ${data.bairro || ''}, ${data.localidade}, ${data.uf}, Brasil`,
+        `${data.bairro || ''}, ${data.localidade}, ${data.uf}, Brasil`,
+      ]);
+
       const result = {
         display_name: `${data.logradouro || ''}, ${data.bairro || ''}, ${data.localidade} - ${data.uf}, ${cleanCEP}, Brasil`.replace(/^, /, ''),
         address: {
@@ -197,6 +219,8 @@ export class GeocodingService {
           postcode: cleanCEP,
           country: 'Brasil',
         },
+        lat: geocoded?.lat || '',
+        lon: geocoded?.lon || '',
         // Dados originais do ViaCEP para compatibilidade
         cep: cleanCEP,
         logradouro: data.logradouro || '',

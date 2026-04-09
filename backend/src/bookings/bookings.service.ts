@@ -14,6 +14,10 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 import { EmailService } from '../email/email.service';
 import { ChatService } from '../chat/chat.service';
 import { getDatesInRange } from '../common/utils/date-range';
+import {
+  isIntervalCoveredByAvailability,
+  normalizeAvailabilityCalendar,
+} from '../common/utils/availability';
 
 @Injectable()
 export class BookingsService {
@@ -21,6 +25,12 @@ export class BookingsService {
   private readonly checkInRadiusMeters = 200;
   private readonly earlyCheckInWindowMs = 2 * 60 * 60 * 1000;
   private paymentsService: any;
+  private readonly dateOnlyDurationKeys = [
+    'semanal',
+    'mensal',
+    'semanal_noite',
+    'mensal_noite',
+  ];
 
   constructor(
     @InjectModel(Booking.name) private bookingModel: Model<BookingDocument>,
@@ -31,6 +41,10 @@ export class BookingsService {
 
   setPaymentsService(paymentsService: any) {
     this.paymentsService = paymentsService;
+  }
+
+  private isDateOnlyDuration(durationKey: string) {
+    return this.dateOnlyDurationKeys.includes(durationKey);
   }
 
   // ═══════════════════════════════════════════
@@ -114,6 +128,18 @@ export class BookingsService {
       );
     }
 
+    if (!this.isDateOnlyDuration(dto.durationKey)) {
+      const actualDurationMinutes =
+        (end.getTime() - start.getTime()) / (60 * 1000);
+      const expectedDurationMinutes = dto.durationHours * 60;
+
+      if (actualDurationMinutes !== expectedDurationMinutes) {
+        throw new ForbiddenException(
+          'O intervalo selecionado não corresponde à duração contratada.',
+        );
+      }
+    }
+
     if (!dto.address?.trim()) {
       throw new ForbiddenException(
         'Informe o endereço do atendimento para permitir o check-in do cuidador.',
@@ -155,19 +181,30 @@ export class BookingsService {
       );
     }
 
-    const bookingDates = getDatesInRange(start, end);
-    const availableDates = caregiver.availabilityCalendar || [];
-    const availableDateStrings = availableDates
-      .filter((item: any) => item.isAvailable)
-      .map((item: any) => item.date);
-
-    const unavailableDates = bookingDates.filter(
-      (date) => !availableDateStrings.includes(date),
+    const normalizedAvailability = normalizeAvailabilityCalendar(
+      caregiver.availabilityCalendar || [],
     );
 
-    if (unavailableDates.length > 0) {
+    if (this.isDateOnlyDuration(dto.durationKey)) {
+      const bookingDates = getDatesInRange(start, end);
+      const availableDateStrings = normalizedAvailability
+        .filter((item) => item.isAvailable)
+        .map((item) => item.date);
+
+      const unavailableDates = bookingDates.filter(
+        (date) => !availableDateStrings.includes(date),
+      );
+
+      if (unavailableDates.length > 0) {
+        throw new ForbiddenException(
+          `O cuidador não está disponível para todas as datas do período. Datas indisponíveis: ${unavailableDates.join(', ')}`,
+        );
+      }
+    } else if (
+      !isIntervalCoveredByAvailability(normalizedAvailability, start, end)
+    ) {
       throw new ForbiddenException(
-        `O cuidador não está disponível para todas as datas do período. Datas indisponíveis: ${unavailableDates.join(', ')}`,
+        'O cuidador não está disponível neste horário. Escolha outro intervalo dentro dos horários livres.',
       );
     }
 
@@ -179,7 +216,7 @@ export class BookingsService {
 
     if (existingBookings.length > 0) {
       throw new ForbiddenException(
-        'Este cuidador já possui agendamento em uma ou mais datas deste período.',
+        'Este cuidador já possui um agendamento que conflita com o horário selecionado.',
       );
     }
 

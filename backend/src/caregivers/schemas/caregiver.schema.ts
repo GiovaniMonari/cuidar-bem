@@ -14,6 +14,14 @@ class ServicePrice {
   isAvailable: boolean;
 }
 
+class AvailabilityTimeRange {
+  @Prop({ required: true })
+  startTime: string;
+
+  @Prop({ required: true })
+  endTime: string;
+}
+
 class AvailabilityDate {
   @Prop({ required: true })
   date: string; // YYYY-MM-DD
@@ -24,6 +32,9 @@ class AvailabilityDate {
     default: [],
   })
   slots: string[];
+
+  @Prop({ type: [AvailabilityTimeRange], default: [] })
+  timeRanges: AvailabilityTimeRange[];
 
   @Prop({ default: true })
   isAvailable: boolean;

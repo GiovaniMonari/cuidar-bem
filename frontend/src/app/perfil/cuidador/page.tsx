@@ -5,7 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/services/api';
 import { AvailabilityCalendar } from '@/components/AvailabilityCalendar';
-import { ServiceType, SPECIALTIES, STATES } from '@/types';
+import {
+  AvailabilityDate,
+  ServiceType,
+  SPECIALTIES,
+  STATES,
+} from '@/types';
 import {
   Save,
   Loader2,
@@ -36,7 +41,7 @@ export default function CaregiverProfilePage() {
     servicePrices: [] as { serviceKey: string; pricePerHour: number; isAvailable: boolean }[],
     city: '',
     state: '',
-    availabilityCalendar: [] as { date: string; slots: string[]; isAvailable: boolean }[],
+    availabilityCalendar: [] as AvailabilityDate[],
     certifications: [] as string[],
     isAvailable: true,
   });

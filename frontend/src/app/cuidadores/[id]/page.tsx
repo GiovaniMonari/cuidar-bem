@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { Caregiver, Review, SPECIALTIES} from '@/types';
+import { AvailabilityDate, Caregiver, Review, SPECIALTIES } from '@/types';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { StarRating } from '@/components/StarRating';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -29,7 +29,14 @@ import {
 } from 'lucide-react';
 import { saveAddress } from '@/utils/savedAddresses';
 import { SavedAddresses } from '@/components/SavedAddress';
-import { combineDateAndTime, getSuggestedEndDate, isHourlyDuration, isMultiDayDuration } from '@/utils/booking';
+import {
+  combineDateAndTime,
+  getAvailableStartTimes,
+  getComputedEndDateTime,
+  getSuggestedEndDate,
+  isHourlyDuration,
+  isMultiDayDuration,
+} from '@/utils/booking';
 import { getDatesInRange } from '@/utils/dateRange';
 
 function CaregiverDetailContent() {
@@ -42,7 +49,7 @@ function CaregiverDetailContent() {
   const [caregiver, setCaregiver] = useState<Caregiver | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
-  const [availableDates, setAvailableDates] = useState<{ date: string; slots: string[]; isAvailable: boolean }[]>([]);
+  const [availableDates, setAvailableDates] = useState<AvailabilityDate[]>([]);
   const [canChat, setCanChat] = useState(false);
   const [chatBookingId, setChatBookingId] = useState<string | null>(null);
   const [chatLoading, setChatLoading] = useState(false);
@@ -104,8 +111,46 @@ function CaregiverDetailContent() {
     comment: '',
   });
 
+  const hourlyDateOptions = useMemo(
+    () =>
+      availableDates
+        .filter((item) => item.isAvailable)
+        .filter(
+          (item) =>
+            getAvailableStartTimes(
+              availableDates,
+              item.date,
+              bookingData.durationHours,
+            ).length > 0,
+        )
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    [availableDates, bookingData.durationHours],
+  );
+
+  const availableStartTimes = useMemo(
+    () =>
+      bookingForm.startDate
+        ? getAvailableStartTimes(
+            availableDates,
+            bookingForm.startDate,
+            bookingData.durationHours,
+          )
+        : [],
+    [availableDates, bookingData.durationHours, bookingForm.startDate],
+  );
+
+  const computedHourlyEnd = useMemo(
+    () =>
+      getComputedEndDateTime(
+        bookingForm.startDate,
+        bookingForm.startTime,
+        bookingData.durationHours,
+      ),
+    [bookingData.durationHours, bookingForm.startDate, bookingForm.startTime],
+  );
+
   // Carregar dados do cuidador e reviews
-      useEffect(() => {
+  useEffect(() => {
     const fetchData = async () => {
       try {
         const [caregiverData, reviewsData, availabilityData, bookedData] = await Promise.all([
@@ -128,6 +173,78 @@ function CaregiverDetailContent() {
 
     fetchData();
   }, [id]);
+
+  useEffect(() => {
+    if (!isHourlyDuration(bookingData.durationKey)) {
+      return;
+    }
+
+    if (!bookingForm.startDate) {
+      if (bookingForm.startTime || bookingForm.endTime) {
+        setBookingForm((prev) => ({
+          ...prev,
+          startTime: '',
+          endTime: '',
+        }));
+      }
+      return;
+    }
+
+    if (
+      bookingForm.startTime &&
+      !availableStartTimes.includes(bookingForm.startTime)
+    ) {
+      setBookingForm((prev) => ({
+        ...prev,
+        startTime: '',
+        endTime: '',
+      }));
+      return;
+    }
+
+    const nextEndTime = computedHourlyEnd?.endTime || '';
+    const nextEndDate = computedHourlyEnd?.endDate || '';
+
+    if (
+      bookingForm.startTime &&
+      (bookingForm.endTime !== nextEndTime || bookingForm.endDate !== nextEndDate)
+    ) {
+      setBookingForm((prev) => ({
+        ...prev,
+        endTime: nextEndTime,
+        endDate: nextEndDate,
+      }));
+      return;
+    }
+
+    if (!bookingForm.startTime && (bookingForm.endTime || bookingForm.endDate)) {
+      setBookingForm((prev) => ({
+        ...prev,
+        endTime: '',
+        endDate: '',
+      }));
+    }
+  }, [
+    availableStartTimes,
+    bookingData.durationKey,
+    bookingForm.endDate,
+    bookingForm.endTime,
+    bookingForm.startDate,
+    bookingForm.startTime,
+    computedHourlyEnd,
+  ]);
+
+  useEffect(() => {
+    setBookingForm((prev) => ({
+      ...prev,
+      startDate: '',
+      endDate: '',
+      startTime: '',
+      endTime: '',
+    }));
+    setDateRangeError('');
+    setIsRangeAvailable(true);
+  }, [bookingData.durationKey]);
 
   // Verificar se o usuário pode avaliar este cuidador
   // Verificar se o usuário pode avaliar este cuidador - SUBSTITUIR
@@ -170,15 +287,10 @@ useEffect(() => {
 }, [id, isAuthenticated, user, caregiver, avaliarBookingId]);
 
   // Submeter agendamento
-    const handleBooking = async (e: React.FormEvent) => {
+  const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (bookingLoading) return;
-
-    if (!bookingData.serviceType || !bookingData.durationKey) {
-      alert('Por favor, selecione o tipo de serviço e duração');
-      return;
-    }
 
     if (!bookingData.serviceType || !bookingData.durationKey) {
       alert('Por favor, selecione o tipo de serviço e duração');
@@ -201,13 +313,13 @@ useEffect(() => {
     }
 
     if (!isAddressValidated) {
-      alert('Valide o endereço pelo CEP antes de solicitar o atendimento.');
+      alert('Clique em "Validar endereço" antes de solicitar o atendimento.');
       return;
     }
 
     if (!bookingForm.lat || !bookingForm.lon) {
       alert(
-        'Confirme o endereço no mapa ou pelo CEP para habilitar o check-in do cuidador no local combinado.',
+        'Confirme o endereço usando o botão "Validar endereço" para habilitar o check-in do cuidador no local combinado.',
       );
       return;
     }
@@ -216,16 +328,29 @@ useEffect(() => {
     let finalEndDate = '';
 
     if (isHourlyDuration(bookingData.durationKey)) {
-      if (!bookingForm.startDate || !bookingForm.startTime || !bookingForm.endTime) {
-        alert('Selecione a data, horário de início e horário de fim.');
+      if (!bookingForm.startDate || !bookingForm.startTime) {
+        alert('Selecione a data e o horário de início.');
+        return;
+      }
+
+      if (!availableStartTimes.includes(bookingForm.startTime)) {
+        alert('Escolha um horário disponível na lista.');
+        return;
+      }
+
+      if (!computedHourlyEnd) {
+        alert('Não foi possível calcular o horário final deste atendimento.');
         return;
       }
 
       finalStartDate = combineDateAndTime(bookingForm.startDate, bookingForm.startTime);
-      finalEndDate = combineDateAndTime(bookingForm.startDate, bookingForm.endTime);
+      finalEndDate = combineDateAndTime(
+        computedHourlyEnd.endDate,
+        computedHourlyEnd.endTime,
+      );
 
       const startDateObj = new Date(finalStartDate);
-      const endDateObj = new Date(finalEndDate);
+      const endDateObj = computedHourlyEnd.dateTime;
 
       if (endDateObj <= startDateObj) {
         alert('O horário de fim deve ser maior que o horário de início.');
@@ -326,13 +451,28 @@ useEffect(() => {
         patientAge: '',
         patientCondition: '',
       });
+
       setIsAddressValidated(false);
+
+      try {
+        const [availabilityData, bookedData] = await Promise.all([
+          api.getCaregiverAvailability(id as string),
+          api.getCaregiverBookedDates(id as string),
+        ]);
+        setAvailableDates(availabilityData || []);
+        setBookedDates(bookedData || []);
+      } catch (refreshError) {
+        console.error(
+          'Erro ao atualizar disponibilidade após reserva:',
+          refreshError,
+        );
+      }
 
       setTimeout(() => setBookingSuccess(false), 5000);
     } catch (error: any) {
     alert(error.message);
   } finally {
-    setBookingLoading(false); // ⬅️ ADICIONAR
+    setBookingLoading(false);
   }
 };
 
@@ -668,10 +808,7 @@ const handleReview = async (e: React.FormEvent) => {
                                 required
                               >
                                 <option value="">Selecione uma data</option>
-                                {availableDates
-                                  .filter((item) => item.isAvailable)
-                                  .sort((a, b) => a.date.localeCompare(b.date))
-                                  .map((item) => (
+                                {hourlyDateOptions.map((item) => (
                                     <option key={item.date} value={item.date}>
                                       {new Date(item.date + 'T00:00:00').toLocaleDateString(
                                         'pt-BR',
@@ -692,8 +829,7 @@ const handleReview = async (e: React.FormEvent) => {
                                 <label className="text-sm font-medium text-gray-700 mb-1 block">
                                   Horário de início *
                                 </label>
-                                <input
-                                  type="time"
+                                <select
                                   value={bookingForm.startTime}
                                   onChange={(e) =>
                                     setBookingForm((prev) => ({
@@ -703,27 +839,59 @@ const handleReview = async (e: React.FormEvent) => {
                                   }
                                   className="input-field"
                                   required
-                                />
+                                >
+                                  <option value="">Selecione um horário</option>
+                                  {availableStartTimes.map((time) => (
+                                    <option key={time} value={time}>
+                                      {time}
+                                    </option>
+                                  ))}
+                                </select>
                               </div>
 
                               <div>
                                 <label className="text-sm font-medium text-gray-700 mb-1 block">
-                                  Horário de fim *
+                                  Horário de fim
                                 </label>
                                 <input
-                                  type="time"
+                                  type="text"
                                   value={bookingForm.endTime}
-                                  onChange={(e) =>
-                                    setBookingForm((prev) => ({
-                                      ...prev,
-                                      endTime: e.target.value,
-                                    }))
-                                  }
-                                  className="input-field"
-                                  required
+                                  className="input-field bg-gray-100"
+                                  readOnly
                                 />
                               </div>
                             </div>
+
+                            {bookingForm.startDate && availableStartTimes.length === 0 && (
+                              <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                                <p className="text-sm text-red-700">
+                                  Não há horários livres suficientes nesta data para a duração selecionada.
+                                </p>
+                              </div>
+                            )}
+
+                            {computedHourlyEnd && (
+                              <div className="bg-primary-50 border border-primary-200 rounded-xl p-3">
+                                <p className="text-sm text-primary-700">
+                                  Atendimento previsto para terminar em{' '}
+                                  <strong>
+                                    {new Date(
+                                      computedHourlyEnd.endDate +
+                                        'T' +
+                                        computedHourlyEnd.endTime +
+                                        ':00',
+                                    ).toLocaleString('pt-BR', {
+                                      day: '2-digit',
+                                      month: '2-digit',
+                                      year: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}
+                                  </strong>
+                                  .
+                                </p>
+                              </div>
+                            )}
 
                             <p className="text-xs text-gray-500">
                               Duração selecionada: {bookingData.durationLabel}
@@ -1035,13 +1203,13 @@ const handleReview = async (e: React.FormEvent) => {
               <h2 className="text-lg font-bold text-gray-900 mb-3">
                 Disponibilidade
               </h2>
-              {caregiver.availabilityCalendar?.length > 0 ? (
+              {availableDates.length > 0 || bookedDates.length > 0 ? (
                 <>
                   <p className="text-sm text-gray-500 mb-4">
-                    Dias disponíveis para atendimento
+                    Dias e horários disponíveis para atendimento
                   </p>
                   <AvailabilityCalendar
-                    selectedDates={caregiver.availabilityCalendar}
+                    selectedDates={availableDates}
                     bookedDates={bookedDates}
                     readOnly
                   />

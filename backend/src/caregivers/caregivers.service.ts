@@ -4,7 +4,13 @@ import { Model } from 'mongoose';
 import { Caregiver, CaregiverDocument } from './schemas/caregiver.schema';
 import { CreateCaregiverDto } from './dto/create-caregiver.dto';
 import { FilterCaregiverDto } from './dto/filter-caregiver.dto';
-import { getDatesInRange } from 'src/common/utils/date-range';
+import {
+  normalizeAvailabilityCalendar,
+  getBookingSegmentsByDate,
+  subtractMinuteRanges,
+  serializeMinuteRanges,
+  timeToMinutes,
+} from 'src/common/utils/availability';
 
 @Injectable()
 export class CaregiversService {
@@ -17,7 +23,13 @@ export class CaregiversService {
     if (existing) {
       throw new ForbiddenException('Perfil de cuidador já existe');
     }
-    const caregiver = new this.caregiverModel({ ...dto, userId });
+    const caregiver = new this.caregiverModel({
+      ...dto,
+      availabilityCalendar: normalizeAvailabilityCalendar(
+        dto.availabilityCalendar || [],
+      ),
+      userId,
+    });
     return (await caregiver.save()).populate('userId', 'name email phone avatar');
   }
 
@@ -89,8 +101,16 @@ export class CaregiversService {
     if (caregiver.userId.toString() !== userId) {
       throw new ForbiddenException('Sem permissão para editar este perfil');
     }
+    const updateData = { ...dto } as Partial<CreateCaregiverDto>;
+
+    if (dto.availabilityCalendar) {
+      updateData.availabilityCalendar = normalizeAvailabilityCalendar(
+        dto.availabilityCalendar,
+      );
+    }
+
     return this.caregiverModel
-      .findByIdAndUpdate(id, dto, { new: true })
+      .findByIdAndUpdate(id, updateData, { new: true })
       .populate('userId', 'name email phone avatar');
   }
 
@@ -108,32 +128,12 @@ export class CaregiversService {
     );
   }
 
-   async getAvailability(id: string) {
-  const caregiver = await this.caregiverModel.findById(id).select('availabilityCalendar');
-  if (!caregiver) throw new NotFoundException('Cuidador não encontrado');
+  async getAvailability(id: string) {
+    const caregiver = await this.caregiverModel
+      .findById(id)
+      .select('availabilityCalendar');
+    if (!caregiver) throw new NotFoundException('Cuidador não encontrado');
 
-  const bookingModelAny: any = this.caregiverModel.db.model('Booking');
-
-  const activeBookings = await bookingModelAny.find({
-    caregiverId: id,
-    status: { $in: ['pending', 'confirmed', 'in_progress'] },
-  }).select('startDate endDate');
-
-  const bookedDates = new Set<string>();
-
-  activeBookings.forEach((booking: any) => {
-    const dates = getDatesInRange(
-      new Date(booking.startDate),
-      new Date(booking.endDate),
-    );
-    dates.forEach((date) => bookedDates.add(date));
-  });
-
-  return (caregiver.availabilityCalendar || []).filter(
-    (item: any) => item.isAvailable && !bookedDates.has(item.date),
-  );
-}
-  async getBookedDates(id: string) {
     const bookingModelAny: any = this.caregiverModel.db.model('Booking');
 
     const activeBookings = await bookingModelAny.find({
@@ -141,24 +141,62 @@ export class CaregiversService {
       status: { $in: ['pending', 'confirmed', 'in_progress'] },
     }).select('startDate endDate');
 
-    const bookedDates = new Set<string>();
+    const normalizedAvailability = normalizeAvailabilityCalendar(
+      caregiver.availabilityCalendar || [],
+    );
+
+    const bookedRangesByDate = new Map<
+      string,
+      Array<{ start: number; end: number }>
+    >();
 
     activeBookings.forEach((booking: any) => {
-      const start = new Date(booking.startDate);
-      const end = new Date(booking.endDate);
-
-      const current = new Date(start);
-      current.setHours(0, 0, 0, 0);
-
-      const final = new Date(end);
-      final.setHours(0, 0, 0, 0);
-
-      while (current <= final) {
-        bookedDates.add(current.toISOString().split('T')[0]);
-        current.setDate(current.getDate() + 1);
-      }
+      getBookingSegmentsByDate(
+        new Date(booking.startDate),
+        new Date(booking.endDate),
+      ).forEach((segment) => {
+        const current = bookedRangesByDate.get(segment.date) || [];
+        current.push({ start: segment.start, end: segment.end });
+        bookedRangesByDate.set(segment.date, current);
+      });
     });
 
-    return Array.from(bookedDates);
+    return normalizedAvailability
+      .filter((item) => item.isAvailable)
+      .map((item) => {
+        const remainingRanges = subtractMinuteRanges(
+          (item.timeRanges || []).map((range) => ({
+            start: timeToMinutes(range.startTime),
+            end: range.endTime === '23:59' ? 1440 : timeToMinutes(range.endTime),
+          })),
+          bookedRangesByDate.get(item.date) || [],
+        );
+
+        return {
+          ...item,
+          timeRanges: serializeMinuteRanges(remainingRanges),
+        };
+      })
+      .filter((item) => item.timeRanges.length > 0);
+  }
+
+  async getBookedDates(id: string) {
+    const caregiver = await this.caregiverModel
+      .findById(id)
+      .select('availabilityCalendar');
+    if (!caregiver) throw new NotFoundException('Cuidador não encontrado');
+
+    const normalizedAvailability = normalizeAvailabilityCalendar(
+      caregiver.availabilityCalendar || [],
+    ).filter((item) => item.isAvailable);
+
+    const remainingAvailability = await this.getAvailability(id);
+    const remainingDates = new Set(
+      remainingAvailability.map((item: any) => item.date),
+    );
+
+    return normalizedAvailability
+      .filter((item) => !remainingDates.has(item.date))
+      .map((item) => item.date);
   }
 }

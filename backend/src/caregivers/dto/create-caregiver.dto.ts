@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   Min,
+  Matches,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -26,13 +27,30 @@ class AvailabilityDateDto {
   @IsString()
   date: string;
 
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  slots: string[];
+  slots?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AvailabilityTimeRangeDto)
+  timeRanges?: AvailabilityTimeRangeDto[];
 
   @IsOptional()
   @IsBoolean()
   isAvailable?: boolean;
+}
+
+class AvailabilityTimeRangeDto {
+  @IsString()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
+  startTime: string;
+
+  @IsString()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
+  endTime: string;
 }
 
 export class CreateCaregiverDto {

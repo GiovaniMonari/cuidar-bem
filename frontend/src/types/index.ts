@@ -1,3 +1,8 @@
+export interface AvailabilityTimeRange {
+  startTime: string;
+  endTime: string;
+}
+
 export interface User {
   id: string;
   _id?: string;
@@ -10,7 +15,8 @@ export interface User {
 
 export interface AvailabilityDate {
   date: string;
-  slots: ('manha' | 'tarde' | 'noite' | 'integral')[];
+  slots?: ('manha' | 'tarde' | 'noite' | 'integral')[];
+  timeRanges: AvailabilityTimeRange[];
   isAvailable: boolean;
 }
 

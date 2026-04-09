@@ -3,6 +3,52 @@ import { AppModule } from './app.module';
 import { getModelToken } from '@nestjs/mongoose';
 import * as bcrypt from 'bcryptjs';
 
+const WEEKDAY_MAP: Record<string, number> = {
+  domingo: 0,
+  segunda: 1,
+  terca: 2,
+  quarta: 3,
+  quinta: 4,
+  sexta: 5,
+  sabado: 6,
+};
+
+function formatDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function buildUpcomingAvailability(
+  weekdays: string[],
+  startTime = '08:00',
+  endTime = '18:00',
+  daysAhead = 30,
+) {
+  const acceptedWeekdays = new Set(
+    weekdays
+      .map((weekday) => WEEKDAY_MAP[weekday])
+      .filter((weekday) => weekday !== undefined),
+  );
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return Array.from({ length: daysAhead })
+    .map((_, index) => {
+      const current = new Date(today);
+      current.setDate(today.getDate() + index);
+      return current;
+    })
+    .filter((date) => acceptedWeekdays.has(date.getDay()))
+    .map((date) => ({
+      date: formatDate(date),
+      timeRanges: [{ startTime, endTime }],
+      isAvailable: true,
+    }));
+}
+
 async function seed() {
   const app = await NestFactory.createApplicationContext(AppModule);
 
@@ -40,7 +86,11 @@ async function seed() {
       hourlyRate: 65,
       city: 'São Paulo',
       state: 'SP',
-      availability: ['segunda', 'terca', 'quarta', 'quinta', 'sexta'],
+      availabilityCalendar: buildUpcomingAvailability(
+        ['segunda', 'terca', 'quarta', 'quinta', 'sexta'],
+        '08:00',
+        '18:00',
+      ),
       certifications: ['COREN Ativo', 'Esp. Geriatria'],
       rating: 4.8,
       reviewCount: 24,
@@ -54,7 +104,11 @@ async function seed() {
       hourlyRate: 80,
       city: 'São Paulo',
       state: 'SP',
-      availability: ['segunda', 'quarta', 'sexta'],
+      availabilityCalendar: buildUpcomingAvailability(
+        ['segunda', 'quarta', 'sexta'],
+        '09:00',
+        '17:00',
+      ),
       certifications: ['CREFITO Ativo', 'Esp. Neurologia'],
       rating: 4.9,
       reviewCount: 18,
@@ -68,7 +122,11 @@ async function seed() {
       hourlyRate: 50,
       city: 'Rio de Janeiro',
       state: 'RJ',
-      availability: ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'],
+      availabilityCalendar: buildUpcomingAvailability(
+        ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'],
+        '07:00',
+        '19:00',
+      ),
       certifications: ['Técnica em Enfermagem'],
       rating: 4.7,
       reviewCount: 32,
@@ -82,7 +140,11 @@ async function seed() {
       hourlyRate: 55,
       city: 'Belo Horizonte',
       state: 'MG',
-      availability: ['segunda', 'terca', 'quinta', 'sexta'],
+      availabilityCalendar: buildUpcomingAvailability(
+        ['segunda', 'terca', 'quinta', 'sexta'],
+        '08:00',
+        '16:00',
+      ),
       certifications: ['Psicologia - CRP Ativo'],
       rating: 4.6,
       reviewCount: 15,
@@ -96,7 +158,11 @@ async function seed() {
       hourlyRate: 75,
       city: 'Curitiba',
       state: 'PR',
-      availability: ['segunda', 'terca', 'quarta', 'quinta', 'sexta'],
+      availabilityCalendar: buildUpcomingAvailability(
+        ['segunda', 'terca', 'quarta', 'quinta', 'sexta'],
+        '08:00',
+        '20:00',
+      ),
       certifications: ['COREN Ativo', 'Esp. Cuidados Paliativos'],
       rating: 5.0,
       reviewCount: 41,
@@ -110,7 +176,11 @@ async function seed() {
       hourlyRate: 45,
       city: 'São Paulo',
       state: 'SP',
-      availability: ['sabado', 'domingo'],
+      availabilityCalendar: buildUpcomingAvailability(
+        ['sabado', 'domingo'],
+        '09:00',
+        '21:00',
+      ),
       certifications: ['Técnico em Enfermagem'],
       rating: 4.3,
       reviewCount: 8,

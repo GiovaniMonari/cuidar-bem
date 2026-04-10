@@ -254,6 +254,61 @@ class ApiService {
       headers: this.headers(true),
     });
   }
+
+  // Feedback
+  async createFeedback(data: any) {
+    return this.request<any>('/feedback', {
+      method: 'POST',
+      headers: this.headers(true),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getFeedbackByBooking(bookingId: string) {
+    return this.request<any[]>(`/feedback/booking/${bookingId}`, {
+      headers: this.headers(true),
+    });
+  }
+
+  async getFeedbackSent() {
+    return this.request<any[]>('/feedback/sent', {
+      headers: this.headers(true),
+    });
+  }
+
+  async getFeedback(id: string) {
+    return this.request<any>(`/feedback/${id}`, {
+      headers: this.headers(true),
+    });
+  }
+
+  async updateFeedback(id: string, data: any) {
+    return this.request<any>(`/feedback/${id}`, {
+      method: 'PUT',
+      headers: this.headers(true),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteFeedback(id: string) {
+    return this.request<any>(`/feedback/${id}`, {
+      method: 'DELETE',
+      headers: this.headers(true),
+    });
+  }
+
+  async checkDayFeedback(bookingId: string, dayNumber: number) {
+    return this.request<any>(`/feedback/check/${bookingId}/${dayNumber}`, {
+      headers: this.headers(true),
+    });
+  }
+
+  // Genérico GET
+  async get(endpoint: string) {
+    return this.request<any>(endpoint, {
+      headers: this.headers(true),
+    });
+  }
 }
 
 export const api = new ApiService();

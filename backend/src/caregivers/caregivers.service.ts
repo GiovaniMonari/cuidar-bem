@@ -14,6 +14,8 @@ import {
 
 @Injectable()
 export class CaregiversService {
+  private readonly commuteBufferMinutes = 60;
+
   constructor(
     @InjectModel(Caregiver.name) private caregiverModel: Model<CaregiverDocument>,
   ) {}
@@ -156,7 +158,10 @@ export class CaregiversService {
         new Date(booking.endDate),
       ).forEach((segment) => {
         const current = bookedRangesByDate.get(segment.date) || [];
-        current.push({ start: segment.start, end: segment.end });
+        current.push({
+          start: Math.max(0, segment.start - this.commuteBufferMinutes),
+          end: Math.min(1440, segment.end + this.commuteBufferMinutes),
+        });
         bookedRangesByDate.set(segment.date, current);
       });
     });

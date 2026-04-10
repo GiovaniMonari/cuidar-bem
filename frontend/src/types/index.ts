@@ -120,6 +120,36 @@ export interface Review {
   createdAt: string;
 }
 
+export interface Feedback {
+  _id: string;
+  bookingId: string;
+  clientId: User;
+  caregiverId: Caregiver | string;
+  feedbackDate: string;
+  content: string;
+  patientMood?: number;
+  tookMedication?: boolean;
+  medicationDetails?: string;
+  ate?: boolean;
+  foodDetails?: string;
+  hydration?: boolean;
+  hygiene?: boolean;
+  hygieneDetails?: string;
+  sleptWell?: boolean;
+  sleepDetails?: string;
+  behavior?: 'excelente' | 'bom' | 'normal' | 'agitado' | 'agressivo';
+  behaviorDetails?: string;
+  painLevel?: number;
+  symptoms?: string[];
+  healthObservations?: string;
+  careActivities?: string[];
+  photos?: string[];
+  isFinal: boolean;
+  dayNumber?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AuthResponse {
   user: User;
   access_token: string;

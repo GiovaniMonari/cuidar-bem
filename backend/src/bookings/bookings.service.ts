@@ -24,6 +24,7 @@ export class BookingsService {
   private readonly logger = new Logger(BookingsService.name);
   private readonly checkInRadiusMeters = 200;
   private readonly earlyCheckInWindowMs = 2 * 60 * 60 * 1000;
+  private readonly commuteBufferMs = 60 * 60 * 1000;
   private paymentsService: any;
   private readonly dateOnlyDurationKeys = [
     'semanal',
@@ -117,6 +118,10 @@ export class BookingsService {
   ): Promise<BookingDocument> {
     const start = new Date(dto.startDate);
     const end = new Date(dto.endDate);
+    const startOfDay = new Date(start);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(start);
+    endOfDay.setHours(23, 59, 59, 999);
 
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       throw new ForbiddenException('Datas inválidas para o agendamento.');
@@ -125,6 +130,20 @@ export class BookingsService {
     if (end < start) {
       throw new ForbiddenException(
         'A data final não pode ser anterior à inicial.',
+      );
+    }
+
+    const duplicatedBooking = await this.bookingModel.findOne({
+      clientId,
+      caregiverId: dto.caregiverId,
+      serviceType: dto.serviceType,
+      startDate: { $gte: startOfDay, $lte: endOfDay },
+      status: { $in: ['pending', 'confirmed', 'in_progress', 'completed'] },
+    });
+
+    if (duplicatedBooking) {
+      throw new ForbiddenException(
+        'Você já possui uma solicitação deste serviço para este cuidador neste dia.',
       );
     }
 
@@ -208,15 +227,18 @@ export class BookingsService {
       );
     }
 
+    const bufferedStart = new Date(start.getTime() - this.commuteBufferMs);
+    const bufferedEnd = new Date(end.getTime() + this.commuteBufferMs);
+
     const existingBookings = await this.bookingModel.find({
       caregiverId: dto.caregiverId,
-      status: { $in: ['pending', 'confirmed', 'in_progress'] },
-      $or: [{ startDate: { $lte: end }, endDate: { $gte: start } }],
+      status: { $in: ['confirmed', 'in_progress'] },
+      $or: [{ startDate: { $lt: bufferedEnd }, endDate: { $gt: bufferedStart } }],
     });
 
     if (existingBookings.length > 0) {
       throw new ForbiddenException(
-        'Este cuidador já possui um agendamento que conflita com o horário selecionado.',
+        'Este cuidador precisa de 1 hora de intervalo entre atendimentos. Escolha outro horário.',
       );
     }
 

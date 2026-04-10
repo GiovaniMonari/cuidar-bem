@@ -21,6 +21,7 @@ import {
   ArrowRight,
   BadgeDollarSign,
   MessageCircle,
+  MessageSquare,
 } from 'lucide-react';
 import { BookingCalendar } from '@/components/BookingCalendar';
 
@@ -645,6 +646,17 @@ export default function DashboardPage() {
                           <span className="text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-lg">
                             Serviço concluído. Falta apenas realizar o pagamento.
                           </span>
+                        )}
+
+                        {/* Feedback Button */}
+                        {['completed', 'in_progress'].includes(booking.status) && (
+                          <button
+                            onClick={() => router.push(`/dashboard/care-reports?booking=${booking._id}`)}
+                            className="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-200 transition-colors flex items-center gap-1.5"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            {isCaregiver ? 'Enviar Relatório' : 'Ver Relatórios'}
+                          </button>
                         )}
                       </div>
                     </div>

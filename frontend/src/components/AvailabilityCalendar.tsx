@@ -19,6 +19,7 @@ interface Props {
   onSelectDate?: (date: string) => void;
   selectedDate?: string | null;
   readOnly?: boolean;
+  compact?: boolean;
 }
 
 const DEFAULT_TIME_RANGE: AvailabilityTimeRange = {
@@ -45,6 +46,7 @@ export function AvailabilityCalendar({
   onSelectDate,
   selectedDate,
   readOnly = false,
+  compact = false,
 }: Props) {
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
@@ -230,8 +232,8 @@ export function AvailabilityCalendar({
   );
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-4">
-      <div className="flex items-center justify-between mb-4">
+    <div className={`bg-white rounded-2xl border border-gray-200 ${compact ? 'p-3' : 'p-4'}`}>
+      <div className={`flex items-center justify-between ${compact ? 'mb-3' : 'mb-4'}`}>
         <button
           type="button"
           onClick={goPrevMonth}
@@ -255,21 +257,21 @@ export function AvailabilityCalendar({
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-2 mb-2">
+      <div className={`grid grid-cols-7 ${compact ? 'gap-1 mb-1' : 'gap-2 mb-2'}`}>
         {weekDays.map((day) => (
           <div
             key={day}
-            className="text-center text-xs font-medium text-gray-400 py-2"
+            className={`text-center text-xs font-medium text-gray-400 ${compact ? 'py-1' : 'py-2'}`}
           >
             {day}
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-2">
+      <div className={`grid grid-cols-7 ${compact ? 'gap-1' : 'gap-2'}`}>
         {days.map((day, index) => {
           if (!day) {
-            return <div key={index} className="h-16" />;
+            return <div key={index} className={compact ? 'h-12' : 'h-16'} />;
           }
 
           const dateStr = formatDate(day);
@@ -286,7 +288,7 @@ export function AvailabilityCalendar({
               type="button"
               disabled={isPast || isBooked}
               onClick={() => toggleDate(dateStr)}
-              className={`min-h-[64px] rounded-xl text-sm font-medium transition-all border relative px-1 py-2 ${
+              className={`${compact ? 'min-h-[48px] text-xs' : 'min-h-[64px] text-sm'} rounded-xl font-medium transition-all border relative px-1 py-2 ${
                 isBooked
                   ? 'bg-red-100 text-red-700 border-red-200 cursor-not-allowed'
                   : isSelected
@@ -315,6 +317,7 @@ export function AvailabilityCalendar({
         })}
       </div>
 
+      {!compact && (
       <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500">
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded bg-primary-600 inline-block" />
@@ -335,6 +338,7 @@ export function AvailabilityCalendar({
           Hoje
         </div>
       </div>
+      )}
 
       {activeEditDate && !readOnly && selectedMap.get(activeEditDate) && (
         <div className="fixed inset-0 z-50 bg-black/50 p-4 sm:p-6 flex items-center justify-center">

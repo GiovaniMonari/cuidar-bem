@@ -138,7 +138,7 @@ export class CaregiversService {
 
     const activeBookings = await bookingModelAny.find({
       caregiverId: id,
-      status: { $in: ['pending', 'confirmed', 'in_progress'] },
+      status: { $in: ['confirmed', 'in_progress'] },
     }).select('startDate endDate');
 
     const normalizedAvailability = normalizeAvailabilityCalendar(
@@ -198,5 +198,21 @@ export class CaregiversService {
     return normalizedAvailability
       .filter((item) => !remainingDates.has(item.date))
       .map((item) => item.date);
+  }
+
+  async getCaregiverBookings(id: string) {
+    const caregiver = await this.caregiverModel.findById(id);
+    if (!caregiver) throw new NotFoundException('Cuidador não encontrado');
+
+    const bookingModelAny: any = this.caregiverModel.db.model('Booking');
+
+    return await bookingModelAny
+      .find({
+        caregiverId: id,
+        status: { $in: ['confirmed', 'in_progress', 'completed'] },
+      })
+      .select('startDate endDate status')
+      .sort({ startDate: -1 })
+      .exec();
   }
 }

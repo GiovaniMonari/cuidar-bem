@@ -204,6 +204,12 @@ class ApiService {
     });
   }
 
+  async getCaregiverBookings(id: string) {
+    return this.request<any[]>(`/caregivers/${id}/bookings`, {
+      headers: this.headers(),
+    });
+  }
+
     async uploadAvatar(file: File) {
     const formData = new FormData();
     formData.append('file', file);

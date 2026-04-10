@@ -406,7 +406,7 @@ export default function CaregiverProfilePage() {
                                       Sugestão: R$ {service.suggestedPrice}/h
                                     </span>
                                     <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">
-                                      Faixa: R$ {service.basePriceMin} a R$ {service.basePriceMax}/h
+                                      Horário: R$ {service.basePriceMin} a R$ {service.basePriceMax}/h
                                     </span>
                                   </div>
                                 </div>

@@ -10,6 +10,7 @@ import { StarRating } from '@/components/StarRating';
 import { UserAvatar } from '@/components/UserAvatar';
 import { AvailabilityCalendar } from '@/components/AvailabilityCalendar';
 import { ServiceSelector } from '@/components/ServiceSelector';
+import { DailyScheduleView } from '@/components/DailyScheduleView';
 import {
   MapPin,
   Clock,
@@ -50,6 +51,95 @@ function CaregiverDetailContent() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [availableDates, setAvailableDates] = useState<AvailabilityDate[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [showTimeSlots, setShowTimeSlots] = useState(false);
+  const [bookedSlots, setBookedSlots] = useState<any[]>([]);
+
+  const selectedAvailability = useMemo(
+    () => availableDates.find((item) => item.date === selectedDate) || null,
+    [availableDates, selectedDate],
+  );
+
+  const handleSelectDate = (date: string) => {
+    setSelectedDate(date);
+    setShowTimeSlots(true);
+    fetchBookedSlotsForDate(date);
+  };
+
+  const fetchBookedSlotsForDate = async (date: string) => {
+    try {
+      const bookings = await api.getCaregiverBookings(id as string);
+
+      if (!bookings || bookings.length === 0) {
+        setBookedSlots([]);
+        return;
+      }
+
+      const blockingStatuses = new Set(['confirmed', 'in_progress', 'completed']);
+      const blockingBookings = bookings.filter(
+        (booking: any) => !booking?.status || blockingStatuses.has(booking.status),
+      );
+
+      // Filtrar bookings da data selecionada
+      const dateBookings = blockingBookings.filter((booking: any) => {
+        const bookingStart = new Date(booking.startDate);
+        const bookingDate = `${bookingStart.getFullYear()}-${String(bookingStart.getMonth() + 1).padStart(2, '0')}-${String(bookingStart.getDate()).padStart(2, '0')}`;
+        return bookingDate === date;
+      });
+
+      const slots = dateBookings.map((booking: any) => ({
+        startTime: new Date(booking.startDate).toLocaleTimeString('pt-BR', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        }),
+        endTime: new Date(booking.endDate).toLocaleTimeString('pt-BR', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        }),
+      }));
+
+      // Remover duplicatas
+      const uniqueSlots = slots.filter((slot, index, self) =>
+        index === self.findIndex((s) => s.startTime === slot.startTime && s.endTime === slot.endTime)
+      );
+
+      setBookedSlots(uniqueSlots);
+    } catch (error) {
+      console.error('Erro ao buscar agendamentos:', error);
+      setBookedSlots([]);
+    }
+  };
+
+  const selectedDateWeekLabel = useMemo(() => {
+    if (!selectedDate) return '';
+
+    const date = new Date(selectedDate + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const currentWeekStart = new Date(today);
+    currentWeekStart.setDate(today.getDate() - today.getDay());
+    const currentWeekEnd = new Date(currentWeekStart);
+    currentWeekEnd.setDate(currentWeekStart.getDate() + 6);
+
+    const nextWeekStart = new Date(currentWeekStart);
+    nextWeekStart.setDate(currentWeekStart.getDate() + 7);
+    const nextWeekEnd = new Date(nextWeekStart);
+    nextWeekEnd.setDate(nextWeekStart.getDate() + 6);
+
+    if (date >= currentWeekStart && date <= currentWeekEnd) {
+      return 'Esta semana';
+    }
+
+    if (date >= nextWeekStart && date <= nextWeekEnd) {
+      return 'Semana seguinte';
+    }
+
+    return 'Fora deste períodos';
+  }, [selectedDate]);
+
   const [canChat, setCanChat] = useState(false);
   const [chatBookingId, setChatBookingId] = useState<string | null>(null);
   const [chatLoading, setChatLoading] = useState(false);
@@ -731,6 +821,48 @@ const handleReview = async (e: React.FormEvent) => {
           </div>
         )}
 
+        {/* Modal de Horários Disponíveis - Estilo Outlook */}
+        {showTimeSlots && selectedAvailability && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-6 lg:p-8">
+            <div className="bg-white rounded-2xl w-full max-w-4xl my-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+              {/* Header do Modal */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    Agenda Disponível
+                  </h2>
+                </div>
+                <button
+                  onClick={() => setShowTimeSlots(false)}
+                  className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              {/* Conteúdo do Modal */}
+              <div className="p-6 overflow-visible">
+                {selectedAvailability.timeRanges && selectedAvailability.timeRanges.length > 0 ? (
+                  <DailyScheduleView
+                    date={selectedAvailability.date}
+                    timeRanges={selectedAvailability.timeRanges}
+                    bookedSlots={bookedSlots}
+                    readOnly={true}
+                  />
+                ) : (
+                  <div className="text-center py-8">
+                    <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-600 font-medium">Nenhum horário disponível</p>
+                    <p className="text-gray-500 text-sm mt-1">
+                      para esta data. Tente selecionar outro dia no calendário.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Modal de Agendamento */}
         {showBooking && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-6 lg:p-8">
@@ -1206,12 +1338,14 @@ const handleReview = async (e: React.FormEvent) => {
               {availableDates.length > 0 || bookedDates.length > 0 ? (
                 <>
                   <p className="text-sm text-gray-500 mb-4">
-                    Dias e horários disponíveis para atendimento
+                    Toque em um dia para ver a agenda detalhada e os horários livres.
                   </p>
                   <AvailabilityCalendar
                     selectedDates={availableDates}
                     bookedDates={bookedDates}
                     readOnly
+                    onSelectDate={handleSelectDate}
+                    selectedDate={selectedDate}
                   />
                 </>
               ) : (

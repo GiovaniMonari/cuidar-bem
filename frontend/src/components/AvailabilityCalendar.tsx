@@ -1,14 +1,14 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
   Clock3,
   Lock,
-  Plus,
   Trash2,
+  X,
 } from 'lucide-react';
 import { AvailabilityDate, AvailabilityTimeRange } from '@/types';
 
@@ -16,6 +16,8 @@ interface Props {
   selectedDates: AvailabilityDate[];
   bookedDates?: string[];
   onChange?: (dates: AvailabilityDate[]) => void;
+  onSelectDate?: (date: string) => void;
+  selectedDate?: string | null;
   readOnly?: boolean;
 }
 
@@ -40,6 +42,8 @@ export function AvailabilityCalendar({
   selectedDates,
   bookedDates = [],
   onChange,
+  onSelectDate,
+  selectedDate,
   readOnly = false,
 }: Props) {
   const today = new Date();
@@ -57,18 +61,17 @@ export function AvailabilityCalendar({
     return map;
   }, [selectedDates]);
 
-  const sortedSelectedDates = useMemo(
-    () =>
-      [...selectedDates]
-        .map((item) => ({
-          ...item,
-          timeRanges: getNormalizedTimeRanges(item),
-        }))
-        .sort((a, b) => a.date.localeCompare(b.date)),
-    [selectedDates],
-  );
+  const [activeEditDate, setActiveEditDate] = useState<string | null>(null);
 
   const bookedSet = useMemo(() => new Set(bookedDates), [bookedDates]);
+
+  useEffect(() => {
+    if (!activeEditDate) return;
+    const stillExists = selectedDates.some((item) => item.date === activeEditDate);
+    if (!stillExists) {
+      setActiveEditDate(null);
+    }
+  }, [activeEditDate, selectedDates]);
 
   const days = useMemo(() => {
     const firstDay = new Date(currentYear, currentMonth, 1);
@@ -91,6 +94,11 @@ export function AvailabilityCalendar({
   }, [currentMonth, currentYear]);
 
   const toggleDate = (dateStr: string) => {
+    if (readOnly && onSelectDate) {
+      onSelectDate(dateStr);
+      return;
+    }
+
     if (readOnly || !onChange) return;
     if (bookedSet.has(dateStr)) return;
 
@@ -103,7 +111,7 @@ export function AvailabilityCalendar({
     const exists = selectedDates.find((d) => d.date === dateStr);
 
     if (exists) {
-      onChange(selectedDates.filter((d) => d.date !== dateStr));
+      setActiveEditDate(dateStr);
       return;
     }
 
@@ -116,6 +124,7 @@ export function AvailabilityCalendar({
           isAvailable: true,
         },
     ]);
+    setActiveEditDate(dateStr);
   };
 
   const updateTimeRange = (
@@ -184,6 +193,14 @@ export function AvailabilityCalendar({
     );
   };
 
+  const removeDateAvailability = (date: string) => {
+    if (!onChange || readOnly) return;
+    onChange(selectedDates.filter((item) => item.date !== date));
+    if (activeEditDate === date) {
+      setActiveEditDate(null);
+    }
+  };
+
   const goPrevMonth = () => {
     if (currentMonth === 0) {
       setCurrentMonth(11);
@@ -229,7 +246,6 @@ export function AvailabilityCalendar({
             {monthLabel}
           </h3>
         </div>
-
         <button
           type="button"
           onClick={goNextMonth}
@@ -257,12 +273,12 @@ export function AvailabilityCalendar({
           }
 
           const dateStr = formatDate(day);
-          const selectedDate = selectedMap.get(dateStr);
-          const isSelected = Boolean(selectedDate);
+          const selectedDateItem = selectedMap.get(dateStr);
+          const isPicked = selectedDate === dateStr;
+          const isSelected = Boolean(selectedDateItem) || isPicked;
           const isBooked = bookedSet.has(dateStr);
           const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
           const isToday = formatDate(day) === formatDate(new Date());
-          const rangeCount = selectedDate?.timeRanges?.length || 0;
 
           return (
             <button
@@ -291,9 +307,7 @@ export function AvailabilityCalendar({
                 )}
 
                 {isSelected && !isBooked && (
-                  <span className="text-[10px] leading-none opacity-90">
-                    {rangeCount} faixa{rangeCount > 1 ? 's' : ''}
-                  </span>
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-current opacity-90" />
                 )}
               </div>
             </button>
@@ -307,6 +321,12 @@ export function AvailabilityCalendar({
           Disponível
         </div>
         <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full border border-primary-600 inline-flex items-center justify-center">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary-600 inline-block" />
+          </span>
+          Dia selecionado
+        </div>
+        <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded bg-red-100 border border-red-200 inline-block" />
           Dia sem horários livres
         </div>
@@ -316,66 +336,65 @@ export function AvailabilityCalendar({
         </div>
       </div>
 
-      {sortedSelectedDates.length > 0 && (
-        <div className="mt-5 pt-5 border-t border-gray-100 space-y-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
-            <Clock3 className="w-4 h-4 text-primary-600" />
-            {readOnly ? 'Horários disponíveis' : 'Horários por dia'}
-          </div>
+      {activeEditDate && !readOnly && selectedMap.get(activeEditDate) && (
+        <div className="fixed inset-0 z-50 bg-black/50 p-4 sm:p-6 flex items-center justify-center">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
+            {(() => {
+              const item = selectedMap.get(activeEditDate);
+              if (!item) return null;
 
-          <div className="space-y-3">
-            {sortedSelectedDates.map((item) => (
-              <div
-                key={item.date}
-                className="rounded-xl border border-gray-200 bg-gray-50 p-3"
-              >
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">
-                      {new Date(item.date + 'T00:00:00').toLocaleDateString(
-                        'pt-BR',
-                        {
-                          weekday: 'long',
-                          day: '2-digit',
-                          month: 'long',
-                          year: 'numeric',
-                        },
-                      )}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {item.timeRanges.length} faixa
-                      {item.timeRanges.length > 1 ? 's' : ''} configurada
-                      {item.timeRanges.length > 1 ? 's' : ''}
-                    </p>
-                  </div>
-
-                  {!readOnly && (
+              return (
+                <>
+                  <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-100">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900">
+                        Configurar horários
+                      </h3>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {new Date(item.date + 'T00:00:00').toLocaleDateString(
+                          'pt-BR',
+                          {
+                            weekday: 'long',
+                            day: '2-digit',
+                            month: 'long',
+                            year: 'numeric',
+                          },
+                        )}
+                      </p>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => addTimeRange(item.date)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary-300 hover:text-primary-700"
+                      onClick={() => setActiveEditDate(null)}
+                      className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                      aria-label="Fechar"
                     >
-                      <Plus className="w-3.5 h-3.5" />
-                      Nova faixa
+                      <X className="w-4 h-4 text-gray-500" />
                     </button>
-                  )}
-                </div>
+                  </div>
 
-                <div className="space-y-2">
-                  {item.timeRanges.map((range, index) => (
-                    <div
-                      key={`${item.date}-${index}`}
-                      className="flex flex-col gap-2 rounded-xl bg-white p-3 border border-gray-200 sm:flex-row sm:items-center"
-                    >
-                      {readOnly ? (
-                        <div className="flex items-center gap-2 text-sm text-gray-700">
-                          <Clock3 className="w-4 h-4 text-gray-400" />
-                          <span className="font-medium">
-                            {range.startTime} às {range.endTime}
-                          </span>
-                        </div>
-                      ) : (
-                        <>
+                  <div className="p-5">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <p className="text-xs text-gray-500">
+                        {item.timeRanges.length} horário
+                        {item.timeRanges.length > 1 ? 's' : ''} configurado
+                        {item.timeRanges.length > 1 ? 's' : ''}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => removeDateAvailability(item.date)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Marcar indisponível
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {item.timeRanges.map((range, index) => (
+                        <div
+                          key={`${item.date}-${index}`}
+                          className="flex flex-col gap-2 rounded-xl bg-gray-50 p-3 border border-gray-200 sm:flex-row sm:items-center"
+                        >
                           <div className="grid flex-1 grid-cols-2 gap-2">
                             <input
                               type="time"
@@ -409,17 +428,34 @@ export function AvailabilityCalendar({
                             type="button"
                             onClick={() => removeTimeRange(item.date, index)}
                             className="inline-flex items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-red-600 hover:bg-red-50"
-                            title="Remover faixa"
+                            title="Remover horário"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
-                        </>
-                      )}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => addTimeRange(item.date)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary-300 hover:text-primary-700"
+                      >
+                        + Novo horário
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveEditDate(null)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        Concluir
+                      </button>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

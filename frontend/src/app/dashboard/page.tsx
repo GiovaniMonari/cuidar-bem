@@ -1,3 +1,4 @@
+// filepath: app/dashboard/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -22,10 +23,12 @@ import {
   BadgeDollarSign,
   MessageCircle,
   MessageSquare,
+  FileText,
 } from 'lucide-react';
 import { BookingCalendar } from '@/components/BookingCalendar';
 
 const CHECK_IN_EARLY_WINDOW_MS = 2 * 60 * 60 * 1000;
+const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 const STATUS_MAP: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
@@ -45,11 +48,33 @@ const PAYMENT_STATUS_MAP: Record<string, { label: string; color: string }> = {
   failed: { label: 'Falhou', color: 'bg-red-100 text-red-700' },
 };
 
+/**
+ * Determina se o botão de relatórios deve ser exibido para um booking.
+ *
+ * - Serviços curtos (≤ 24h): só aparece quando o status é "completed"
+ * - Serviços longos (> 24h): aparece a partir do check-in do cuidador
+ *   (status "in_progress" ou "completed")
+ */
+function shouldShowReports(booking: Booking): boolean {
+  const durationMs =
+    new Date(booking.endDate).getTime() - new Date(booking.startDate).getTime();
+  const isShortService = durationMs <= TWENTY_FOUR_HOURS_MS;
+
+  if (isShortService) {
+    // Serviços de até 24h: só após conclusão
+    return booking.status === 'completed';
+  }
+
+  // Serviços longos (1 semana, 1 mês, etc.): a partir do check-in
+  return ['in_progress', 'completed'].includes(booking.status);
+}
+
 export default function DashboardPage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [payments, setPayments] = useState<Record<string, any>>({});
+  const [feedbackCounts, setFeedbackCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<string>('all');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -73,8 +98,9 @@ export default function DashboardPage() {
       const bookingsList = Array.isArray(bookingsData) ? bookingsData : [];
       setBookings(bookingsList);
 
-      // Buscar pagamentos para cada booking
       const paymentMap: Record<string, any> = {};
+      const feedbackMap: Record<string, number> = {};
+
       await Promise.all(
         bookingsList.map(async (booking: any) => {
           try {
@@ -85,9 +111,18 @@ export default function DashboardPage() {
           } catch {
             // Sem pagamento para este booking
           }
+
+          try {
+            const feedbacks = await api.getFeedbackByBooking(booking._id);
+            feedbackMap[booking._id] = Array.isArray(feedbacks) ? feedbacks.length : 0;
+          } catch {
+            feedbackMap[booking._id] = 0;
+          }
         }),
       );
+
       setPayments(paymentMap);
+      setFeedbackCounts(feedbackMap);
     } catch (error) {
       console.error(error);
     } finally {
@@ -125,11 +160,7 @@ export default function DashboardPage() {
           return;
         }
 
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          reject,
-          options,
-        );
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
       });
 
     try {
@@ -139,10 +170,7 @@ export default function DashboardPage() {
         maximumAge: 0,
       });
     } catch (error: any) {
-      if (
-        error?.code === error?.PERMISSION_DENIED ||
-        error?.code === 1
-      ) {
+      if (error?.code === error?.PERMISSION_DENIED || error?.code === 1) {
         throw new Error(
           'Permita o acesso à localização para realizar o check-in.',
         );
@@ -199,7 +227,9 @@ export default function DashboardPage() {
         position.coords.longitude,
       );
       await fetchData();
-      alert('Check-in realizado com sucesso. Atendimento marcado como em andamento.');
+      alert(
+        'Check-in realizado com sucesso. Atendimento marcado como em andamento.',
+      );
     } catch (error: any) {
       alert(error.message || 'Não foi possível realizar o check-in.');
     } finally {
@@ -221,23 +251,26 @@ export default function DashboardPage() {
   };
 
   const openChat = async (bookingId: string) => {
-  // ⬇️ PROTEÇÃO: Evita cliques múltiplos
-  if (chatLoading === bookingId) {
-    console.log('⏳ Já abrindo chat, aguarde...');
-    return;
-  }
+    if (chatLoading === bookingId) {
+      console.log('⏳ Já abrindo chat, aguarde...');
+      return;
+    }
 
-  setChatLoading(bookingId);
+    setChatLoading(bookingId);
 
-  try {
-    const conversation = await api.getOrCreateConversation(bookingId);
-    router.push(`/chat?conversation=${conversation._id}`);
-  } catch (error: any) {
-    alert(error.message || 'Erro ao abrir conversa');
-  } finally {
-    setChatLoading(null);
-  }
-};
+    try {
+      const conversation = await api.getOrCreateConversation(bookingId);
+      router.push(`/chat?conversation=${conversation._id}`);
+    } catch (error: any) {
+      alert(error.message || 'Erro ao abrir conversa');
+    } finally {
+      setChatLoading(null);
+    }
+  };
+
+  const openReports = (bookingId: string) => {
+    router.push(`/dashboard/care-reports?booking=${bookingId}`);
+  };
 
   if (authLoading || loading) {
     return (
@@ -253,11 +286,19 @@ export default function DashboardPage() {
   // Calcular totais financeiros
   const totalEarnings = Object.values(payments)
     .filter((p: any) => p.status === 'released')
-    .reduce((sum: number, p: any) => sum + (user?.role === 'caregiver' ? p.caregiverAmount : p.amount), 0);
+    .reduce(
+      (sum: number, p: any) =>
+        sum + (user?.role === 'caregiver' ? p.caregiverAmount : p.amount),
+      0,
+    );
 
   const pendingAmount = Object.values(payments)
     .filter((p: any) => ['pending', 'held', 'paid'].includes(p.status))
-    .reduce((sum: number, p: any) => sum + (user?.role === 'caregiver' ? p.caregiverAmount : p.amount), 0);
+    .reduce(
+      (sum: number, p: any) =>
+        sum + (user?.role === 'caregiver' ? p.caregiverAmount : p.amount),
+      0,
+    );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -271,7 +312,7 @@ export default function DashboardPage() {
               : 'Acompanhe seus agendamentos e pagamentos'}
           </p>
         </div>
-        
+
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           <div className="card p-4">
@@ -286,7 +327,11 @@ export default function DashboardPage() {
           </div>
           <div className="card p-4">
             <div className="text-2xl font-bold text-blue-600">
-              {bookings.filter((b) => ['confirmed', 'in_progress'].includes(b.status)).length}
+              {
+                bookings.filter((b) =>
+                  ['confirmed', 'in_progress'].includes(b.status),
+                ).length
+              }
             </div>
             <div className="text-sm text-gray-500">Ativos</div>
           </div>
@@ -342,24 +387,33 @@ export default function DashboardPage() {
         {filtered.length === 0 ? (
           <div className="card p-12 text-center">
             <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <h3 className="font-semibold text-gray-600">Nenhum agendamento</h3>
+            <h3 className="font-semibold text-gray-600">
+              Nenhum agendamento
+            </h3>
           </div>
         ) : (
           <div className="space-y-4">
             {filtered.map((booking) => {
-              const status = STATUS_MAP[booking.status] || STATUS_MAP.pending;
+              const status =
+                STATUS_MAP[booking.status] || STATUS_MAP.pending;
               const StatusIcon = status.icon;
               const isCaregiver = user?.role === 'caregiver';
               const payment = payments[booking._id];
               const paymentStatus = payment
-                ? PAYMENT_STATUS_MAP[payment.status] || PAYMENT_STATUS_MAP.pending
+                ? PAYMENT_STATUS_MAP[payment.status] ||
+                  PAYMENT_STATUS_MAP.pending
                 : null;
               const canCheckInNow =
-                new Date(booking.startDate).getTime() - CHECK_IN_EARLY_WINDOW_MS <=
+                new Date(booking.startDate).getTime() -
+                  CHECK_IN_EARLY_WINDOW_MS <=
                 Date.now();
               const checkInWindowLabel = new Date(
-                new Date(booking.startDate).getTime() - CHECK_IN_EARLY_WINDOW_MS,
+                new Date(booking.startDate).getTime() -
+                  CHECK_IN_EARLY_WINDOW_MS,
               ).toLocaleString('pt-BR');
+
+              const feedbackCount = feedbackCounts[booking._id] || 0;
+              const showReports = shouldShowReports(booking);
 
               return (
                 <div key={booking._id} className="card p-6">
@@ -385,7 +439,9 @@ export default function DashboardPage() {
                           )}
 
                           <span className="text-xs text-gray-400">
-                            {new Date(booking.createdAt).toLocaleDateString('pt-BR')}
+                            {new Date(
+                              booking.createdAt,
+                            ).toLocaleDateString('pt-BR')}
                           </span>
                         </div>
 
@@ -395,7 +451,9 @@ export default function DashboardPage() {
                               <User className="w-4 h-4 text-gray-400" />
                               <span>
                                 <strong>Cliente:</strong>{' '}
-                                {booking.clientName || (booking.clientId as any)?.name || '—'}
+                                {booking.clientName ||
+                                  (booking.clientId as any)?.name ||
+                                  '—'}
                               </span>
                             </div>
                           ) : (
@@ -403,7 +461,8 @@ export default function DashboardPage() {
                               <User className="w-4 h-4 text-gray-400" />
                               <span>
                                 <strong>Cuidador:</strong>{' '}
-                                {(booking.caregiverId as any)?.userId?.name || '—'}
+                                {(booking.caregiverId as any)?.userId
+                                  ?.name || '—'}
                               </span>
                             </div>
                           )}
@@ -411,8 +470,13 @@ export default function DashboardPage() {
                           <div className="flex items-center gap-2 text-gray-600">
                             <Calendar className="w-4 h-4 text-gray-400" />
                             <span>
-                              {new Date(booking.startDate).toLocaleDateString('pt-BR')}{' '}
-                              - {new Date(booking.endDate).toLocaleDateString('pt-BR')}
+                              {new Date(
+                                booking.startDate,
+                              ).toLocaleDateString('pt-BR')}{' '}
+                              -{' '}
+                              {new Date(
+                                booking.endDate,
+                              ).toLocaleDateString('pt-BR')}
                             </span>
                           </div>
 
@@ -423,11 +487,13 @@ export default function DashboardPage() {
                             </div>
                           )}
 
-                          {(booking.clientPhone || (booking.clientId as any)?.phone) && (
+                          {(booking.clientPhone ||
+                            (booking.clientId as any)?.phone) && (
                             <div className="flex items-center gap-2 text-gray-600">
                               <Phone className="w-4 h-4 text-gray-400" />
                               <span>
-                                {booking.clientPhone || (booking.clientId as any)?.phone}
+                                {booking.clientPhone ||
+                                  (booking.clientId as any)?.phone}
                               </span>
                             </div>
                           )}
@@ -444,8 +510,11 @@ export default function DashboardPage() {
                             <MapPin className="w-4 h-4 flex-shrink-0" />
                             <span>
                               Check-in realizado em{' '}
-                              {new Date(booking.checkInAt).toLocaleString('pt-BR')}
-                              {typeof booking.checkInDistanceMeters === 'number'
+                              {new Date(
+                                booking.checkInAt,
+                              ).toLocaleString('pt-BR')}
+                              {typeof booking.checkInDistanceMeters ===
+                              'number'
                                 ? ` a ${Math.round(booking.checkInDistanceMeters)}m do local combinado`
                                 : ''}
                             </span>
@@ -464,7 +533,8 @@ export default function DashboardPage() {
                           </div>
                           {isCaregiver && (
                             <div className="text-xs text-gray-400">
-                              Taxa: R$ {payment.platformFee?.toFixed(2)}
+                              Taxa: R${' '}
+                              {payment.platformFee?.toFixed(2)}
                             </div>
                           )}
                         </div>
@@ -497,19 +567,21 @@ export default function DashboardPage() {
                         payment &&
                         booking.status === 'completed' &&
                         payment.status === 'pending' && (
-                        <button
-                          onClick={() => handleSimulatePayment(booking._id)}
-                          disabled={actionLoading === booking._id}
-                          className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors flex items-center gap-1.5"
-                        >
-                          {actionLoading === booking._id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <BadgeDollarSign className="w-4 h-4" />
-                          )}
-                          Simular Pagamento
-                        </button>
-                      )}
+                          <button
+                            onClick={() =>
+                              handleSimulatePayment(booking._id)
+                            }
+                            disabled={actionLoading === booking._id}
+                            className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors flex items-center gap-1.5"
+                          >
+                            {actionLoading === booking._id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <BadgeDollarSign className="w-4 h-4" />
+                            )}
+                            Simular Pagamento
+                          </button>
+                        )}
 
                       {/* Escrow indicator */}
                       {payment && payment.status === 'held' && (
@@ -520,13 +592,20 @@ export default function DashboardPage() {
                       )}
 
                       {/* Booking actions */}
-                      <div className="flex gap-2 ml-auto">
+                      <div className="flex gap-2 ml-auto flex-wrap">
                         {booking.status === 'pending' && (
                           <>
                             {isCaregiver && (
                               <button
-                                onClick={() => handleStatusUpdate(booking._id, 'confirmed')}
-                                disabled={actionLoading === booking._id}
+                                onClick={() =>
+                                  handleStatusUpdate(
+                                    booking._id,
+                                    'confirmed',
+                                  )
+                                }
+                                disabled={
+                                  actionLoading === booking._id
+                                }
                                 className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors flex items-center gap-1.5"
                               >
                                 {actionLoading === booking._id ? (
@@ -538,16 +617,23 @@ export default function DashboardPage() {
                               </button>
                             )}
                             <button
-                              onClick={() => handleStatusUpdate(booking._id, 'cancelled')}
+                              onClick={() =>
+                                handleStatusUpdate(
+                                  booking._id,
+                                  'cancelled',
+                                )
+                              }
                               disabled={actionLoading === booking._id}
                               className="bg-red-100 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
                             >
                               Cancelar
                             </button>
+
+                            {/* Chat */}
                             <button
                               onClick={() => openChat(booking._id)}
-                              disabled={chatLoading === booking._id} // ⬅️ ADICIONAR
-                              className="bg-primary-100 text-primary-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-200 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={chatLoading === booking._id}
+                              className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {chatLoading === booking._id ? (
                                 <>
@@ -557,106 +643,327 @@ export default function DashboardPage() {
                               ) : (
                                 <>
                                   <MessageCircle className="w-4 h-4" />
-                                  Abrir Chat
+                                  Chat
                                 </>
                               )}
                             </button>
-                          </>
-                        )}
 
-                        {booking.status === 'confirmed' && isCaregiver && (
-                          <>
-                            <button
-                              onClick={() => handleCheckIn(booking._id)}
-                              disabled={actionLoading === booking._id || !canCheckInNow}
-                              className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {actionLoading === booking._id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <MapPin className="w-4 h-4" />
-                              )}
-                              Fazer Check-in
-                            </button>
-                            <span className="text-sm text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg">
-                              {canCheckInNow
-                                ? 'Ao chegar no endereço combinado, use o check-in para iniciar o atendimento'
-                                : `Check-in liberado a partir de ${checkInWindowLabel}`}
-                            </span>
-                          </>
-                        )}
-
-                        {booking.status === 'confirmed' && !isCaregiver && (
-                          <>
-                            <button
-                              onClick={() => handleStatusUpdate(booking._id, 'cancelled')}
-                              disabled={actionLoading === booking._id}
-                              className="bg-red-100 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
-                            >
-                              Cancelar
-                            </button>
-                            <span className="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
-                              O cuidador fará o check-in quando chegar ao local do atendimento
-                            </span>
-                          </>
-                        )}
-
-                        {booking.status === 'in_progress' && isCaregiver && (
-                          <>
-                            <button
-                              onClick={() => handleStatusUpdate(booking._id, 'completed')}
-                              disabled={actionLoading === booking._id}
-                              className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors flex items-center gap-1.5"
-                            >
-                              {actionLoading === booking._id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <ArrowRight className="w-4 h-4" />
-                              )}
-                              Concluir Serviço
-                            </button>
-                            <span className="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
-                              O pagamento será solicitado ao cliente após a conclusão
-                            </span>
-                          </>
-                        )}
-
-                        {booking.status === 'in_progress' && !isCaregiver && (
-                          <span className="text-sm text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg">
-                            O cuidador já realizou o check-in e o atendimento está em andamento
-                          </span>
-                        )}
-
-                        {booking.status === 'completed' && isCaregiver && (
-                          <>
-                            {payment?.status === 'pending' && (
-                              <span className="text-sm text-yellow-600 bg-yellow-50 px-3 py-2 rounded-lg">
-                                Aguardando pagamento do cliente
-                              </span>
-                            )}
-                            {payment?.status === 'released' && (
-                              <span className="text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg">
-                                Pagamento recebido com sucesso
-                              </span>
+                            {/* Relatórios - condicional */}
+                            {showReports && (
+                              <button
+                                onClick={() =>
+                                  openReports(booking._id)
+                                }
+                                className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors flex items-center gap-1.5"
+                              >
+                                <FileText className="w-4 h-4" />
+                                Relatórios
+                                {feedbackCount > 0 && (
+                                  <span className="ml-1 px-1.5 py-0.5 bg-purple-600 text-white text-xs rounded-full font-bold">
+                                    {feedbackCount}
+                                  </span>
+                                )}
+                              </button>
                             )}
                           </>
                         )}
 
-                        {booking.status === 'completed' && !isCaregiver && payment?.status === 'pending' && (
-                          <span className="text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-lg">
-                            Serviço concluído. Falta apenas realizar o pagamento.
-                          </span>
-                        )}
+                        {booking.status === 'confirmed' &&
+                          isCaregiver && (
+                            <>
+                              <button
+                                onClick={() =>
+                                  handleCheckIn(booking._id)
+                                }
+                                disabled={
+                                  actionLoading === booking._id ||
+                                  !canCheckInNow
+                                }
+                                className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {actionLoading === booking._id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <MapPin className="w-4 h-4" />
+                                )}
+                                Fazer Check-in
+                              </button>
+                              <span className="text-sm text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg">
+                                {canCheckInNow
+                                  ? 'Ao chegar no endereço combinado, use o check-in para iniciar o atendimento'
+                                  : `Check-in liberado a partir de ${checkInWindowLabel}`}
+                              </span>
 
-                        {/* Feedback Button */}
-                        {['completed', 'in_progress'].includes(booking.status) && (
-                          <button
-                            onClick={() => router.push(`/dashboard/care-reports?booking=${booking._id}`)}
-                            className="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-200 transition-colors flex items-center gap-1.5"
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                            {isCaregiver ? 'Enviar Relatório' : 'Ver Relatórios'}
-                          </button>
+                              {/* Chat */}
+                              <button
+                                onClick={() =>
+                                  openChat(booking._id)
+                                }
+                                disabled={
+                                  chatLoading === booking._id
+                                }
+                                className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1.5"
+                              >
+                                {chatLoading === booking._id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <MessageCircle className="w-4 h-4" />
+                                )}
+                                Chat
+                              </button>
+
+                              {/* Relatórios - condicional */}
+                              {showReports && (
+                                <button
+                                  onClick={() =>
+                                    openReports(booking._id)
+                                  }
+                                  className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors flex items-center gap-1.5"
+                                >
+                                  <FileText className="w-4 h-4" />
+                                  Relatórios
+                                  {feedbackCount > 0 && (
+                                    <span className="ml-1 px-1.5 py-0.5 bg-purple-600 text-white text-xs rounded-full font-bold">
+                                      {feedbackCount}
+                                    </span>
+                                  )}
+                                </button>
+                              )}
+                            </>
+                          )}
+
+                        {booking.status === 'confirmed' &&
+                          !isCaregiver && (
+                            <>
+                              <button
+                                onClick={() =>
+                                  handleStatusUpdate(
+                                    booking._id,
+                                    'cancelled',
+                                  )
+                                }
+                                disabled={
+                                  actionLoading === booking._id
+                                }
+                                className="bg-red-100 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
+                              >
+                                Cancelar
+                              </button>
+                              <span className="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
+                                O cuidador fará o check-in quando
+                                chegar ao local do atendimento
+                              </span>
+
+                              {/* Chat */}
+                              <button
+                                onClick={() =>
+                                  openChat(booking._id)
+                                }
+                                disabled={
+                                  chatLoading === booking._id
+                                }
+                                className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1.5"
+                              >
+                                {chatLoading === booking._id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <MessageCircle className="w-4 h-4" />
+                                )}
+                                Chat
+                              </button>
+
+                              {/* Relatórios - condicional */}
+                              {showReports && (
+                                <button
+                                  onClick={() =>
+                                    openReports(booking._id)
+                                  }
+                                  className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors flex items-center gap-1.5"
+                                >
+                                  <FileText className="w-4 h-4" />
+                                  Relatórios
+                                  {feedbackCount > 0 && (
+                                    <span className="ml-1 px-1.5 py-0.5 bg-purple-600 text-white text-xs rounded-full font-bold">
+                                      {feedbackCount}
+                                    </span>
+                                  )}
+                                </button>
+                              )}
+                            </>
+                          )}
+
+                        {booking.status === 'in_progress' &&
+                          isCaregiver && (
+                            <>
+                              <button
+                                onClick={() =>
+                                  handleStatusUpdate(
+                                    booking._id,
+                                    'completed',
+                                  )
+                                }
+                                disabled={
+                                  actionLoading === booking._id
+                                }
+                                className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors flex items-center gap-1.5"
+                              >
+                                {actionLoading === booking._id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <ArrowRight className="w-4 h-4" />
+                                )}
+                                Concluir Serviço
+                              </button>
+                              <span className="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
+                                O pagamento será solicitado ao
+                                cliente após a conclusão
+                              </span>
+
+                              {/* Chat */}
+                              <button
+                                onClick={() =>
+                                  openChat(booking._id)
+                                }
+                                disabled={
+                                  chatLoading === booking._id
+                                }
+                                className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1.5"
+                              >
+                                {chatLoading === booking._id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <MessageCircle className="w-4 h-4" />
+                                )}
+                                Chat
+                              </button>
+
+                              {/* Relatórios - condicional */}
+                              {showReports && (
+                                <button
+                                  onClick={() =>
+                                    openReports(booking._id)
+                                  }
+                                  className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors flex items-center gap-1.5"
+                                >
+                                  <FileText className="w-4 h-4" />
+                                  Relatórios
+                                  {feedbackCount > 0 && (
+                                    <span className="ml-1 px-1.5 py-0.5 bg-purple-600 text-white text-xs rounded-full font-bold">
+                                      {feedbackCount}
+                                    </span>
+                                  )}
+                                </button>
+                              )}
+                            </>
+                          )}
+
+                        {booking.status === 'in_progress' &&
+                          !isCaregiver && (
+                            <>
+                              <span className="text-sm text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg">
+                                O cuidador já realizou o check-in e
+                                o atendimento está em andamento
+                              </span>
+
+                              {/* Chat */}
+                              <button
+                                onClick={() =>
+                                  openChat(booking._id)
+                                }
+                                disabled={
+                                  chatLoading === booking._id
+                                }
+                                className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1.5"
+                              >
+                                {chatLoading === booking._id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <MessageCircle className="w-4 h-4" />
+                                )}
+                                Chat
+                              </button>
+
+                              {/* Relatórios - condicional */}
+                              {showReports && (
+                                <button
+                                  onClick={() =>
+                                    openReports(booking._id)
+                                  }
+                                  className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors flex items-center gap-1.5"
+                                >
+                                  <FileText className="w-4 h-4" />
+                                  Relatórios
+                                  {feedbackCount > 0 && (
+                                    <span className="ml-1 px-1.5 py-0.5 bg-purple-600 text-white text-xs rounded-full font-bold">
+                                      {feedbackCount}
+                                    </span>
+                                  )}
+                                </button>
+                              )}
+                            </>
+                          )}
+
+                        {booking.status === 'completed' && (
+                          <>
+                            {isCaregiver && (
+                              <>
+                                {payment?.status === 'pending' && (
+                                  <span className="text-sm text-yellow-600 bg-yellow-50 px-3 py-2 rounded-lg">
+                                    Aguardando pagamento do cliente
+                                  </span>
+                                )}
+                                {payment?.status === 'released' && (
+                                  <span className="text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg">
+                                    Pagamento recebido com sucesso
+                                  </span>
+                                )}
+                              </>
+                            )}
+
+                            {!isCaregiver &&
+                              payment?.status === 'pending' && (
+                                <span className="text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-lg">
+                                  Serviço concluído. Falta apenas
+                                  realizar o pagamento.
+                                </span>
+                              )}
+
+                            {/* Chat */}
+                            <button
+                              onClick={() =>
+                                openChat(booking._id)
+                              }
+                              disabled={
+                                chatLoading === booking._id
+                              }
+                              className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1.5"
+                            >
+                              {chatLoading === booking._id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <MessageCircle className="w-4 h-4" />
+                              )}
+                              Chat
+                            </button>
+
+                            {/* Relatórios - condicional (sempre true para completed) */}
+                            {showReports && (
+                              <button
+                                onClick={() =>
+                                  openReports(booking._id)
+                                }
+                                className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors flex items-center gap-1.5"
+                              >
+                                <FileText className="w-4 h-4" />
+                                Relatórios
+                                {feedbackCount > 0 && (
+                                  <span className="ml-1 px-1.5 py-0.5 bg-purple-600 text-white text-xs rounded-full font-bold">
+                                    {feedbackCount}
+                                  </span>
+                                )}
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>

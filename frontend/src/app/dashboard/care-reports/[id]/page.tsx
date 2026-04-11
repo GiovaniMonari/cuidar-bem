@@ -193,7 +193,7 @@ export default function CareReportDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="max-w-3xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="mb-4">
           <button
@@ -211,7 +211,7 @@ export default function CareReportDetailPage() {
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm mb-4">
           {/* Header do Card */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
                   {report.caregiverId?.avatar ? (
@@ -234,14 +234,14 @@ export default function CareReportDetailPage() {
                 </div>
               </div>
               
-              <div className="text-right">
+              <div className="flex items-center gap-2 flex-wrap">
                 {report.dayNumber && (
-                  <span className="inline-block px-3 py-1 bg-white/20 text-white text-sm rounded-full font-medium mb-1">
+                  <span className="inline-block px-3 py-1 bg-white/20 text-white text-xs sm:text-sm rounded-full font-medium whitespace-nowrap">
                     Dia {report.dayNumber}
                   </span>
                 )}
                 {report.isFinal && (
-                  <span className="inline-block px-3 py-1 bg-green-400 text-green-900 text-sm rounded-full font-semibold">
+                  <span className="inline-block px-3 py-1 bg-green-400 text-green-900 text-xs sm:text-sm rounded-full font-semibold whitespace-nowrap">
                     Relatório Final
                   </span>
                 )}

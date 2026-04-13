@@ -907,6 +907,9 @@ const handleReview = async (e: React.FormEvent) => {
                   <h2 className="text-xl font-bold text-gray-900">
                     Agenda Disponível
                   </h2>
+                  <p className="text-sm text-red-500 mt-1">
+                    Há um intervalo de 1 hora entre os atendimentos para deslocamento do cuidador.
+                  </p>
                 </div>
                 <button
                   onClick={() => setShowTimeSlots(false)}

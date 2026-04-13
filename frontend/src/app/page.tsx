@@ -74,7 +74,6 @@ function HeroGuest() {
   return (
     <section className="relative min-h-[90vh] flex items-center overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900" />
-      <HeroDecorations />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28 w-full">
         <div className="flex flex-col items-center text-center max-w-4xl mx-auto">
@@ -165,7 +164,6 @@ function HeroClient({ user }: { user: NonNullable<ReturnType<typeof useAuth>['us
   return (
     <section className="relative min-h-[75vh] flex items-center overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900" />
-      <HeroDecorations />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-24 w-full">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-12">
@@ -260,9 +258,7 @@ function HeroCaregiver({ user }: { user: NonNullable<ReturnType<typeof useAuth>[
 
   return (
     <section className="relative min-h-[75vh] flex items-center overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-primary-800 via-primary-700 to-accent-700" />
-      <HeroDecorations />
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-accent-400/10 rounded-full blur-3xl -translate-y-1/4 translate-x-1/4" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900" />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-24 w-full">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-12">
@@ -350,26 +346,6 @@ function HeroCaregiver({ user }: { user: NonNullable<ReturnType<typeof useAuth>[
       </div>
 
     </section>
-  );
-}
-
-// ─── Subcomponentes reutilizáveis ─────────────────────────────────────────────
-function HeroDecorations() {
-  return (
-    <>
-      <div className="absolute inset-0">
-        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-accent-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-primary-600/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" />
-        <div className="absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-accent-400/5 rounded-full blur-2xl -translate-x-1/2 -translate-y-1/2" />
-      </div>
-      <div
-        className="absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
-          backgroundSize: '40px 40px',
-        }}
-      />
-    </>
   );
 }
 

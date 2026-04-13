@@ -4,6 +4,7 @@ import { Feedback, FeedbackSchema } from './schemas/feedback.schema';
 import { Booking, BookingSchema } from '../bookings/schemas/booking.schema';
 import { FeedbackService } from './feedback.service';
 import { FeedbackController } from './feedback.controller';
+import { EmailModule } from 'src/email/email.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { FeedbackController } from './feedback.controller';
       { name: Feedback.name, schema: FeedbackSchema },
       { name: Booking.name, schema: BookingSchema },
     ]),
+    EmailModule,
   ],
   controllers: [FeedbackController],
   providers: [FeedbackService],

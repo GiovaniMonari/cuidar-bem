@@ -10,6 +10,7 @@ import { Model } from 'mongoose';
 import { Feedback, FeedbackDocument } from './schemas/feedback.schema';
 import { Booking, BookingDocument } from '../bookings/schemas/booking.schema';
 import { CreateFeedbackDto } from './dto/create-feedback.dto';
+import { EmailService } from 'src/email/email.service';
 
 @Injectable()
 export class FeedbackService {
@@ -20,16 +21,17 @@ export class FeedbackService {
     private feedbackModel: Model<FeedbackDocument>,
     @InjectModel(Booking.name)
     private bookingModel: Model<BookingDocument>,
+    private emailService: EmailService, // 👈 Adicione esta linha
   ) {}
 
-  // Criar relatório de cuidados (apenas cuidador)
   async create(createFeedbackDto: CreateFeedbackDto, userId: string) {
     const { bookingId, feedbackDate, dayNumber, content, ...rest } = createFeedbackDto;
 
-    // Validar booking existe e popular para pegar o userId do cuidador
+    // Validar booking existe e popular CLIENTE também para enviar email
     const booking = await this.bookingModel
       .findById(bookingId)
-      .populate('caregiverId', 'userId');
+      .populate('caregiverId', 'userId')
+      .populate('clientId', 'email name'); // 👈 Adicione o populate do cliente
       
     if (!booking) {
       throw new NotFoundException('Serviço não encontrado');
@@ -102,6 +104,45 @@ export class FeedbackService {
 
     const savedFeedback = await feedback.save();
     this.logger.log(`✅ Relatório criado para booking ${bookingId}, dia ${finalDayNumber || 'único'}`);
+
+    // 👇 ENVIAR EMAIL PARA O CLIENTE
+    try {
+      const clientEmail = (booking.clientId as any)?.email;
+      const clientName = (booking.clientId as any)?.name;
+      
+      // Buscar o nome do cuidador
+      const caregiverUser = await this.bookingModel
+        .findById(bookingId)
+        .populate({
+          path: 'caregiverId',
+          populate: { path: 'userId', select: 'name' }
+        });
+      
+      const caregiverName = (caregiverUser?.caregiverId as any)?.userId?.name || 'Seu cuidador';
+
+      if (clientEmail) {
+        await this.emailService.sendNewFeedbackAvailableEmail({
+          to: clientEmail,
+          clientName: clientName || 'Cliente',
+          caregiverName,
+          serviceName: booking.serviceName || 'Atendimento',
+          feedbackDate: finalFeedbackDate.toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          dayNumber: finalDayNumber,
+          isFinal: isShortService || booking.status === 'completed',
+        });
+
+        this.logger.log(`📧 Email de relatório enviado para ${clientEmail}`);
+      }
+    } catch (emailError) {
+      this.logger.error(`❌ Erro ao enviar email de relatório`);
+      // Não falha a criação do relatório se o email falhar
+    }
 
     return this.findById(savedFeedback._id.toString());
   }

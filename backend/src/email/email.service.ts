@@ -721,4 +721,93 @@ export class EmailService implements OnModuleInit {
       caregiverAmount: data.caregiverAmount,
     });
   }
+
+  // 8. NOVO RELATÓRIO DISPONÍVEL (CLIENTE)
+
+  async sendNewFeedbackAvailableEmail(data: {
+    to: string;
+    clientName: string;
+    caregiverName: string;
+    serviceName: string;
+    feedbackDate: string;
+    dayNumber?: number;
+    isFinal: boolean;
+  }) {
+    const reportType = data.isFinal 
+      ? 'Relatório Final' 
+      : data.dayNumber 
+      ? `Relatório do Dia ${data.dayNumber}` 
+      : 'Novo Relatório';
+
+    const content = `
+      <div class="header" style="background: linear-gradient(135deg, #7c3aed, #6d28d9);">
+        <h1>📋 ${reportType} Disponível</h1>
+        <p>Seu cuidador enviou um relatório de atendimento</p>
+      </div>
+      <div class="content">
+        <p style="font-size: 18px; color: #1e293b;">Olá, <strong>${data.clientName}</strong>!</p>
+        
+        <p style="color: #475569; line-height: 1.6;">
+          <strong>${data.caregiverName}</strong> enviou ${data.isFinal ? 'o relatório final' : 'um novo relatório'} 
+          sobre o atendimento de <strong>${data.serviceName}</strong>.
+        </p>
+
+        <div class="info-box">
+          <div class="info-row">
+            <span style="color: #64748b;">Cuidador</span>
+            <span style="color: #1e293b; font-weight: 600;">${data.caregiverName}</span>
+          </div>
+          <div class="info-row">
+            <span style="color: #64748b;">Serviço</span>
+            <span style="color: #1e293b; font-weight: 600;">${data.serviceName}</span>
+          </div>
+          <div class="info-row">
+            <span style="color: #64748b;">Data do Relatório</span>
+            <span style="color: #1e293b; font-weight: 600;">${data.feedbackDate}</span>
+          </div>
+          ${data.dayNumber ? `
+          <div class="info-row">
+            <span style="color: #64748b;">Dia</span>
+            <span style="color: #7c3aed; font-weight: 700;">Dia ${data.dayNumber}</span>
+          </div>
+          ` : ''}
+          <div class="info-row">
+            <span style="color: #64748b;">Tipo</span>
+            <span style="color: #1e293b; font-weight: 600;">${data.isFinal ? '✅ Relatório Final' : '📝 Relatório Diário'}</span>
+          </div>
+        </div>
+
+        ${data.isFinal ? `
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin: 16px 0;">
+            <p style="color: #166534; margin: 0;">
+              ✅ Este é o relatório final do atendimento, contendo um resumo completo do período de cuidados.
+            </p>
+          </div>
+        ` : `
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 16px; margin: 16px 0;">
+            <p style="color: #1d4ed8; margin: 0;">
+              📝 Este relatório contém informações sobre o dia de atendimento, 
+              permitindo que você acompanhe de perto os cuidados prestados.
+            </p>
+          </div>
+        `}
+
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/dashboard" class="btn" style="background: linear-gradient(135deg, #7c3aed, #6d28d9); font-size: 16px; padding: 16px 48px;">
+            📋 Consultar Relatório
+          </a>
+        </div>
+
+        <p style="color: #64748b; font-size: 14px; margin-top: 24px; text-align: center;">
+          Acesse seu dashboard para visualizar o relatório completo com todos os detalhes do atendimento.
+        </p>
+      </div>
+    `;
+
+    return this.sendMail(
+      data.to,
+      `📋 ${reportType} - ${data.serviceName}`,
+      this.baseTemplate(content),
+    );
+  }
 }

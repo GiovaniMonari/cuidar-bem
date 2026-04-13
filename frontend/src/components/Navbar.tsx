@@ -19,6 +19,8 @@ export function Navbar() {
   const { user, logout, isAuthenticated } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const isCaregiver = user?.role === 'caregiver';
+
   return (
     <nav className="bg-white/80 backdrop-blur-lg border-b border-gray-100 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -26,8 +28,8 @@ export function Navbar() {
           <Link href="/" className="flex items-center">
             <div>
               <img
-                src="/logo_cuidadores_transparente.png" 
-                alt="Logo" 
+                src="/logo_cuidadores_transparente.png"
+                alt="Logo"
                 className="w-20 h-20 object-contain group-hover:scale-105 transition-transform"
               />
             </div>
@@ -38,13 +40,15 @@ export function Navbar() {
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-6">
-            <Link
-              href="/cuidadores"
-              className="flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors"
-            >
-              <Search className="w-4 h-4" />
-              Buscar Cuidadores
-            </Link>
+            {!isCaregiver && (
+              <Link
+                href="/cuidadores"
+                className="flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors"
+              >
+                <Search className="w-4 h-4" />
+                Buscar Cuidadores
+              </Link>
+            )}
 
             {isAuthenticated ? (
               <>
@@ -62,7 +66,7 @@ export function Navbar() {
                   <Calendar className="w-4 h-4" />
                   Dashboard
                 </Link>
-                
+
                 <div className="flex items-center gap-3 pl-3 border-l border-gray-200">
                   <Link
                     href="/perfil"
@@ -73,7 +77,9 @@ export function Navbar() {
                       avatar={user?.avatar}
                       size={32}
                     />
-                    <span className="font-medium text-sm">{user?.name?.split(' ')[0]}</span>
+                    <span className="font-medium text-sm">
+                      {user?.name?.split(' ')[0]}
+                    </span>
                   </Link>
                   <button
                     onClick={logout}
@@ -112,13 +118,16 @@ export function Navbar() {
       {/* Mobile Menu */}
       {mobileOpen && (
         <div className="md:hidden bg-white border-t border-gray-100 px-4 py-4 space-y-3">
-          <Link
-            href="/cuidadores"
-            className="block py-2 text-gray-600 hover:text-primary-600 font-medium"
-            onClick={() => setMobileOpen(false)}
-          >
-            Buscar Cuidadores
-          </Link>
+          {!isCaregiver && (
+            <Link
+              href="/cuidadores"
+              className="block py-2 text-gray-600 hover:text-primary-600 font-medium"
+              onClick={() => setMobileOpen(false)}
+            >
+              Buscar Cuidadores
+            </Link>
+          )}
+
           {isAuthenticated ? (
             <>
               <Link

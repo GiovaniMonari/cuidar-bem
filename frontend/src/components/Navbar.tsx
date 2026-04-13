@@ -129,6 +129,13 @@ export function Navbar() {
                 Dashboard
               </Link>
               <Link
+                href="/chat"
+                className="block py-2 text-gray-600 hover:text-primary-600 font-medium"
+                onClick={() => setMobileOpen(false)}
+              >
+                Chat
+              </Link>
+              <Link
                 href="/perfil"
                 className="block py-2 text-gray-600 hover:text-primary-600 font-medium"
                 onClick={() => setMobileOpen(false)}

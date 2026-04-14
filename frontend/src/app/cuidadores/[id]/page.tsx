@@ -869,51 +869,6 @@ const handleReview = async (e: React.FormEvent) => {
           </div>
         )}
 
-        {/* Modal de Horários Disponíveis - Estilo Outlook */}
-        {showTimeSlots && selectedAvailability && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-6 lg:p-8">
-            <div className="bg-white rounded-2xl w-full max-w-4xl my-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-              {/* Header do Modal */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-100">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">
-                    Agenda Disponível
-                  </h2>
-                  <p className="text-sm text-red-500 mt-1">
-                    Há um intervalo de 1 hora entre os atendimentos para deslocamento do cuidador.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowTimeSlots(false)}
-                  className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
-                >
-                  <X className="w-5 h-5 text-gray-500" />
-                </button>
-              </div>
-
-              {/* Conteúdo do Modal */}
-              <div className="p-6 overflow-visible">
-                {selectedAvailability.timeRanges && selectedAvailability.timeRanges.length > 0 ? (
-                  <DailyScheduleView
-                    date={selectedAvailability.date}
-                    timeRanges={selectedAvailability.timeRanges}
-                    bookedSlots={bookedSlots}
-                    readOnly={true}
-                  />
-                ) : (
-                  <div className="text-center py-8">
-                    <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-600 font-medium">Nenhum horário disponível</p>
-                    <p className="text-gray-500 text-sm mt-1">
-                      para esta data. Tente selecionar outro dia no calendário.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Modal de Agendamento */}
         {showBooking && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-6 lg:p-8">
@@ -1376,31 +1331,6 @@ const handleReview = async (e: React.FormEvent) => {
                 </div>
               </div>
             )}
-
-            {/* Availability */}
-            <div className="card p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-3">
-                Disponibilidade
-              </h2>
-              {availableDates.length > 0 || bookedDates.length > 0 ? (
-                <>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Toque em um dia para ver a agenda detalhada e os horários livres.
-                  </p>
-                  <AvailabilityCalendar
-                    selectedDates={availableDates}
-                    bookedDates={bookedDates}
-                    readOnly
-                    onSelectDate={handleSelectDate}
-                    selectedDate={selectedDate}
-                  />
-                </>
-              ) : (
-                <p className="text-gray-400 text-sm">
-                  Nenhuma data disponível cadastrada no momento.
-                </p>
-              )}
-            </div>
 
             {/* Reviews */}
             <div className="card p-6">

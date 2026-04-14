@@ -15,7 +15,6 @@ import {
   Heart,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
 } from 'lucide-react';
 
 // Hook para debounce (busca automática após parar de digitar)
@@ -125,7 +124,6 @@ function CaregiverListContent() {
           {/* Título e Descrição */}
           <div className="text-center mb-8">
             <div className="flex items-center justify-center gap-2 mb-3">
-              <Sparkles className="w-6 h-6 text-yellow-300" />
               <h1 className="text-4xl font-bold text-white">
                 {filters.specialty 
                   ? SPECIALTIES[filters.specialty] || filters.specialty

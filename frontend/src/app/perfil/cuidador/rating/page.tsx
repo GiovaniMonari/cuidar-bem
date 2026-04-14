@@ -8,6 +8,7 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useRouter } from 'next/navigation';
+import { Loader2 } from "lucide-react";
 
 interface ReviewWithBooking {
   _id: string;
@@ -120,13 +121,10 @@ export default function CaregiverRatingsPage() {
   }
 
   // Loading dos dados
-  if (loading) {
+  if (authLoading || loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando avaliações...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
       </div>
     );
   }

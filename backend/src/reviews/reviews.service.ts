@@ -1,11 +1,19 @@
 // reviews.service.ts
-import { Injectable, ForbiddenException, BadRequestException, NotFoundException } from '@nestjs/common';
+import { 
+  Injectable, 
+  ForbiddenException, 
+  BadRequestException, 
+  NotFoundException 
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Review, ReviewDocument } from './schemas/review.schema';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { CaregiversService } from '../caregivers/caregivers.service';
 import { BookingsService } from '../bookings/bookings.service';
+import { User } from '../users/schemas/user.schema';
+import { Booking } from '../bookings/schemas/booking.schema';
+import { ReviewWithBookingDto } from './dto/review-with-booking.dto';
 
 @Injectable()
 export class ReviewsService {
@@ -19,6 +27,16 @@ export class ReviewsService {
     // Verificar se o bookingId foi informado
     if (!dto.bookingId) {
       throw new BadRequestException('É necessário informar o ID do atendimento.');
+    }
+
+    // Validar ObjectId do booking
+    if (!Types.ObjectId.isValid(dto.bookingId)) {
+      throw new BadRequestException('ID do atendimento inválido.');
+    }
+
+    // Validar ObjectId do caregiver
+    if (!Types.ObjectId.isValid(dto.caregiverId)) {
+      throw new BadRequestException('ID do cuidador inválido.');
     }
 
     // Buscar o booking
@@ -72,10 +90,12 @@ export class ReviewsService {
       .sort({ createdAt: -1 });
   }
 
-  // ⬇️ NOVO: Buscar bookings que podem ser avaliados
   async getReviewableBookings(clientId: string, caregiverId: string) {
     // Buscar todos os bookings completados do cliente com este cuidador
-    const completedBookings = await this.bookingsService.getCompletedBookings(clientId, caregiverId);
+    const completedBookings = await this.bookingsService.getCompletedBookings(
+      clientId, 
+      caregiverId
+    );
 
     // Filtrar os que ainda não foram avaliados
     const reviewableBookings = [];
@@ -100,7 +120,6 @@ export class ReviewsService {
     return reviewableBookings;
   }
 
-  // ⬇️ ATUALIZADO: canReview retorna lista de bookings disponíveis
   async checkCanReview(clientId: string, caregiverId: string) {
     const reviewableBookings = await this.getReviewableBookings(clientId, caregiverId);
 
@@ -112,7 +131,6 @@ export class ReviewsService {
     };
   }
 
-  // ⬇️ NOVO: Atualizar rating do cuidador baseado em todas as reviews
   private async updateCaregiverRating(caregiverId: string) {
     const reviews = await this.reviewModel.find({
       caregiverId: new Types.ObjectId(caregiverId),
@@ -124,5 +142,68 @@ export class ReviewsService {
     const avgRating = Math.round((totalRating / reviews.length) * 10) / 10;
 
     await this.caregiversService.updateRating(caregiverId, avgRating, reviews.length);
+  }
+
+ async getReviewsWithBookingDetails(caregiverId: string): Promise<ReviewWithBookingDto[]> {
+  console.log('🔍 Buscando reviews para caregiverId:', caregiverId);
+  
+  try {
+    if (!Types.ObjectId.isValid(caregiverId)) {
+      throw new BadRequestException('ID do cuidador inválido.');
+    }
+
+    const reviews = await this.reviewModel
+      .find({ caregiverId: new Types.ObjectId(caregiverId) })
+      .sort({ createdAt: -1 })
+      .populate({
+        path: 'bookingId',
+        select: 'serviceType serviceName startDate endDate patientName clientId',
+        populate: {
+          path: 'clientId',
+          select: 'name avatar',
+        }
+      })
+      .lean()
+      .exec();
+
+    console.log(`📦 ${reviews.length} review(s) encontrada(s)`);
+
+    if (reviews.length === 0) {
+      return [];
+    }
+
+    const formattedReviews: ReviewWithBookingDto[] = reviews
+      .filter(review => review.bookingId) // Filtra reviews com booking válido
+      .map((review: any) => {
+        const bookingDetails = review.bookingId;
+        const contractedBy = bookingDetails?.clientId;
+
+        return {
+          _id: review._id.toString(),
+          rating: review.rating,
+          comment: review.comment || '',
+          createdAt: review.createdAt.toISOString(),
+          
+          booking: {
+            _id: bookingDetails._id.toString(),
+            startDate: bookingDetails.startDate?.toISOString(),
+            endDate: bookingDetails.endDate?.toISOString(),
+            
+            contractedBy: {
+              _id: contractedBy._id.toString(),
+              name: contractedBy.name || 'Cliente não encontrado',
+              avatar: contractedBy.avatar || undefined,
+            },
+          },
+        };
+      });
+
+      console.log('✅ Reviews formatadas:', formattedReviews.length);
+      
+      return formattedReviews;
+    } catch (error) {
+      console.error('❌ Erro ao buscar reviews:', error);
+      throw error;
+    }
   }
 }

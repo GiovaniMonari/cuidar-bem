@@ -122,34 +122,6 @@ function CaregiverDetailContent() {
     }
   };
 
-  const selectedDateWeekLabel = useMemo(() => {
-    if (!selectedDate) return '';
-
-    const date = new Date(selectedDate + 'T00:00:00');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const currentWeekStart = new Date(today);
-    currentWeekStart.setDate(today.getDate() - today.getDay());
-    const currentWeekEnd = new Date(currentWeekStart);
-    currentWeekEnd.setDate(currentWeekStart.getDate() + 6);
-
-    const nextWeekStart = new Date(currentWeekStart);
-    nextWeekStart.setDate(currentWeekStart.getDate() + 7);
-    const nextWeekEnd = new Date(nextWeekStart);
-    nextWeekEnd.setDate(nextWeekStart.getDate() + 6);
-
-    if (date >= currentWeekStart && date <= currentWeekEnd) {
-      return 'Esta semana';
-    }
-
-    if (date >= nextWeekStart && date <= nextWeekEnd) {
-      return 'Semana seguinte';
-    }
-
-    return 'Fora deste períodos';
-  }, [selectedDate]);
-
   const hasDuplicateBookingSameDay = (
     bookings: any[],
     caregiverId: string,

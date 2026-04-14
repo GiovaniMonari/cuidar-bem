@@ -19,6 +19,9 @@ export class Review {
 
   @Prop({ required: true })
   comment: string;
+
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export const ReviewSchema = SchemaFactory.createForClass(Review);

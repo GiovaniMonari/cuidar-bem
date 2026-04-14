@@ -111,6 +111,29 @@ export interface Booking {
   createdAt: string;
 }
 
+// types/index.ts ou types.ts
+
+// services/api.ts - adicione/atualize a interface
+export interface ReviewWithBooking {
+  _id: string;
+  rating: number;
+  comment?: string;
+  createdAt: string;
+  booking: {
+    _id: string;
+    serviceType: string;
+    serviceName: string;
+    startDate: string;
+    endDate: string;
+    patientName: string;
+    contractedBy: {
+      _id: string;
+      name: string;
+      avatar?: string;
+    };
+  };
+}
+
 export interface Review {
   _id: string;
   clientId: User;

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/services/api';
 import { UserAvatar } from '@/components/UserAvatar';
-import { Camera, Trash2 } from 'lucide-react';
+import { Camera, Star, Trash2 } from 'lucide-react';
 import {
   User,
   Mail,
@@ -255,22 +255,43 @@ export default function ProfilePage() {
         </div>
 
         {user?.role === 'caregiver' && (
-          <div className="card p-6 mt-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Stethoscope className="w-5 h-5 text-primary-600" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">
-                    Perfil de Cuidador
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    Configure suas especialidades e disponibilidade
-                  </p>
+          <div>
+            <div className="card p-6 mt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Star className="w-5 h-5 text-yellow-400" />
+                  <div>
+                    <h3 className="font-semibold text-gray-900">
+                      Minhas Avaliações
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      Veja o feedback dos clientes sobre seus serviços
+                    </p>
+                  </div>
                 </div>
+                <Link href="/perfil/cuidador/rating" className="btn-primary !py-2 text-sm">
+                  Ver Avaliações
+                </Link>
               </div>
-              <Link href="/perfil/cuidador" className="btn-primary !py-2 text-sm">
-                Configurar
-              </Link>
+            </div>
+
+            <div className="card p-6 mt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Stethoscope className="w-5 h-5 text-primary-600" />
+                  <div>
+                    <h3 className="font-semibold text-gray-900">
+                      Perfil de Cuidador
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      Configure suas especialidades e disponibilidade
+                    </p>
+                  </div>
+                </div>
+                <Link href="/perfil/cuidador" className="btn-primary !py-2 text-sm">
+                  Configurar
+                </Link>
+              </div>
             </div>
           </div>
         )}

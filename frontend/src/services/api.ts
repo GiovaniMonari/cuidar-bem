@@ -1,3 +1,5 @@
+import { ReviewWithBooking } from "@/types";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 class ApiService {
@@ -120,6 +122,12 @@ class ApiService {
   async getReviews(caregiverId: string) {
     return this.request<any>(`/reviews/caregiver/${caregiverId}`, {
       headers: this.headers(),
+    });
+  }
+
+  async getMyReviews(): Promise<ReviewWithBooking[]> {
+    return this.request<ReviewWithBooking[]>('/reviews/my-reviews', {
+      headers: this.headers(true),
     });
   }
 

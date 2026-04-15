@@ -311,6 +311,28 @@ class ApiService {
     });
   }
 
+  async favoriteCaregiver(caregiverId: string) {
+  return this.request<any>(`/users/me/favorite/${caregiverId}`, {
+    method: 'POST',
+    headers: this.headers(true),
+    // Remova o body, não é mais necessário
+  });
+}
+
+async removeFavoriteCaregiver(caregiverId: string) {
+  return this.request<any>(`/users/me/favorite/${caregiverId}/remove`, {
+    method: 'POST',
+    headers: this.headers(true),
+  });
+}
+
+  async getFavoriteCaregivers() {
+    return this.request<any[]>('/users/favorites/caregivers', {
+      headers: this.headers(true),
+    });
+  }
+
+
   // Genérico GET
   async get(endpoint: string) {
     return this.request<any>(endpoint, {

@@ -153,9 +153,9 @@ function HeroClient({ user }: { user: NonNullable<ReturnType<typeof useAuth>['us
       color: 'bg-accent-500/20 hover:bg-accent-500/30',
     },
     {
-      href: '/dashboard/favoritos',
+      href: '/favoritos',
       icon: Heart,
-      label: 'Favoritos',
+      label: 'Cuidadores favoritos',
       desc: 'Cuidadores que você salvou',
       color: 'bg-white/[0.08] hover:bg-white/[0.14]',
     },

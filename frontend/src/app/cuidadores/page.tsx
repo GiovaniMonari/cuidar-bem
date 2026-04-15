@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+import { useFavorites } from '../hooks/useFavorites';
 
 // Hook para debounce (busca automática após parar de digitar)
 function useDebounce<T>(value: T, delay: number): T {
@@ -37,7 +38,7 @@ function useDebounce<T>(value: T, delay: number): T {
 function CaregiverListContent() {
   const searchParams = useSearchParams();
   const initialSpecialty = searchParams.get('specialty') || '';
-
+  const { isFavorited, toggleFavorite } = useFavorites();
   const [caregivers, setCaregivers] = useState<Caregiver[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalPages, setTotalPages] = useState(1);
@@ -419,7 +420,11 @@ function CaregiverListContent() {
               {/* Grid de Cuidadores */}
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {caregivers.map((caregiver) => (
-                  <CaregiverCard key={caregiver._id} caregiver={caregiver} />
+                  <CaregiverCard
+                    caregiver={caregiver}
+                    isFavorited={isFavorited(caregiver._id)}
+                    onToggleFavorite={toggleFavorite}
+                  />
                 ))}
               </div>
 

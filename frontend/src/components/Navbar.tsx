@@ -50,7 +50,17 @@ export function Navbar() {
               </Link>
             )}
 
-            {isAuthenticated ? (
+            {isAuthenticated && !isCaregiver && (
+              <Link
+                href="/favoritos"
+                className="flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors"
+              >
+                <Heart className="w-4 h-4" />
+                Cuidadores Favoritos
+              </Link>
+            )}
+
+            {isAuthenticated && (
               <>
                 <Link
                   href="/chat"
@@ -59,6 +69,7 @@ export function Navbar() {
                   <MessageCircle className="w-4 h-4" />
                   Chat
                 </Link>
+
                 <Link
                   href="/dashboard"
                   className="flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors"
@@ -90,7 +101,9 @@ export function Navbar() {
                   </button>
                 </div>
               </>
-            ) : (
+            )}
+
+            {!isAuthenticated && (
               <div className="flex items-center gap-3">
                 <Link
                   href="/login"
@@ -128,7 +141,17 @@ export function Navbar() {
             </Link>
           )}
 
-          {isAuthenticated ? (
+          {isAuthenticated && !isCaregiver && (
+            <Link
+              href="/favoritos"
+              className="block py-2 text-gray-600 hover:text-primary-600 font-medium flex items-center gap-2"
+              onClick={() => setMobileOpen(false)}
+            >
+              Cuidadores Favoritos
+            </Link>
+          )}
+
+          {isAuthenticated && (
             <>
               <Link
                 href="/dashboard"
@@ -156,12 +179,14 @@ export function Navbar() {
                   logout();
                   setMobileOpen(false);
                 }}
-                className="block py-2 text-red-500 font-medium"
+                className="block py-2 text-red-500 font-medium w-full text-left"
               >
                 Sair
               </button>
             </>
-          ) : (
+          )}
+
+          {!isAuthenticated && (
             <>
               <Link
                 href="/login"

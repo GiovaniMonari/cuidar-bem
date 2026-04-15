@@ -1,6 +1,6 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import { User, UserDocument } from './schemas/user.schema';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -42,5 +42,66 @@ export class UsersService {
       .select('-password');
     if (!user) throw new NotFoundException('Usuário não encontrado');
     return user;
+  }
+
+  async updatePassword(id: string, newPassword: string): Promise<void> {
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await this.userModel.findByIdAndUpdate(id, { password: hashedPassword });
+  }
+
+  async favoriteCaregiver(userId: string, caregiverId: string) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+
+    // Limpeza preventiva de valores nulos
+    user.favoriteCaregivers = user.favoriteCaregivers.filter(
+      (id): id is Types.ObjectId => id != null && Types.ObjectId.isValid(id.toString())
+    );
+
+    const isAlreadyFavorited = user.favoriteCaregivers.some(
+      (id) => id.toString() === caregiverId
+    );
+
+    if (isAlreadyFavorited) {
+      user.favoriteCaregivers = user.favoriteCaregivers.filter(
+        (id) => id.toString() !== caregiverId
+      );
+    } else {
+      user.favoriteCaregivers.push(new Types.ObjectId(caregiverId));
+    }
+
+    await user.save();
+    return { 
+      success: true, 
+      isFavorited: !isAlreadyFavorited 
+    };
+  }
+
+  async getFavoriteCaregivers(userId: string) {
+    const user = await this.userModel
+      .findById(userId)
+      .populate({
+        path: 'favoriteCaregivers',
+        populate: {
+          path: 'userId',
+          select: 'name avatar email phone',
+        },
+      })
+      .exec();
+
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+    return user.favoriteCaregivers || [];
+  }
+
+  async deleteFavoriteCaregiver(userId: string, caregiverId: string) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+
+    user.favoriteCaregivers = user.favoriteCaregivers
+      .filter((id): id is Types.ObjectId => id != null && Types.ObjectId.isValid(id.toString()))
+      .filter((id) => id.toString() !== caregiverId);
+
+    await user.save();
+    return { message: 'Favorito removido com sucesso' };
   }
 }

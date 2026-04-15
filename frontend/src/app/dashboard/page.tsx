@@ -22,52 +22,78 @@ import {
   ArrowRight,
   BadgeDollarSign,
   MessageCircle,
-  MessageSquare,
   FileText,
+  TrendingUp,
+  AlertCircle,
+  Banknote,
+  Activity,
+  Star,
+  Filter,
 } from 'lucide-react';
 import { BookingCalendar } from '@/components/BookingCalendar';
 
 const CHECK_IN_EARLY_WINDOW_MS = 2 * 60 * 60 * 1000;
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
-const STATUS_MAP: Record<string, { label: string; color: string; icon: any }> = {
-  pending: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
-  confirmed: { label: 'Confirmado', color: 'bg-blue-100 text-blue-700', icon: CheckCircle },
-  in_progress: { label: 'Em andamento', color: 'bg-emerald-100 text-emerald-700', icon: MapPin },
-  completed: { label: 'Concluído', color: 'bg-green-100 text-green-700', icon: CheckCircle },
-  cancelled: { label: 'Cancelado', color: 'bg-red-100 text-red-700', icon: XCircle },
+const STATUS_MAP: Record<string, { label: string; color: string; bg: string; icon: any }> = {
+  pending: {
+    label: 'Pendente',
+    color: 'text-amber-700',
+    bg: 'bg-amber-50 border-amber-200',
+    icon: Clock,
+  },
+  confirmed: {
+    label: 'Confirmado',
+    color: 'text-blue-700',
+    bg: 'bg-blue-50 border-blue-200',
+    icon: CheckCircle,
+  },
+  in_progress: {
+    label: 'Em andamento',
+    color: 'text-emerald-700',
+    bg: 'bg-emerald-50 border-emerald-200',
+    icon: Activity,
+  },
+  completed: {
+    label: 'Concluído',
+    color: 'text-green-700',
+    bg: 'bg-green-50 border-green-200',
+    icon: CheckCircle,
+  },
+  cancelled: {
+    label: 'Cancelado',
+    color: 'text-red-700',
+    bg: 'bg-red-50 border-red-200',
+    icon: XCircle,
+  },
 };
 
-const PAYMENT_STATUS_MAP: Record<string, { label: string; color: string }> = {
-  pending: { label: 'Aguardando Pagamento', color: 'bg-yellow-100 text-yellow-700' },
-  paid: { label: 'Pago', color: 'bg-green-100 text-green-700' },
-  held: { label: 'Pago - Retido na Plataforma', color: 'bg-blue-100 text-blue-700' },
-  released: { label: 'Liberado ao Cuidador', color: 'bg-green-100 text-green-700' },
-  refunded: { label: 'Reembolsado', color: 'bg-orange-100 text-orange-700' },
-  cancelled: { label: 'Cancelado', color: 'bg-red-100 text-red-700' },
-  failed: { label: 'Falhou', color: 'bg-red-100 text-red-700' },
+const PAYMENT_STATUS_MAP: Record<string, { label: string; color: string; dot: string }> = {
+  pending: { label: 'Aguardando Pagamento', color: 'text-amber-700', dot: 'bg-amber-400' },
+  paid: { label: 'Pago', color: 'text-green-700', dot: 'bg-green-400' },
+  held: { label: 'Retido na Plataforma', color: 'text-blue-700', dot: 'bg-blue-400' },
+  released: { label: 'Liberado ao Cuidador', color: 'text-green-700', dot: 'bg-green-400' },
+  refunded: { label: 'Reembolsado', color: 'text-orange-700', dot: 'bg-orange-400' },
+  cancelled: { label: 'Cancelado', color: 'text-red-700', dot: 'bg-red-400' },
+  failed: { label: 'Falhou', color: 'text-red-700', dot: 'bg-red-400' },
 };
 
-/**
- * Determina se o botão de relatórios deve ser exibido para um booking.
- *
- * - Serviços curtos (≤ 24h): só aparece quando o status é "completed"
- * - Serviços longos (> 24h): aparece a partir do check-in do cuidador
- *   (status "in_progress" ou "completed")
- */
 function shouldShowReports(booking: Booking): boolean {
   const durationMs =
     new Date(booking.endDate).getTime() - new Date(booking.startDate).getTime();
   const isShortService = durationMs <= TWENTY_FOUR_HOURS_MS;
-
-  if (isShortService) {
-    // Serviços de até 24h: só após conclusão
-    return booking.status === 'completed';
-  }
-
-  // Serviços longos (1 semana, 1 mês, etc.): a partir do check-in
+  if (isShortService) return booking.status === 'completed';
   return ['in_progress', 'completed'].includes(booking.status);
 }
+
+const TABS = [
+  { key: 'all', label: 'Todos' },
+  { key: 'pending', label: 'Pendentes' },
+  { key: 'confirmed', label: 'Confirmados' },
+  { key: 'in_progress', label: 'Em andamento' },
+  { key: 'completed', label: 'Concluídos' },
+  { key: 'cancelled', label: 'Cancelados' },
+];
 
 export default function DashboardPage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -81,15 +107,11 @@ export default function DashboardPage() {
   const [chatLoading, setChatLoading] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push('/login');
-    }
+    if (!authLoading && !isAuthenticated) router.push('/login');
   }, [authLoading, isAuthenticated]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchData();
-    }
+    if (isAuthenticated) fetchData();
   }, [isAuthenticated]);
 
   const fetchData = async () => {
@@ -105,12 +127,8 @@ export default function DashboardPage() {
         bookingsList.map(async (booking: any) => {
           try {
             const payment = await api.getPaymentByBooking(booking._id);
-            if (payment) {
-              paymentMap[booking._id] = payment;
-            }
-          } catch {
-            // Sem pagamento para este booking
-          }
+            if (payment) paymentMap[booking._id] = payment;
+          } catch {}
 
           try {
             const feedbacks = await api.getFeedbackByBooking(booking._id);
@@ -146,73 +164,31 @@ export default function DashboardPage() {
     const isLocalEnvironment = ['localhost', '127.0.0.1', '::1'].includes(
       window.location.hostname,
     );
-
     if (!window.isSecureContext && !isLocalEnvironment) {
-      throw new Error(
-        'A localização do navegador só funciona em páginas seguras (HTTPS). Abra a plataforma em HTTPS para fazer o check-in.',
-      );
+      throw new Error('A localização só funciona em páginas seguras (HTTPS).');
     }
-
     const getPosition = (options: PositionOptions) =>
       new Promise<GeolocationPosition>((resolve, reject) => {
         if (!navigator.geolocation) {
           reject(new Error('Seu navegador não suporta geolocalização.'));
           return;
         }
-
         navigator.geolocation.getCurrentPosition(resolve, reject, options);
       });
-
     try {
-      return await getPosition({
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0,
-      });
+      return await getPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
     } catch (error: any) {
-      if (error?.code === error?.PERMISSION_DENIED || error?.code === 1) {
-        throw new Error(
-          'Permita o acesso à localização para realizar o check-in.',
-        );
-      }
-
+      if (error?.code === 1) throw new Error('Permita o acesso à localização para o check-in.');
       try {
-        return await getPosition({
-          enableHighAccuracy: false,
-          timeout: 12000,
-          maximumAge: 300000,
-        });
+        return await getPosition({ enableHighAccuracy: false, timeout: 12000, maximumAge: 300000 });
       } catch (fallbackError: any) {
-        if (
-          fallbackError?.code === fallbackError?.PERMISSION_DENIED ||
-          fallbackError?.code === 1
-        ) {
-          throw new Error(
-            'Permita o acesso à localização para realizar o check-in.',
-          );
-        }
-
-        if (
-          fallbackError?.code === fallbackError?.POSITION_UNAVAILABLE ||
-          fallbackError?.code === 2
-        ) {
-          throw new Error(
-            'Não foi possível identificar sua localização atual. Ative a localização do dispositivo e tente novamente.',
-          );
-        }
-
-        if (
-          fallbackError?.code === fallbackError?.TIMEOUT ||
-          fallbackError?.code === 3
-        ) {
-          throw new Error(
-            'A localização demorou demais para responder. Tente novamente em um local com melhor sinal.',
-          );
-        }
-
-        throw new Error(
-          'Não foi possível obter sua localização atual para o check-in.',
-        );
+        if (fallbackError?.code === 1)
+          throw new Error('Permita o acesso à localização para o check-in.');
+        if (fallbackError?.code === 2)
+          throw new Error('Não foi possível identificar sua localização. Ative o GPS.');
+        if (fallbackError?.code === 3)
+          throw new Error('Tempo esgotado. Tente em um local com melhor sinal.');
+        throw new Error('Não foi possível obter sua localização.');
       }
     }
   };
@@ -221,15 +197,9 @@ export default function DashboardPage() {
     setActionLoading(bookingId);
     try {
       const position = await requestCurrentLocation();
-      await api.checkInBooking(
-        bookingId,
-        position.coords.latitude,
-        position.coords.longitude,
-      );
+      await api.checkInBooking(bookingId, position.coords.latitude, position.coords.longitude);
       await fetchData();
-      alert(
-        'Check-in realizado com sucesso. Atendimento marcado como em andamento.',
-      );
+      alert('Check-in realizado com sucesso!');
     } catch (error: any) {
       alert(error.message || 'Não foi possível realizar o check-in.');
     } finally {
@@ -251,13 +221,8 @@ export default function DashboardPage() {
   };
 
   const openChat = async (bookingId: string) => {
-    if (chatLoading === bookingId) {
-      console.log('⏳ Já abrindo chat, aguarde...');
-      return;
-    }
-
+    if (chatLoading === bookingId) return;
     setChatLoading(bookingId);
-
     try {
       const conversation = await api.getOrCreateConversation(bookingId);
       router.push(`/chat?conversation=${conversation._id}`);
@@ -274,706 +239,729 @@ export default function DashboardPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-3">
+        <Loader2 className="w-10 h-10 text-primary-600 animate-spin" />
+        <p className="text-gray-500 text-sm">Carregando seu dashboard...</p>
       </div>
     );
   }
 
-  const filtered =
-    tab === 'all' ? bookings : bookings.filter((b) => b.status === tab);
+  const filtered = tab === 'all' ? bookings : bookings.filter((b) => b.status === tab);
+  const isCaregiver = user?.role === 'caregiver';
 
-  // Calcular totais financeiros
   const totalEarnings = Object.values(payments)
     .filter((p: any) => p.status === 'released')
-    .reduce(
-      (sum: number, p: any) =>
-        sum + (user?.role === 'caregiver' ? p.caregiverAmount : p.amount),
-      0,
-    );
+    .reduce((sum: number, p: any) => sum + (isCaregiver ? (p.caregiverAmount ?? p.amount ?? 0) : (p.amount ?? 0)), 0);
 
   const pendingAmount = Object.values(payments)
     .filter((p: any) => ['pending', 'held', 'paid'].includes(p.status))
-    .reduce(
-      (sum: number, p: any) =>
-        sum + (user?.role === 'caregiver' ? p.caregiverAmount : p.amount),
-      0,
-    );
+    .reduce((sum: number, p: any) => sum + (isCaregiver ? (p.caregiverAmount ?? p.amount ?? 0) : (p.amount ?? 0)), 0);
+
+  const activeCount = bookings.filter((b) =>
+    ['confirmed', 'in_progress'].includes(b.status),
+  ).length;
+  const pendingCount = bookings.filter((b) => b.status === 'pending').length;
+  const completedCount = bookings.filter((b) => b.status === 'completed').length;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-500 mt-1">
-            {user?.role === 'caregiver'
-              ? 'Gerencie seus atendimentos e pagamentos'
-              : 'Acompanhe seus agendamentos e pagamentos'}
-          </p>
-        </div>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-          <div className="card p-4">
-            <div className="text-2xl font-bold">{bookings.length}</div>
-            <div className="text-sm text-gray-500">Total</div>
+        {/* ── Header ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-primary-600 mb-1">
+              Bem-vindo de volta
+            </p>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {user?.name?.split(' ')[0] || 'Usuário'}
+            </h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {isCaregiver
+                ? 'Gerencie seus atendimentos e pagamentos'
+                : 'Acompanhe seus agendamentos e pagamentos'}
+            </p>
           </div>
-          <div className="card p-4">
-            <div className="text-2xl font-bold text-yellow-600">
-              {bookings.filter((b) => b.status === 'pending').length}
-            </div>
-            <div className="text-sm text-gray-500">Pendentes</div>
-          </div>
-          <div className="card p-4">
-            <div className="text-2xl font-bold text-blue-600">
-              {
-                bookings.filter((b) =>
-                  ['confirmed', 'in_progress'].includes(b.status),
-                ).length
-              }
-            </div>
-            <div className="text-sm text-gray-500">Ativos</div>
-          </div>
-          <div className="card p-4">
-            <div className="text-2xl font-bold text-green-600">
-              R$ {totalEarnings.toFixed(0)}
-            </div>
-            <div className="text-sm text-gray-500">
-              {user?.role === 'caregiver' ? 'Recebido' : 'Pago'}
-            </div>
-          </div>
-          <div className="card p-4">
-            <div className="text-2xl font-bold text-orange-600">
-              R$ {pendingAmount.toFixed(0)}
-            </div>
-            <div className="text-sm text-gray-500">
-              {user?.role === 'caregiver' ? 'A receber' : 'A pagar'}
-            </div>
+          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2.5 self-start sm:self-auto">
+            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-sm font-medium text-gray-700">
+              {isCaregiver ? 'Cuidador' : 'Cliente'}
+            </span>
           </div>
         </div>
 
-        {user?.role === 'caregiver' && bookings.length > 0 && (
-          <div className="mb-8">
+        {/* ── Stats Cards ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            label="Total de agendamentos"
+            value={bookings.length}
+            icon={Calendar}
+            iconColor="text-gray-600"
+            iconBg="bg-gray-100"
+          />
+          <StatCard
+            label="Pendentes"
+            value={pendingCount}
+            icon={Clock}
+            iconColor="text-amber-600"
+            iconBg="bg-amber-100"
+            highlight={pendingCount > 0}
+          />
+          <StatCard
+            label="Ativos"
+            value={activeCount}
+            icon={Activity}
+            iconColor="text-blue-600"
+            iconBg="bg-blue-100"
+          />
+          <StatCard
+            label="Concluídos"
+            value={completedCount}
+            icon={CheckCircle}
+            iconColor="text-green-600"
+            iconBg="bg-green-100"
+          />
+        </div>
+
+        {/* ── Financial Summary ── */}
+        {isCaregiver && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl p-6 text-white shadow-md">
+              <div className="flex items-center gap-2 mb-4 opacity-80">
+                <Banknote className="w-4 h-4" />
+                <span className="text-sm font-medium">Total Recebido</span>
+              </div>
+              <div className="text-3xl font-bold tracking-tight">
+                R$ {totalEarnings.toFixed(2)}
+              </div>
+              <p className="text-sm opacity-70 mt-1">Pagamentos liberados</p>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+              <div className="flex items-center gap-2 mb-4 text-amber-600">
+                <TrendingUp className="w-4 h-4" />
+                <span className="text-sm font-medium">A Receber</span>
+              </div>
+              <div className="text-3xl font-bold text-gray-900 tracking-tight">
+                R$ {pendingAmount.toFixed(2)}
+              </div>
+              <p className="text-sm text-gray-400 mt-1">Em processamento</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Calendar (caregiver only) ── */}
+        {isCaregiver && bookings.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+            <h2 className="text-base font-semibold text-gray-900 mb-4">
+              Calendário de Atendimentos
+            </h2>
             <BookingCalendar bookings={bookings} />
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6 overflow-x-auto">
-          {[
-            { key: 'all', label: 'Todos' },
-            { key: 'pending', label: 'Pendentes' },
-            { key: 'confirmed', label: 'Confirmados' },
-            { key: 'in_progress', label: 'Em andamento' },
-            { key: 'completed', label: 'Concluídos' },
-            { key: 'cancelled', label: 'Cancelados' },
-          ].map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${
-                tab === t.key
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Bookings List */}
-        {filtered.length === 0 ? (
-          <div className="card p-12 text-center">
-            <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <h3 className="font-semibold text-gray-600">
-              Nenhum agendamento
-            </h3>
+        {/* ── Bookings ── */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold text-gray-900">
+              Agendamentos
+            </h2>
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <Filter className="w-3.5 h-3.5" />
+              Filtrar por status
+            </div>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {filtered.map((booking) => {
-              const status =
-                STATUS_MAP[booking.status] || STATUS_MAP.pending;
-              const StatusIcon = status.icon;
-              const isCaregiver = user?.role === 'caregiver';
-              const payment = payments[booking._id];
-              const paymentStatus = payment
-                ? PAYMENT_STATUS_MAP[payment.status] ||
-                  PAYMENT_STATUS_MAP.pending
-                : null;
-              const canCheckInNow =
-                new Date(booking.startDate).getTime() -
-                  CHECK_IN_EARLY_WINDOW_MS <=
-                Date.now();
-              const checkInWindowLabel = new Date(
-                new Date(booking.startDate).getTime() -
-                  CHECK_IN_EARLY_WINDOW_MS,
-              ).toLocaleString('pt-BR');
 
-              const feedbackCount = feedbackCounts[booking._id] || 0;
-              const showReports = shouldShowReports(booking);
-
+          {/* Tabs */}
+          <div className="flex gap-2 mb-5 overflow-x-auto pb-1 scrollbar-hide">
+            {TABS.map((t) => {
+              const count =
+                t.key === 'all'
+                  ? bookings.length
+                  : bookings.filter((b) => b.status === t.key).length;
               return (
-                <div key={booking._id} className="card p-6">
-                  <div className="flex flex-col gap-4">
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-                      <div className="flex-1">
-                        <div className="flex flex-wrap items-center gap-2 mb-3">
-                          <span
-                            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${status.color}`}
-                          >
-                            <StatusIcon className="w-3.5 h-3.5" />
-                            {status.label}
-                          </span>
-
-                          {paymentStatus && (
-                            <span
-                              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${paymentStatus.color}`}
-                            >
-                              <DollarSign className="w-3.5 h-3.5" />
-                              {paymentStatus.label}
-                            </span>
-                          )}
-
-                          <span className="text-xs text-gray-400">
-                            {new Date(
-                              booking.createdAt,
-                            ).toLocaleDateString('pt-BR')}
-                          </span>
-                        </div>
-
-                        <div className="grid sm:grid-cols-2 gap-3 text-sm">
-                          {isCaregiver ? (
-                            <div className="flex items-center gap-2 text-gray-600">
-                              <User className="w-4 h-4 text-gray-400" />
-                              <span>
-                                <strong>Cliente:</strong>{' '}
-                                {booking.clientName ||
-                                  (booking.clientId as any)?.name ||
-                                  '—'}
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 text-gray-600">
-                              <User className="w-4 h-4 text-gray-400" />
-                              <span>
-                                <strong>Cuidador:</strong>{' '}
-                                {(booking.caregiverId as any)?.userId
-                                  ?.name || '—'}
-                              </span>
-                            </div>
-                          )}
-
-                          <div className="flex items-center gap-2 text-gray-600">
-                            <Calendar className="w-4 h-4 text-gray-400" />
-                            <span>
-                              {new Date(
-                                booking.startDate,
-                              ).toLocaleDateString('pt-BR')}{' '}
-                              -{' '}
-                              {new Date(
-                                booking.endDate,
-                              ).toLocaleDateString('pt-BR')}
-                            </span>
-                          </div>
-
-                          {booking.address && (
-                            <div className="flex items-center gap-2 text-gray-600">
-                              <MapPin className="w-4 h-4 text-gray-400" />
-                              <span>{booking.address}</span>
-                            </div>
-                          )}
-
-                          {(booking.clientPhone ||
-                            (booking.clientId as any)?.phone) && (
-                            <div className="flex items-center gap-2 text-gray-600">
-                              <Phone className="w-4 h-4 text-gray-400" />
-                              <span>
-                                {booking.clientPhone ||
-                                  (booking.clientId as any)?.phone}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {booking.notes && (
-                          <p className="mt-3 text-sm text-gray-500 bg-gray-50 rounded-lg p-3">
-                            {booking.notes}
-                          </p>
-                        )}
-
-                        {booking.checkInAt && (
-                          <div className="mt-3 flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 rounded-lg p-3">
-                            <MapPin className="w-4 h-4 flex-shrink-0" />
-                            <span>
-                              Check-in realizado em{' '}
-                              {new Date(
-                                booking.checkInAt,
-                              ).toLocaleString('pt-BR')}
-                              {typeof booking.checkInDistanceMeters ===
-                              'number'
-                                ? ` a ${Math.round(booking.checkInDistanceMeters)}m do local combinado`
-                                : ''}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Amount */}
-                      {payment && (
-                        <div className="text-right flex-shrink-0">
-                          <div className="text-2xl font-bold text-gray-900">
-                            R${' '}
-                            {isCaregiver
-                              ? payment.caregiverAmount?.toFixed(2)
-                              : payment.amount?.toFixed(2)}
-                          </div>
-                          {isCaregiver && (
-                            <div className="text-xs text-gray-400">
-                              Taxa: R${' '}
-                              {payment.platformFee?.toFixed(2)}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Payment Info & Actions */}
-                    <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100">
-                      {/* Payment link for client */}
-                      {!isCaregiver &&
-                        payment &&
-                        booking.status === 'completed' &&
-                        payment.status === 'pending' &&
-                        payment.paymentUrl &&
-                        payment.paymentUrl !== '#' && (
-                          <a
-                            href={payment.paymentUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors flex items-center gap-1.5"
-                          >
-                            <CreditCard className="w-4 h-4" />
-                            Pagar Agora
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        )}
-
-                      {/* Simulate payment (for testing) */}
-                      {!isCaregiver &&
-                        payment &&
-                        booking.status === 'completed' &&
-                        payment.status === 'pending' && (
-                          <button
-                            onClick={() =>
-                              handleSimulatePayment(booking._id)
-                            }
-                            disabled={actionLoading === booking._id}
-                            className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors flex items-center gap-1.5"
-                          >
-                            {actionLoading === booking._id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <BadgeDollarSign className="w-4 h-4" />
-                            )}
-                            Simular Pagamento
-                          </button>
-                        )}
-
-                      {/* Escrow indicator */}
-                      {payment && payment.status === 'held' && (
-                        <div className="flex items-center gap-1.5 text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
-                          <Shield className="w-4 h-4" />
-                          Valor retido com segurança na plataforma
-                        </div>
-                      )}
-
-                      {/* Booking actions */}
-                      <div className="flex gap-2 ml-auto flex-wrap">
-                        {booking.status === 'pending' && (
-                          <>
-                            {isCaregiver && (
-                              <button
-                                onClick={() =>
-                                  handleStatusUpdate(
-                                    booking._id,
-                                    'confirmed',
-                                  )
-                                }
-                                disabled={
-                                  actionLoading === booking._id
-                                }
-                                className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors flex items-center gap-1.5"
-                              >
-                                {actionLoading === booking._id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <CheckCircle className="w-4 h-4" />
-                                )}
-                                Aceitar
-                              </button>
-                            )}
-                            <button
-                              onClick={() =>
-                                handleStatusUpdate(
-                                  booking._id,
-                                  'cancelled',
-                                )
-                              }
-                              disabled={actionLoading === booking._id}
-                              className="bg-red-100 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
-                            >
-                              Cancelar
-                            </button>
-
-                            {/* Chat */}
-                            <button
-                              onClick={() => openChat(booking._id)}
-                              disabled={chatLoading === booking._id}
-                              className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {chatLoading === booking._id ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                  Abrindo...
-                                </>
-                              ) : (
-                                <>
-                                  <MessageCircle className="w-4 h-4" />
-                                  Chat
-                                </>
-                              )}
-                            </button>
-
-                            {/* Relatórios - condicional */}
-                            {showReports && (
-                              <button
-                                onClick={() =>
-                                  openReports(booking._id)
-                                }
-                                className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors flex items-center gap-1.5"
-                              >
-                                <FileText className="w-4 h-4" />
-                                Relatórios
-                                {feedbackCount > 0 && (
-                                  <span className="ml-1 px-1.5 py-0.5 bg-purple-600 text-white text-xs rounded-full font-bold">
-                                    {feedbackCount}
-                                  </span>
-                                )}
-                              </button>
-                            )}
-                          </>
-                        )}
-
-                        {booking.status === 'confirmed' &&
-                          isCaregiver && (
-                            <>
-                              <button
-                                onClick={() =>
-                                  handleCheckIn(booking._id)
-                                }
-                                disabled={
-                                  actionLoading === booking._id ||
-                                  !canCheckInNow
-                                }
-                                className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {actionLoading === booking._id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <MapPin className="w-4 h-4" />
-                                )}
-                                Fazer Check-in
-                              </button>
-                              <span className="text-sm text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg">
-                                {canCheckInNow
-                                  ? 'Ao chegar no endereço combinado, use o check-in para iniciar o atendimento'
-                                  : `Check-in liberado a partir de ${checkInWindowLabel}`}
-                              </span>
-
-                              {/* Chat */}
-                              <button
-                                onClick={() =>
-                                  openChat(booking._id)
-                                }
-                                disabled={
-                                  chatLoading === booking._id
-                                }
-                                className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1.5"
-                              >
-                                {chatLoading === booking._id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <MessageCircle className="w-4 h-4" />
-                                )}
-                                Chat
-                              </button>
-
-                              {/* Relatórios - condicional */}
-                              {showReports && (
-                                <button
-                                  onClick={() =>
-                                    openReports(booking._id)
-                                  }
-                                  className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors flex items-center gap-1.5"
-                                >
-                                  <FileText className="w-4 h-4" />
-                                  Relatórios
-                                  {feedbackCount > 0 && (
-                                    <span className="ml-1 px-1.5 py-0.5 bg-purple-600 text-white text-xs rounded-full font-bold">
-                                      {feedbackCount}
-                                    </span>
-                                  )}
-                                </button>
-                              )}
-                            </>
-                          )}
-
-                        {booking.status === 'confirmed' &&
-                          !isCaregiver && (
-                            <>
-                              <button
-                                onClick={() =>
-                                  handleStatusUpdate(
-                                    booking._id,
-                                    'cancelled',
-                                  )
-                                }
-                                disabled={
-                                  actionLoading === booking._id
-                                }
-                                className="bg-red-100 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
-                              >
-                                Cancelar
-                              </button>
-                              <span className="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
-                                O cuidador fará o check-in quando
-                                chegar ao local do atendimento
-                              </span>
-
-                              {/* Chat */}
-                              <button
-                                onClick={() =>
-                                  openChat(booking._id)
-                                }
-                                disabled={
-                                  chatLoading === booking._id
-                                }
-                                className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1.5"
-                              >
-                                {chatLoading === booking._id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <MessageCircle className="w-4 h-4" />
-                                )}
-                                Chat
-                              </button>
-
-                              {/* Relatórios - condicional */}
-                              {showReports && (
-                                <button
-                                  onClick={() =>
-                                    openReports(booking._id)
-                                  }
-                                  className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors flex items-center gap-1.5"
-                                >
-                                  <FileText className="w-4 h-4" />
-                                  Relatórios
-                                  {feedbackCount > 0 && (
-                                    <span className="ml-1 px-1.5 py-0.5 bg-purple-600 text-white text-xs rounded-full font-bold">
-                                      {feedbackCount}
-                                    </span>
-                                  )}
-                                </button>
-                              )}
-                            </>
-                          )}
-
-                        {booking.status === 'in_progress' &&
-                          isCaregiver && (
-                            <>
-                              <button
-                                onClick={() =>
-                                  handleStatusUpdate(
-                                    booking._id,
-                                    'completed',
-                                  )
-                                }
-                                disabled={
-                                  actionLoading === booking._id
-                                }
-                                className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors flex items-center gap-1.5"
-                              >
-                                {actionLoading === booking._id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <ArrowRight className="w-4 h-4" />
-                                )}
-                                Concluir Serviço
-                              </button>
-                              <span className="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
-                                O pagamento será solicitado ao
-                                cliente após a conclusão
-                              </span>
-
-                              {/* Chat */}
-                              <button
-                                onClick={() =>
-                                  openChat(booking._id)
-                                }
-                                disabled={
-                                  chatLoading === booking._id
-                                }
-                                className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1.5"
-                              >
-                                {chatLoading === booking._id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <MessageCircle className="w-4 h-4" />
-                                )}
-                                Chat
-                              </button>
-
-                              {/* Relatórios - condicional */}
-                              {showReports && (
-                                <button
-                                  onClick={() =>
-                                    openReports(booking._id)
-                                  }
-                                  className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors flex items-center gap-1.5"
-                                >
-                                  <FileText className="w-4 h-4" />
-                                  Relatórios
-                                  {feedbackCount > 0 && (
-                                    <span className="ml-1 px-1.5 py-0.5 bg-purple-600 text-white text-xs rounded-full font-bold">
-                                      {feedbackCount}
-                                    </span>
-                                  )}
-                                </button>
-                              )}
-                            </>
-                          )}
-
-                        {booking.status === 'in_progress' &&
-                          !isCaregiver && (
-                            <>
-                              <span className="text-sm text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg">
-                                O cuidador já realizou o check-in e
-                                o atendimento está em andamento
-                              </span>
-
-                              {/* Chat */}
-                              <button
-                                onClick={() =>
-                                  openChat(booking._id)
-                                }
-                                disabled={
-                                  chatLoading === booking._id
-                                }
-                                className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1.5"
-                              >
-                                {chatLoading === booking._id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <MessageCircle className="w-4 h-4" />
-                                )}
-                                Chat
-                              </button>
-
-                              {/* Relatórios - condicional */}
-                              {showReports && (
-                                <button
-                                  onClick={() =>
-                                    openReports(booking._id)
-                                  }
-                                  className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors flex items-center gap-1.5"
-                                >
-                                  <FileText className="w-4 h-4" />
-                                  Relatórios
-                                  {feedbackCount > 0 && (
-                                    <span className="ml-1 px-1.5 py-0.5 bg-purple-600 text-white text-xs rounded-full font-bold">
-                                      {feedbackCount}
-                                    </span>
-                                  )}
-                                </button>
-                              )}
-                            </>
-                          )}
-
-                        {booking.status === 'completed' && (
-                          <>
-                            {isCaregiver && (
-                              <>
-                                {payment?.status === 'pending' && (
-                                  <span className="text-sm text-yellow-600 bg-yellow-50 px-3 py-2 rounded-lg">
-                                    Aguardando pagamento do cliente
-                                  </span>
-                                )}
-                                {payment?.status === 'released' && (
-                                  <span className="text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg">
-                                    Pagamento recebido com sucesso
-                                  </span>
-                                )}
-                              </>
-                            )}
-
-                            {!isCaregiver &&
-                              payment?.status === 'pending' && (
-                                <span className="text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-lg">
-                                  Serviço concluído. Falta apenas
-                                  realizar o pagamento.
-                                </span>
-                              )}
-
-                            {/* Chat */}
-                            <button
-                              onClick={() =>
-                                openChat(booking._id)
-                              }
-                              disabled={
-                                chatLoading === booking._id
-                              }
-                              className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1.5"
-                            >
-                              {chatLoading === booking._id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <MessageCircle className="w-4 h-4" />
-                              )}
-                              Chat
-                            </button>
-
-                            {/* Relatórios - condicional (sempre true para completed) */}
-                            {showReports && (
-                              <button
-                                onClick={() =>
-                                  openReports(booking._id)
-                                }
-                                className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors flex items-center gap-1.5"
-                              >
-                                <FileText className="w-4 h-4" />
-                                Relatórios
-                                {feedbackCount > 0 && (
-                                  <span className="ml-1 px-1.5 py-0.5 bg-purple-600 text-white text-xs rounded-full font-bold">
-                                    {feedbackCount}
-                                  </span>
-                                )}
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-medium text-sm whitespace-nowrap transition-all ${
+                    tab === t.key
+                      ? 'bg-primary-600 text-white shadow-sm'
+                      : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {t.label}
+                  {count > 0 && (
+                    <span
+                      className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                        tab === t.key
+                          ? 'bg-white/20 text-white'
+                          : 'bg-gray-100 text-gray-500'
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
               );
             })}
           </div>
-        )}
+
+          {/* List */}
+          {filtered.length === 0 ? (
+            <div className="bg-white border border-gray-200 rounded-2xl p-16 text-center">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Calendar className="w-8 h-8 text-gray-300" />
+              </div>
+              <h3 className="font-semibold text-gray-600 mb-1">
+                Nenhum agendamento encontrado
+              </h3>
+              <p className="text-sm text-gray-400">
+                {tab === 'all'
+                  ? 'Você ainda não possui agendamentos.'
+                  : 'Nenhum agendamento com este status.'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filtered.map((booking) => (
+                <BookingCard
+                  key={booking._id}
+                  booking={booking}
+                  payment={payments[booking._id]}
+                  feedbackCount={feedbackCounts[booking._id] || 0}
+                  isCaregiver={isCaregiver}
+                  actionLoading={actionLoading}
+                  chatLoading={chatLoading}
+                  onStatusUpdate={handleStatusUpdate}
+                  onCheckIn={handleCheckIn}
+                  onSimulatePayment={handleSimulatePayment}
+                  onOpenChat={openChat}
+                  onOpenReports={openReports}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
+}
+
+/* ─────────────────────────────────────────────
+   StatCard
+───────────────────────────────────────────── */
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  iconColor,
+  iconBg,
+  highlight,
+}: {
+  label: string;
+  value: number;
+  icon: any;
+  iconColor: string;
+  iconBg: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className={`bg-white border rounded-2xl p-5 shadow-sm transition-all ${
+        highlight ? 'border-amber-300 ring-1 ring-amber-200' : 'border-gray-200'
+      }`}
+    >
+      <div className={`w-10 h-10 ${iconBg} rounded-xl flex items-center justify-center mb-3`}>
+        <Icon className={`w-5 h-5 ${iconColor}`} />
+      </div>
+      <div className="text-2xl font-bold text-gray-900">{value}</div>
+      <div className="text-xs text-gray-500 mt-0.5 leading-snug">{label}</div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   BookingCard
+───────────────────────────────────────────── */
+function BookingCard({
+  booking,
+  payment,
+  feedbackCount,
+  isCaregiver,
+  actionLoading,
+  chatLoading,
+  onStatusUpdate,
+  onCheckIn,
+  onSimulatePayment,
+  onOpenChat,
+  onOpenReports,
+}: {
+  booking: Booking;
+  payment: any;
+  feedbackCount: number;
+  isCaregiver: boolean;
+  actionLoading: string | null;
+  chatLoading: string | null;
+  onStatusUpdate: (id: string, status: string) => void;
+  onCheckIn: (id: string) => void;
+  onSimulatePayment: (id: string) => void;
+  onOpenChat: (id: string) => void;
+  onOpenReports: (id: string) => void;
+}) {
+  const status = STATUS_MAP[booking.status] || STATUS_MAP.pending;
+  const StatusIcon = status.icon;
+  const paymentStatusInfo = payment ? PAYMENT_STATUS_MAP[payment.status] : null;
+  const showReports = shouldShowReports(booking);
+  const isLoading = actionLoading === booking._id;
+  const isChatLoading = chatLoading === booking._id;
+
+  const canCheckInNow =
+    new Date(booking.startDate).getTime() - CHECK_IN_EARLY_WINDOW_MS <= Date.now();
+  const checkInWindowLabel = new Date(
+    new Date(booking.startDate).getTime() - CHECK_IN_EARLY_WINDOW_MS,
+  ).toLocaleString('pt-BR');
+
+  const otherPersonName = isCaregiver
+    ? booking.clientName || (booking.clientId as any)?.name || '—'
+    : (booking.caregiverId as any)?.userId?.name || '—';
+
+  const otherPersonLabel = isCaregiver ? 'Cliente' : 'Cuidador';
+
+  // Resolve the amount to display — use fallbacks so it works for both roles
+  const resolveAmount = (): number | null => {
+    if (!payment) return null;
+    if (isCaregiver) {
+      return payment.caregiverAmount ?? payment.amount ?? null;
+    }
+    return payment.amount ?? payment.totalAmount ?? null;
+  };
+
+  const cardAmount = resolveAmount();
+
+  const isAmountReleased = payment?.status === 'released';
+  const isAmountPaid = payment && ['paid', 'held', 'released'].includes(payment.status);
+  const isAmountPending = payment && ['pending'].includes(payment.status);
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+      {/* Status bar */}
+      <div className={`h-1 w-full ${getStatusBarColor(booking.status)}`} />
+
+      <div className="p-5">
+        {/* ── Top: info + payment block ── */}
+        <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-4">
+
+          {/* Left: status badges + details */}
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <span
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${status.bg} ${status.color}`}
+              >
+                <StatusIcon className="w-3.5 h-3.5" />
+                {status.label}
+              </span>
+
+              {paymentStatusInfo && (
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-transparent bg-gray-50 ${paymentStatusInfo.color}`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${paymentStatusInfo.dot}`} />
+                  {paymentStatusInfo.label}
+                </span>
+              )}
+
+              <span className="text-xs text-gray-400 ml-auto">
+                #{booking._id.slice(-6).toUpperCase()}
+              </span>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-2">
+              <InfoRow icon={User} label={otherPersonLabel} value={otherPersonName} />
+              <InfoRow
+                icon={Calendar}
+                label="Período"
+                value={`${new Date(booking.startDate).toLocaleDateString('pt-BR')} → ${new Date(booking.endDate).toLocaleDateString('pt-BR')}`}
+              />
+              {booking.address && (
+                <InfoRow icon={MapPin} label="Local" value={booking.address} />
+              )}
+              {(booking.clientPhone || (booking.clientId as any)?.phone) && (
+                <InfoRow
+                  icon={Phone}
+                  label="Telefone"
+                  value={booking.clientPhone || (booking.clientId as any)?.phone}
+                />
+              )}
+            </div>
+
+            {booking.notes && (
+              <div className="mt-3 flex gap-2 bg-gray-50 border border-gray-100 rounded-xl p-3">
+                <AlertCircle className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-gray-500 leading-relaxed">{booking.notes}</p>
+              </div>
+            )}
+
+            {booking.checkInAt && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+                <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>
+                  Check-in: {new Date(booking.checkInAt).toLocaleString('pt-BR')}
+                  {typeof booking.checkInDistanceMeters === 'number' &&
+                    ` · ${Math.round(booking.checkInDistanceMeters)}m do local`}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Right: payment block — shown for BOTH roles */}
+          {payment && cardAmount != null && (
+            <div
+              className={`flex-shrink-0 rounded-2xl px-5 py-4 text-right border ${
+                isAmountReleased
+                  ? 'bg-green-50 border-green-200'
+                  : isAmountPaid
+                  ? 'bg-blue-50 border-blue-200'
+                  : isAmountPending
+                  ? 'bg-amber-50 border-amber-200'
+                  : 'bg-gray-50 border-gray-200'
+              }`}
+            >
+              <p
+                className={`text-xs font-medium mb-1 ${
+                  isAmountReleased
+                    ? 'text-green-600'
+                    : isAmountPaid
+                    ? 'text-blue-600'
+                    : isAmountPending
+                    ? 'text-amber-600'
+                    : 'text-gray-400'
+                }`}
+              >
+                {isCaregiver
+                  ? isAmountReleased
+                    ? 'Valor recebido'
+                    : 'Valor a receber'
+                  : isAmountPaid
+                  ? 'Total pago'
+                  : 'Total a pagar'}
+              </p>
+              <p
+                className={`text-2xl font-bold tracking-tight ${
+                  isAmountReleased
+                    ? 'text-green-700'
+                    : isAmountPaid
+                    ? 'text-blue-700'
+                    : isAmountPending
+                    ? 'text-amber-700'
+                    : 'text-gray-700'
+                }`}
+              >
+                R$ {cardAmount.toFixed(2)}
+              </p>
+              {isCaregiver && payment.platformFee != null && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Taxa plataforma: R$ {payment.platformFee.toFixed(2)}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Fallback: show booking totalPrice when no payment record exists yet */}
+          {!payment && booking.totalAmount != null && (
+            <div className="flex-shrink-0 rounded-2xl px-5 py-4 text-right border bg-gray-50 border-gray-200">
+              <p className="text-xs font-medium mb-1 text-gray-400">
+                {isCaregiver ? 'Valor estimado' : 'Valor estimado'}
+              </p>
+              <p className="text-2xl font-bold tracking-tight text-gray-700">
+                R$ {Number(booking.totalAmount).toFixed(2)}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">Pagamento ainda não gerado</p>
+            </div>
+          )}
+        </div>
+
+        {/* ── Actions ── */}
+        <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-gray-100">
+
+          {payment?.status === 'held' && (
+            <div className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border bg-blue-50 text-blue-700 border-blue-100">
+              <Shield className="w-3.5 h-3.5 flex-shrink-0" />
+              Valor protegido pela plataforma
+            </div>
+          )}
+
+          {/* Pending */}
+          {booking.status === 'pending' && isCaregiver && (
+            <ActionButton
+              onClick={() => onStatusUpdate(booking._id, 'confirmed')}
+              loading={isLoading}
+              variant="success"
+              icon={CheckCircle}
+              label="Aceitar"
+            />
+          )}
+          {booking.status === 'pending' && (
+            <ActionButton
+              onClick={() => onStatusUpdate(booking._id, 'cancelled')}
+              loading={isLoading}
+              variant="danger"
+              icon={XCircle}
+              label="Cancelar"
+            />
+          )}
+
+          {/* Confirmed caregiver: check-in */}
+          {booking.status === 'confirmed' && isCaregiver && (
+            <>
+              <ActionButton
+                onClick={() => onCheckIn(booking._id)}
+                loading={isLoading}
+                disabled={!canCheckInNow}
+                variant="primary"
+                icon={MapPin}
+                label="Fazer Check-in"
+              />
+              {!canCheckInNow && (
+                <span className="text-xs text-gray-500 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg">
+                  Liberado a partir de {checkInWindowLabel}
+                </span>
+              )}
+            </>
+          )}
+
+          {/* Confirmed client */}
+          {booking.status === 'confirmed' && !isCaregiver && (
+            <>
+              <ActionButton
+                onClick={() => onStatusUpdate(booking._id, 'cancelled')}
+                loading={isLoading}
+                variant="danger"
+                icon={XCircle}
+                label="Cancelar"
+              />
+              <InfoBadge
+                icon={AlertCircle}
+                text="Aguardando check-in do cuidador"
+                color="blue"
+              />
+            </>
+          )}
+
+          {/* In progress caregiver */}
+          {booking.status === 'in_progress' && isCaregiver && (
+            <>
+              <ActionButton
+                onClick={() => onStatusUpdate(booking._id, 'completed')}
+                loading={isLoading}
+                variant="primary"
+                icon={ArrowRight}
+                label="Concluir Serviço"
+              />
+              <InfoBadge
+                icon={DollarSign}
+                text="Pagamento solicitado após conclusão"
+                color="blue"
+              />
+            </>
+          )}
+
+          {/* In progress client */}
+          {booking.status === 'in_progress' && !isCaregiver && (
+            <InfoBadge icon={Activity} text="Atendimento em andamento" color="emerald" />
+          )}
+
+          {/* Completed — caregiver */}
+          {booking.status === 'completed' && isCaregiver && (
+            <>
+              {payment?.status === 'pending' && (
+                <InfoBadge icon={Clock} text="Aguardando pagamento do cliente" color="amber" />
+              )}
+              {payment?.status === 'paid' && (
+                <InfoBadge icon={Shield} text="Pagamento recebido – em processamento" color="blue" />
+              )}
+              {payment?.status === 'held' && (
+                <InfoBadge icon={Shield} text="Valor retido – será liberado em breve" color="blue" />
+              )}
+              {payment?.status === 'released' && (
+                <InfoBadge icon={CheckCircle} text="Pagamento recebido!" color="green" />
+              )}
+              {payment?.status === 'refunded' && (
+                <InfoBadge icon={AlertCircle} text="Pagamento reembolsado ao cliente" color="amber" />
+              )}
+              {!payment && (
+                <InfoBadge icon={Clock} text="Pagamento será gerado em breve" color="amber" />
+              )}
+            </>
+          )}
+
+          {/* Completed — client */}
+          {booking.status === 'completed' && !isCaregiver && (
+            <>
+              {payment?.status === 'pending' && (
+                <>
+                  {payment?.paymentUrl && payment.paymentUrl !== '#' && (
+                    <a
+                      href={payment.paymentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 bg-green-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-green-600 transition-colors"
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      Pagar Agora
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                  <ActionButton
+                    onClick={() => onSimulatePayment(booking._id)}
+                    loading={isLoading}
+                    variant="purple"
+                    icon={BadgeDollarSign}
+                    label="Simular Pagamento"
+                  />
+                  <InfoBadge icon={AlertCircle} text="Pagamento pendente" color="amber" />
+                </>
+              )}
+              {payment?.status === 'paid' && (
+                <InfoBadge icon={CheckCircle} text="Pagamento realizado com sucesso" color="green" />
+              )}
+              {payment?.status === 'held' && (
+                <InfoBadge icon={Shield} text="Pagamento realizado – valor protegido" color="blue" />
+              )}
+              {payment?.status === 'released' && (
+                <InfoBadge icon={CheckCircle} text="Pagamento concluído – liberado ao cuidador" color="green" />
+              )}
+              {payment?.status === 'refunded' && (
+                <InfoBadge icon={DollarSign} text="Valor reembolsado" color="amber" />
+              )}
+              {!payment && (
+                <InfoBadge icon={Star} text="Serviço concluído com sucesso" color="green" />
+              )}
+            </>
+          )}
+
+          {/* Chat + Reports — always right */}
+          <div className="ml-auto flex items-center gap-2 flex-wrap">
+            {booking.status !== 'cancelled' && (
+              <button
+                onClick={() => onOpenChat(booking._id)}
+                disabled={isChatLoading}
+                className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-700 border border-gray-200 px-3 py-1.5 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
+              >
+                {isChatLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <MessageCircle className="w-4 h-4" />
+                )}
+                Chat
+              </button>
+            )}
+
+            {showReports && (
+              <button
+                onClick={() => onOpenReports(booking._id)}
+                className="inline-flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-xl text-sm font-medium hover:bg-purple-100 transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                Relatórios
+                {feedbackCount > 0 && (
+                  <span className="ml-0.5 px-1.5 py-0.5 bg-purple-600 text-white text-xs rounded-full font-bold leading-none">
+                    {feedbackCount}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   Sub-components
+───────────────────────────────────────────── */
+function InfoRow({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-2 text-sm text-gray-600 min-w-0">
+      <Icon className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+      <span className="truncate">
+        <span className="text-gray-400 mr-1">{label}:</span>
+        <span className="font-medium text-gray-700">{value}</span>
+      </span>
+    </div>
+  );
+}
+
+function InfoBadge({
+  icon: Icon,
+  text,
+  color,
+}: {
+  icon: any;
+  text: string;
+  color: 'blue' | 'emerald' | 'amber' | 'green' | 'red';
+}) {
+  const colors = {
+    blue: 'bg-blue-50 text-blue-700 border-blue-100',
+    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    amber: 'bg-amber-50 text-amber-700 border-amber-100',
+    green: 'bg-green-50 text-green-700 border-green-100',
+    red: 'bg-red-50 text-red-700 border-red-100',
+  };
+  return (
+    <div
+      className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border ${colors[color]}`}
+    >
+      <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+      {text}
+    </div>
+  );
+}
+
+type ButtonVariant = 'success' | 'danger' | 'primary' | 'purple' | 'ghost';
+
+function ActionButton({
+  onClick,
+  loading,
+  disabled,
+  variant,
+  icon: Icon,
+  label,
+}: {
+  onClick: () => void;
+  loading: boolean;
+  disabled?: boolean;
+  variant: ButtonVariant;
+  icon: any;
+  label: string;
+}) {
+  const variants: Record<ButtonVariant, string> = {
+    success: 'bg-green-500 text-white hover:bg-green-600 disabled:opacity-50',
+    danger: 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100',
+    primary: 'bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50',
+    purple: 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100',
+    ghost: 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200',
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading || disabled}
+      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors disabled:cursor-not-allowed ${variants[variant]}`}
+    >
+      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon className="w-4 h-4" />}
+      {label}
+    </button>
+  );
+}
+
+function getStatusBarColor(status: string): string {
+  const colors: Record<string, string> = {
+    pending: 'bg-amber-400',
+    confirmed: 'bg-blue-400',
+    in_progress: 'bg-emerald-400',
+    completed: 'bg-green-400',
+    cancelled: 'bg-red-300',
+  };
+  return colors[status] || 'bg-gray-200';
 }

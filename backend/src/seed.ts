@@ -77,6 +77,16 @@ async function seed() {
     phone: '(11) 98888-0001',
   });
 
+  await userModel.create({
+    name: 'Admin CuidarBem',
+    email: 'admin@cuidarbem.com',
+    password,
+    role: 'admin',
+    phone: '(11) 97777-0001',
+    moderationStatus: 'active',
+    isOnline: false,
+  });
+
   await caregiverModel.insertMany([
     {
       userId: caregiverUsers[0]._id,
@@ -191,6 +201,7 @@ async function seed() {
   console.log('✅ Seed executado com sucesso!');
   console.log('Login teste - Cliente: cliente@email.com / 123456');
   console.log('Login teste - Cuidador: maria@email.com / 123456');
+  console.log('Login teste - Admin: admin@cuidarbem.com / 123456');
   await app.close();
 }
 

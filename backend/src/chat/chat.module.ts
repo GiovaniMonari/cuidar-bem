@@ -11,6 +11,7 @@ import { Message, MessageSchema } from './schemas/message.schema';
 import { BookingsModule } from '../bookings/bookings.module';
 import { UsersModule } from '../users/users.module';
 import { Booking, BookingSchema } from '../bookings/schemas/booking.schema';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { Booking, BookingSchema } from '../bookings/schemas/booking.schema';
     ScheduleModule.forRoot(),
     forwardRef(() => BookingsModule),
     UsersModule,
+    AuthModule,
   ],
   controllers: [ChatController],
   providers: [ChatGateway, ChatService, ChatCleanupService],

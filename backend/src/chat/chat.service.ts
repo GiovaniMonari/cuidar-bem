@@ -229,24 +229,32 @@ export class ChatService {
     return bookings.length > 0;
   }
 
-  async sendMessage(conversationId: string, senderId: string, content: string) {
+  async assertConversationParticipant(conversationId: string, userId: string) {
     const conversation = await this.conversationModel.findById(conversationId);
     if (!conversation) {
       throw new NotFoundException('Conversa não encontrada');
     }
 
-    // ⬇️ NOVO: Verificar se a conversa está ativa
-    if (!conversation.isActive) {
-      throw new ForbiddenException('Esta conversa foi encerrada e não aceita novas mensagens.');
-    }
-
     const isParticipant =
-      conversation.clientId?.toString() === senderId ||
-      conversation.caregiverUserId?.toString() === senderId;
+      conversation.clientId?.toString() === userId ||
+      conversation.caregiverUserId?.toString() === userId;
 
     if (!isParticipant) {
-      throw new ForbiddenException('Sem permissão para enviar mensagem');
+      throw new ForbiddenException('Sem acesso a esta conversa');
     }
+
+    if (!conversation.isActive) {
+      throw new ForbiddenException('Esta conversa foi encerrada');
+    }
+
+    return conversation;
+  }
+
+  async sendMessage(conversationId: string, senderId: string, content: string) {
+    const conversation = await this.assertConversationParticipant(
+      conversationId,
+      senderId,
+    );
 
     const message = await this.messageModel.create({
       conversationId: new Types.ObjectId(conversationId),

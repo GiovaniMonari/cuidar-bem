@@ -8,6 +8,7 @@ import { api } from '@/services/api';
 import { Booking } from '@/types';
 import { CareReportForm } from '@/components/CareReportForm';
 import { CareReportList } from '@/components/CareReportList';
+import { ReportUserModal } from '@/components/ReportUserModal';
 import {
   ChevronLeft,
   Loader2,
@@ -15,6 +16,7 @@ import {
   FileText,
   Calendar,
   Clock,
+  ShieldAlert,
 } from 'lucide-react';
 
 export default function CareReportsContent() {
@@ -27,6 +29,7 @@ export default function CareReportsContent() {
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [reportModalOpen, setReportModalOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -164,6 +167,30 @@ export default function CareReportsContent() {
     };
   }, [booking, reports, permissions]);
 
+  const reportContext = useMemo(() => {
+    if (!booking) return null;
+
+    const caregiverName =
+      (booking.caregiverId as any)?.userId?.name || 'cuidador';
+    const clientName = (booking.clientId as any)?.name || booking.clientName || 'cliente';
+
+    if (permissions.isClientOfBooking) {
+      return {
+        reportedUserName: caregiverName,
+        contextLabel: `${booking.serviceName || 'Serviço'} concluído`,
+      };
+    }
+
+    if (permissions.isCaregiverOfBooking) {
+      return {
+        reportedUserName: clientName,
+        contextLabel: `${booking.serviceName || 'Serviço'} concluído`,
+      };
+    }
+
+    return null;
+  }, [booking, permissions]);
+
   if (!bookingId) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -246,6 +273,16 @@ export default function CareReportsContent() {
             <ChevronLeft className="w-4 h-4" />
             Voltar
           </button>
+          {booking.status === 'completed' && reportContext && (
+            <button
+              type="button"
+              onClick={() => setReportModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100"
+            >
+              <ShieldAlert className="h-4 w-4" />
+              Denunciar usuário
+            </button>
+          )}
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
@@ -342,6 +379,17 @@ export default function CareReportsContent() {
           </div>
         )}
       </div>
+
+      {booking.status === 'completed' && reportContext && (
+        <ReportUserModal
+          open={reportModalOpen}
+          onClose={() => setReportModalOpen(false)}
+          source="service"
+          bookingId={bookingId}
+          reportedUserName={reportContext.reportedUserName}
+          contextLabel={reportContext.contextLabel}
+        />
+      )}
     </div>
   );
 }

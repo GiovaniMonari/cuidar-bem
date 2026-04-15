@@ -4,12 +4,16 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/services/api';
 import { Heart, Mail, Lock, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [banReason, setBanReason] = useState('');
+  const [reviewMessage, setReviewMessage] = useState('');
+  const [reviewStatus, setReviewStatus] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
@@ -17,14 +21,29 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setBanReason('');
+    setReviewStatus('');
     setLoading(true);
     try {
-      await login(email, password);
-      router.push('/dashboard');
+      const loggedUser = await login(email, password);
+      router.push(loggedUser.role === 'admin' ? '/admin' : '/dashboard');
     } catch (err: any) {
       setError(err.message || 'Erro ao fazer login');
+      if (err.code === 'ACCOUNT_BANNED') {
+        setBanReason(err.banReason || '');
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReviewRequest = async () => {
+    setReviewStatus('');
+    try {
+      const response = await api.requestBanReview(email, reviewMessage);
+      setReviewStatus(response.message);
+    } catch (err: any) {
+      setReviewStatus(err.message || 'Não foi possível solicitar revisão.');
     }
   };
 
@@ -48,6 +67,31 @@ export default function LoginPage() {
             <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               {error}
+            </div>
+          )}
+
+          {banReason && (
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-amber-900">Conta bloqueada</p>
+              <p className="mt-1 text-sm text-amber-800">
+                Motivo informado: {banReason}
+              </p>
+              <textarea
+                value={reviewMessage}
+                onChange={(e) => setReviewMessage(e.target.value)}
+                className="mt-3 min-h-[88px] w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+                placeholder="Se desejar, explique por que a conta deve ser revisada."
+              />
+              <button
+                type="button"
+                onClick={handleReviewRequest}
+                className="mt-3 w-full rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-600"
+              >
+                Solicitar revisão
+              </button>
+              {reviewStatus && (
+                <p className="mt-2 text-xs font-medium text-amber-900">{reviewStatus}</p>
+              )}
             </div>
           )}
 
@@ -83,6 +127,14 @@ export default function LoginPage() {
                   placeholder="••••••"
                   required
                 />
+              </div>
+              <div className="mt-2 text-right">
+                <Link
+                  href="/recuperar-senha"
+                  className="text-sm font-medium text-primary-600 hover:underline"
+                >
+                  Esqueceu sua senha?
+                </Link>
               </div>
             </div>
 

@@ -19,6 +19,7 @@ export function Navbar() {
   const { user, logout, isAuthenticated } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const isAdmin = user?.role === 'admin';
   const isCaregiver = user?.role === 'caregiver';
 
   return (
@@ -40,7 +41,7 @@ export function Navbar() {
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-6">
-            {!isCaregiver && (
+            {!isCaregiver && !isAdmin && (
               <Link
                 href="/cuidadores"
                 className="flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors"
@@ -50,7 +51,7 @@ export function Navbar() {
               </Link>
             )}
 
-            {isAuthenticated && !isCaregiver && (
+            {isAuthenticated && !isCaregiver && !isAdmin && (
               <Link
                 href="/favoritos"
                 className="flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors"
@@ -62,20 +63,22 @@ export function Navbar() {
 
             {isAuthenticated && (
               <>
-                <Link
-                  href="/chat"
-                  className="flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  Chat
-                </Link>
+                {!isAdmin && (
+                  <Link
+                    href="/chat"
+                    className="flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Chat
+                  </Link>
+                )}
 
                 <Link
-                  href="/dashboard"
+                  href={isAdmin ? '/admin' : '/dashboard'}
                   className="flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors"
                 >
                   <Calendar className="w-4 h-4" />
-                  Dashboard
+                  {isAdmin ? 'Painel Admin' : 'Dashboard'}
                 </Link>
 
                 <div className="flex items-center gap-3 pl-3 border-l border-gray-200">
@@ -131,7 +134,7 @@ export function Navbar() {
       {/* Mobile Menu */}
       {mobileOpen && (
         <div className="md:hidden bg-white border-t border-gray-100 px-4 py-4 space-y-3">
-          {!isCaregiver && (
+          {!isCaregiver && !isAdmin && (
             <Link
               href="/cuidadores"
               className="block py-2 text-gray-600 hover:text-primary-600 font-medium"
@@ -141,7 +144,7 @@ export function Navbar() {
             </Link>
           )}
 
-          {isAuthenticated && !isCaregiver && (
+          {isAuthenticated && !isCaregiver && !isAdmin && (
             <Link
               href="/favoritos"
               className="block py-2 text-gray-600 hover:text-primary-600 font-medium flex items-center gap-2"
@@ -154,19 +157,21 @@ export function Navbar() {
           {isAuthenticated && (
             <>
               <Link
-                href="/dashboard"
+                href={isAdmin ? '/admin' : '/dashboard'}
                 className="block py-2 text-gray-600 hover:text-primary-600 font-medium"
                 onClick={() => setMobileOpen(false)}
               >
-                Dashboard
+                {isAdmin ? 'Painel Admin' : 'Dashboard'}
               </Link>
-              <Link
-                href="/chat"
-                className="block py-2 text-gray-600 hover:text-primary-600 font-medium"
-                onClick={() => setMobileOpen(false)}
-              >
-                Chat
-              </Link>
+              {!isAdmin && (
+                <Link
+                  href="/chat"
+                  className="block py-2 text-gray-600 hover:text-primary-600 font-medium"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Chat
+                </Link>
+              )}
               <Link
                 href="/perfil"
                 className="block py-2 text-gray-600 hover:text-primary-600 font-medium"

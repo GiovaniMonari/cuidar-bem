@@ -109,6 +109,20 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post('me/presence')
+  async touchPresence(@Request() req) {
+    await this.usersService.touchPresence(req.user.userId);
+    return { success: true };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me/presence/offline')
+  async setOffline(@Request() req) {
+    await this.usersService.setOffline(req.user.userId);
+    return { success: true };
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post('me/password')
   async changePassword(@Request() req, @Body() body: { currentPassword: string; newPassword: string }) {
     const user = await this.usersService.findRawById(req.user.userId);

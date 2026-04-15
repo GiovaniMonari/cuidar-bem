@@ -8,9 +8,18 @@ export interface User {
   _id?: string;
   name: string;
   email: string;
-  role: 'client' | 'caregiver';
+  role: 'client' | 'caregiver' | 'admin';
   phone?: string;
   avatar?: string;
+  moderationStatus?: 'active' | 'watchlist' | 'banned';
+  moderationReason?: string;
+  banReason?: string;
+  isOnline?: boolean;
+  lastSeenAt?: string;
+  lastLoginAt?: string;
+  reviewRequestStatus?: 'none' | 'pending' | 'accepted' | 'rejected';
+  reviewRequestMessage?: string;
+  reviewRequestedAt?: string;
 }
 
 export interface AvailabilityDate {
@@ -176,6 +185,138 @@ export interface Feedback {
 export interface AuthResponse {
   user: User;
   access_token: string;
+}
+
+export type PlatformReportReason =
+  | 'inappropriate_behavior'
+  | 'delay_or_no_show'
+  | 'offensive_language'
+  | 'fraud_attempt'
+  | 'other';
+
+export type PlatformReportSource = 'chat' | 'service';
+
+export interface PlatformReport {
+  _id: string;
+  bookingId?: Booking | string;
+  conversationId?: any;
+  reporterId: User;
+  reportedUserId: User;
+  source: PlatformReportSource;
+  reason: PlatformReportReason;
+  description?: string;
+  status: 'pending' | 'under_review' | 'resolved' | 'dismissed';
+  autoAction: 'none' | 'watchlist' | 'ban';
+  severityScore: number;
+  moderationSnapshot?: Record<string, any>;
+  adminNotes?: string;
+  resolvedAction?: 'none' | 'watchlist' | 'ban' | 'dismiss' | 'unban';
+  reviewedBy?: User;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminNotification {
+  severity: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+}
+
+export interface GrowthPoint {
+  date: string;
+  label: string;
+  total: number;
+}
+
+export interface AdminLog {
+  _id: string;
+  actorId?: User;
+  actorType: 'admin' | 'system' | 'user';
+  action: string;
+  targetType: string;
+  targetId?: string;
+  description: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+}
+
+export interface AdminDashboardResponse {
+  metrics: {
+    caregivers: number;
+    clients: number;
+    admins: number;
+    onlineUsers: number;
+    banned: number;
+    watchlist: number;
+    inProgressServices: number;
+    completedServices: number;
+    recentReportRate: number;
+    pendingReports: number;
+    pendingReviewRequests: number;
+  };
+  growth: {
+    users: GrowthPoint[];
+    services: GrowthPoint[];
+    reports: GrowthPoint[];
+  };
+  topReasons: Array<{
+    key: PlatformReportReason | string;
+    label: string;
+    total: number;
+  }>;
+  flaggedUsers: User[];
+  activeUsers: User[];
+  notifications: AdminNotification[];
+  logs: AdminLog[];
+  refreshWindowSeconds: number;
+}
+
+export interface AdminUserListItem extends User {
+  isOnlineNow: boolean;
+  receivedReports: number;
+  pendingReceivedReports: number;
+  filedReports: number;
+  activeServices: number;
+  completedServices: number;
+}
+
+export interface AdminUserDetailResponse {
+  user: User;
+  caregiverProfile?: {
+    bio?: string;
+    city?: string;
+    state?: string;
+    experienceYears?: number;
+    specialties?: string[];
+    rating?: number;
+    reviewCount?: number;
+    certifications?: string[];
+  } | null;
+  reportsReceived: PlatformReport[];
+  reportsFiled: PlatformReport[];
+  bookings: Booking[];
+  activity: Array<{
+    id: string;
+    kind: string;
+    timestamp: string;
+    title: string;
+    description: string;
+  }>;
+}
+
+export interface AdminReportDetailResponse {
+  report: PlatformReport;
+  evidence: {
+    messages: Array<{
+      _id: string;
+      content: string;
+      createdAt: string;
+      senderId: User;
+    }>;
+    feedbacks: Feedback[];
+  };
+  previousReports: PlatformReport[];
 }
 
 export interface PaginatedResponse<T> {

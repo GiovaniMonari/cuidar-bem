@@ -167,6 +167,49 @@ export class EmailService implements OnModuleInit {
     );
   }
 
+  async sendPasswordResetEmail(data: {
+    to: string;
+    name: string;
+    resetUrl: string;
+    expiresInMinutes: number;
+  }) {
+    const content = `
+      <div class="header">
+        <h1>🔐 Redefinição de senha</h1>
+        <p>Solicitação para criar uma nova senha</p>
+      </div>
+      <div class="content">
+        <p style="font-size: 18px; color: #1e293b;">Olá, <strong>${data.name}</strong>!</p>
+
+        <p style="color: #475569; line-height: 1.6;">
+          Você solicitou a redefinição da sua senha. Clique no botão abaixo para criar uma nova senha:
+        </p>
+
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${data.resetUrl}" class="btn">
+            Redefinir senha
+          </a>
+        </div>
+
+        <div class="info-box">
+          <p style="margin: 0; color: #1e293b;">
+            <strong>Importante:</strong> este link expira em ${data.expiresInMinutes} minutos.
+          </p>
+        </div>
+
+        <p style="color: #64748b; line-height: 1.6; margin-top: 20px;">
+          Se você não solicitou esta alteração, ignore este e-mail. Sua senha atual continuará válida até que uma nova seja definida.
+        </p>
+      </div>
+    `;
+
+    return this.sendMail(
+      data.to,
+      'Redefinição de senha',
+      this.baseTemplate(content),
+    );
+  }
+
   // ═══════════════════════════════════════════
   // 2. NOVA SOLICITAÇÃO (para cuidador)
   // ═══════════════════════════════════════════

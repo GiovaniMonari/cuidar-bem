@@ -1,4 +1,13 @@
-import { ReviewWithBooking } from "@/types";
+import {
+  AdminDashboardResponse,
+  AdminLog,
+  AdminReportDetailResponse,
+  AdminUserDetailResponse,
+  AdminUserListItem,
+  AuthResponse,
+  PlatformReport,
+  ReviewWithBooking,
+} from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -23,14 +32,16 @@ class ApiService {
     const res = await fetch(`${API_URL}${endpoint}`, options);
     if (!res.ok) {
       const error = await res.json().catch(() => ({ message: 'Erro na requisição' }));
-      throw new Error(error.message || 'Erro na requisição');
+      const requestError = new Error(error.message || 'Erro na requisição') as Error & Record<string, any>;
+      Object.assign(requestError, error);
+      throw requestError;
     }
     return res.json();
   }
 
   // Auth
   async login(email: string, password: string) {
-    return this.request<any>('/auth/login', {
+    return this.request<AuthResponse>('/auth/login', {
       method: 'POST',
       headers: this.headers(),
       body: JSON.stringify({ email, password }),
@@ -38,16 +49,48 @@ class ApiService {
   }
 
   async register(data: any) {
-    return this.request<any>('/auth/register', {
+    return this.request<AuthResponse>('/auth/register', {
       method: 'POST',
       headers: this.headers(),
       body: JSON.stringify(data),
     });
   }
 
+  async requestPasswordReset(email: string) {
+    return this.request<{ success: boolean; message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async validatePasswordResetToken(token: string) {
+    return this.request<{ valid: boolean }>('/auth/validate-reset-token', {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify({ token }),
+    });
+  }
+
+  async resetPassword(token: string, password: string) {
+    return this.request<{ success: boolean; message: string }>('/auth/reset-password', {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify({ token, password }),
+    });
+  }
+
   async getProfile() {
     return this.request<any>('/users/me', {
       headers: this.headers(true),
+    });
+  }
+
+  async requestBanReview(email: string, message?: string) {
+    return this.request<{ success: boolean; message: string }>('/auth/request-ban-review', {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify({ email, message }),
     });
   }
 
@@ -218,7 +261,7 @@ class ApiService {
     });
   }
 
-    async uploadAvatar(file: File) {
+  async uploadAvatar(file: File) {
     const formData = new FormData();
     formData.append('file', file);
 
@@ -244,6 +287,21 @@ class ApiService {
       headers: this.headers(true),
     });
   }
+
+  async touchPresence() {
+    return this.request<{ success: boolean }>('/users/me/presence', {
+      method: 'POST',
+      headers: this.headers(true),
+    });
+  }
+
+  async setOfflinePresence() {
+    return this.request<{ success: boolean }>('/users/me/presence/offline', {
+      method: 'POST',
+      headers: this.headers(true),
+    });
+  }
+
     async getOrCreateConversation(bookingId: string) {
     return this.request<any>(`/chat/booking/${bookingId}`, {
       method: 'POST',
@@ -328,6 +386,87 @@ async removeFavoriteCaregiver(caregiverId: string) {
 
   async getFavoriteCaregivers() {
     return this.request<any[]>('/users/favorites/caregivers', {
+      headers: this.headers(true),
+    });
+  }
+
+  async createPlatformReport(data: {
+    source: 'chat' | 'service';
+    bookingId?: string;
+    conversationId?: string;
+    reason: string;
+    description?: string;
+  }) {
+    return this.request<PlatformReport>('/reports', {
+      method: 'POST',
+      headers: this.headers(true),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getAdminDashboard() {
+    return this.request<AdminDashboardResponse>('/admin/dashboard', {
+      headers: this.headers(true),
+    });
+  }
+
+  async getAdminUsers(params: Record<string, string> = {}) {
+    const query = new URLSearchParams(params).toString();
+    return this.request<AdminUserListItem[]>(`/admin/users${query ? `?${query}` : ''}`, {
+      headers: this.headers(true),
+    });
+  }
+
+  async getAdminUserDetail(id: string) {
+    return this.request<AdminUserDetailResponse>(`/admin/users/${id}`, {
+      headers: this.headers(true),
+    });
+  }
+
+  async updateAdminUserModeration(
+    id: string,
+    data: {
+      action: 'ban' | 'unban' | 'watchlist' | 'clear_watch';
+      reason?: string;
+    },
+  ) {
+    return this.request<any>(`/admin/users/${id}/moderation`, {
+      method: 'PATCH',
+      headers: this.headers(true),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getAdminReports(params: Record<string, string> = {}) {
+    const query = new URLSearchParams(params).toString();
+    return this.request<PlatformReport[]>(`/admin/reports${query ? `?${query}` : ''}`, {
+      headers: this.headers(true),
+    });
+  }
+
+  async getAdminReportDetail(id: string) {
+    return this.request<AdminReportDetailResponse>(`/admin/reports/${id}`, {
+      headers: this.headers(true),
+    });
+  }
+
+  async reviewAdminReport(
+    id: string,
+    data: {
+      status?: 'pending' | 'under_review' | 'resolved' | 'dismissed';
+      action?: 'none' | 'watchlist' | 'ban' | 'dismiss' | 'unban';
+      notes?: string;
+    },
+  ) {
+    return this.request<AdminReportDetailResponse>(`/admin/reports/${id}/review`, {
+      method: 'PATCH',
+      headers: this.headers(true),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getAdminLogs(limit = 40) {
+    return this.request<AdminLog[]>(`/admin/logs?limit=${limit}`, {
       headers: this.headers(true),
     });
   }

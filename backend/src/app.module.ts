@@ -15,6 +15,7 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { ChatModule } from './chat/chat.module';
 import { GeocodingModule } from './geocoding/geocoding.module';
 import { FeedbackModule } from './feedback/feedback.module';
+import { ModerationModule } from './moderation/moderation.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { FeedbackModule } from './feedback/feedback.module';
     ChatModule,
     GeocodingModule,
     FeedbackModule,
+    ModerationModule,
   ],
 })
 export class AppModule implements OnModuleInit {

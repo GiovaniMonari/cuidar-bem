@@ -6,6 +6,7 @@ import { api } from '@/services/api';
 import { getSocket } from '@/services/socket';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserAvatar } from '@/components/UserAvatar';
+import { ReportUserModal } from '@/components/ReportUserModal';
 import {
   Send,
   MessageCircle,
@@ -13,6 +14,7 @@ import {
   Search,
   Calendar,
   Heart,
+  ShieldAlert,
 } from 'lucide-react';
 
 function ChatContent() {
@@ -28,6 +30,7 @@ function ChatContent() {
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -154,7 +157,6 @@ function ChatContent() {
 
     socket.emit('sendMessage', {
       conversationId: selectedConversation._id,
-      senderId: currentUserId,
       content: message.trim(),
     });
 
@@ -372,20 +374,30 @@ function ChatContent() {
             ) : (
               <>
                 <div className="p-4 border-b border-gray-100 bg-white">
-                  <div className="flex items-center gap-3">
-                    <UserAvatar
-                      name={getOtherUser(selectedConversation)?.name || 'Usuário'}
-                      avatar={getOtherUser(selectedConversation)?.avatar}
-                      size={44}
-                    />
-                    <div>
-                      <p className="font-semibold text-gray-900">
-                        {getOtherUser(selectedConversation)?.name || 'Usuário'}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Conversa com este profissional
-                      </p>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <UserAvatar
+                        name={getOtherUser(selectedConversation)?.name || 'Usuário'}
+                        avatar={getOtherUser(selectedConversation)?.avatar}
+                        size={44}
+                      />
+                      <div>
+                        <p className="font-semibold text-gray-900">
+                          {getOtherUser(selectedConversation)?.name || 'Usuário'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Conversa com este profissional
+                        </p>
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setReportModalOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100"
+                    >
+                      <ShieldAlert className="h-4 w-4" />
+                      Denunciar
+                    </button>
                   </div>
                 </div>
 
@@ -469,6 +481,22 @@ function ChatContent() {
           </div>
         </div>
       </div>
+
+      {selectedConversation && (
+        <ReportUserModal
+          open={reportModalOpen}
+          onClose={() => setReportModalOpen(false)}
+          source="chat"
+          bookingId={
+            typeof selectedConversation.bookingId === 'object'
+              ? selectedConversation.bookingId?._id
+              : selectedConversation.bookingId
+          }
+          conversationId={selectedConversation._id}
+          reportedUserName={getOtherUser(selectedConversation)?.name || 'Usuário'}
+          contextLabel="Chat em tempo real"
+        />
+      )}
     </div>
   );
 }

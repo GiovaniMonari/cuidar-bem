@@ -282,12 +282,6 @@ export default function DashboardPage() {
                 : 'Acompanhe seus agendamentos e pagamentos'}
             </p>
           </div>
-          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2.5 self-start sm:self-auto">
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-sm font-medium text-gray-700">
-              {isCaregiver ? 'Cuidador' : 'Cliente'}
-            </span>
-          </div>
         </div>
 
         {/* ── Stats Cards ── */}

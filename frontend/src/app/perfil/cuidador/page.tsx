@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { deriveSpecialtiesFromServices } from '@/utils/serviceSpecialities';
+import { CityAutocomplete } from '@/components/CityAutoComplete';
 
 export default function CaregiverProfilePage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -237,42 +238,33 @@ export default function CaregiverProfilePage() {
             <h2 className="font-semibold text-gray-900 mb-4">
               Localização e Preço
             </h2>
-            <div className="grid sm:grid-cols-3 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">
-                  Cidade
-                </label>
-                <input
-                  type="text"
-                  value={form.city}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, city: e.target.value }))
-                  }
-                  className="input-field"
-                  required
-                />
-              </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <CityAutocomplete
+                value={form.city}
+                onChange={({ city, state }) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    city,
+                    state,
+                  }));
+                }}
+              />
+
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-1 block">
                   Estado
                 </label>
-                <select
+                <input
+                  type="text"
                   value={form.state}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, state: e.target.value }))
-                  }
-                  className="input-field"
+                  readOnly
+                  className="input-field bg-gray-100 cursor-not-allowed"
+                  placeholder="Selecionado automaticamente"
                   required
-                >
-                  <option value="">Selecione</option>
-                  {STATES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
-              <div>
+
+              <div className="sm:col-span-2">
                 <label className="text-sm font-medium text-gray-700 mb-1 block">
                   Valor/hora (R$)
                 </label>

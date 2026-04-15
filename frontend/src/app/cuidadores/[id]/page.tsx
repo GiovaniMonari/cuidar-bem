@@ -38,6 +38,7 @@ import {
   isHourlyDuration,
   isMultiDayDuration,
 } from '@/utils/booking';
+import { buildFullAddress } from '@/utils/addressFields';
 import { getDatesInRange } from '@/utils/dateRange';
 
 function CaregiverDetailContent() {
@@ -551,6 +552,9 @@ useEffect(() => {
             ? `Atendimento - ${bookingForm.patientName}`
             : 'Endereço de atendimento',
           address: bookingForm.fullAddress || bookingForm.address,
+          baseAddress: bookingForm.address,
+          number: bookingForm.number,
+          complement: bookingForm.complement,
           cep: bookingForm.cep,
           lat: bookingForm.lat,
           lon: bookingForm.lon,
@@ -1117,18 +1121,33 @@ const handleReview = async (e: React.FormEvent) => {
 
                         <SavedAddresses
                           onSelect={(saved) => {
+                            const selectedFullAddress =
+                              buildFullAddress(
+                                saved.baseAddress || saved.address,
+                                saved.number || '',
+                                saved.complement || '',
+                              ) || saved.address;
+                            const hasStructuredAddress =
+                              Boolean(saved.baseAddress?.trim()) &&
+                              Boolean(saved.number?.trim());
+
                             setBookingForm((prev) => ({
                               ...prev,
                               cep: saved.cep || '',
-                              address: saved.address,
-                              number: '',
-                              complement: '',
-                              fullAddress: saved.address,
+                              address: saved.baseAddress || saved.address,
+                              number: saved.number || '',
+                              complement: saved.complement || '',
+                              fullAddress: selectedFullAddress,
                               lat: saved.lat || '',
                               lon: saved.lon || '',
                             }));
                             setIsAddressValidated(
-                              Boolean(saved.cep && saved.lat && saved.lon),
+                              Boolean(
+                                saved.cep &&
+                                  saved.lat &&
+                                  saved.lon &&
+                                  hasStructuredAddress,
+                              ),
                             );
                           }}
                         />

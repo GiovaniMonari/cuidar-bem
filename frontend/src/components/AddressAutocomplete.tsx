@@ -3,6 +3,7 @@
 
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { addressService } from '@/services/address';
+import { buildFullAddress } from '@/utils/addressFields';
 import { maskCep } from '@/utils/masks';
 import {
   MapPin,
@@ -97,6 +98,34 @@ export function AddressAutocomplete({
   }, [cep, isValidated, lat, lon, value]);
 
   useEffect(() => {
+    const cleanCep = cep.replace(/\D/g, '');
+    const baseAddress = value.trim();
+
+    if (!lat || !lon || !baseAddress) {
+      return;
+    }
+
+    setCandidateCoordinates((current) => {
+      if (
+        current &&
+        current.lat === lat &&
+        current.lon === lon &&
+        current.baseAddress === baseAddress &&
+        current.cep === cleanCep
+      ) {
+        return current;
+      }
+
+      return {
+        lat,
+        lon,
+        baseAddress,
+        cep: cleanCep,
+      };
+    });
+  }, [cep, lat, lon, value]);
+
+  useEffect(() => {
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
@@ -124,34 +153,6 @@ export function AddressAutocomplete({
     }
 
     return maskCep(rawCep);
-  }, []);
-
-  // Montar endereço completo
-  const buildFullAddress = useCallback((baseAddress: string, num: string, comp: string) => {
-    const trimmedBase = baseAddress.trim();
-
-    if (!trimmedBase) {
-      return '';
-    }
-
-    const parts = trimmedBase
-      .split(',')
-      .map((part) => part.trim())
-      .filter(Boolean);
-
-    const street = parts[0] || trimmedBase;
-    const remainder = parts.slice(1).join(', ');
-    let streetLine = street;
-
-    if (num) {
-      streetLine = `${streetLine}, ${num}`;
-    }
-
-    if (comp) {
-      streetLine = `${streetLine} - ${comp}`;
-    }
-
-    return remainder ? `${streetLine}, ${remainder}` : streetLine;
   }, []);
 
   const stripCepFromQuery = useCallback((query: string, rawCep: string) => {

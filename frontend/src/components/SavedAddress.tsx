@@ -1,12 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  MapPin,
-  Trash2,
-  Home,
-  Building2,
-} from 'lucide-react';
+import { MapPin, Trash2 } from 'lucide-react';
 import {
   getSavedAddresses,
   removeSavedAddress,
@@ -38,9 +33,9 @@ export function SavedAddresses({ onSelect }: Props) {
       </h4>
 
       <div className="space-y-2">
-        {addresses.map((item, index) => (
+        {addresses.map((item) => (
           <div
-            key={index}
+            key={item.address}
             className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-3 py-3"
           >
             <button
@@ -53,6 +48,14 @@ export function SavedAddresses({ onSelect }: Props) {
                 <p className="text-sm font-medium text-gray-900">
                   {item.label || 'Endereço salvo'}
                 </p>
+                {item.baseAddress && item.baseAddress !== item.address && (
+                  <p className="text-xs text-gray-700">
+                    {item.number
+                      ? `${item.baseAddress}, ${item.number}`
+                      : item.baseAddress}
+                    {item.complement ? ` - ${item.complement}` : ''}
+                  </p>
+                )}
                 <p className="text-xs text-gray-500">{item.address}</p>
               </div>
             </button>

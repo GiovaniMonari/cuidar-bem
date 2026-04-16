@@ -90,7 +90,7 @@ export class ModerationService {
     reporterRole: string,
   ) {
     if (!['client', 'caregiver'].includes(reporterRole)) {
-      throw new ForbiddenException('Apenas clientes e cuidadores podem enviar denúncias');
+      throw new ForbiddenException('Apenas clientes e cuidadores podem enviar reportagens');
     }
 
     const resolvedContext = await this.resolveReportContext(dto, reporterId, reporterRole);
@@ -117,7 +117,7 @@ export class ModerationService {
     const duplicate = await this.platformReportModel.findOne(duplicateQuery);
     if (duplicate) {
       throw new BadRequestException(
-        'Você já enviou uma denúncia semelhante recentemente para este contexto',
+        'Você já enviou uma reportagem semelhante recentemente para este contexto',
       );
     }
 
@@ -493,14 +493,14 @@ export class ModerationService {
         kind: 'report_received',
         timestamp: (report as any).createdAt,
         title: REASON_LABELS[report.reason] || report.reason,
-        description: `Denúncia recebida via ${SOURCE_LABELS[report.source] || report.source}`,
+        description: `Reportagem recebida via ${SOURCE_LABELS[report.source] || report.source}`,
       })),
       ...reportsFiled.map((report) => ({
         id: report._id.toString(),
         kind: 'report_filed',
         timestamp: (report as any).createdAt,
         title: REASON_LABELS[report.reason] || report.reason,
-        description: `Denúncia enviada via ${SOURCE_LABELS[report.source] || report.source}`,
+        description: `Reportagem enviada via ${SOURCE_LABELS[report.source] || report.source}`,
       })),
     ]
       .sort(
@@ -571,7 +571,7 @@ export class ModerationService {
       .lean();
 
     if (!report) {
-      throw new NotFoundException('Denúncia não encontrada');
+      throw new NotFoundException('Reportagem não encontrada');
     }
 
     const messages = report.conversationId
@@ -620,7 +620,7 @@ export class ModerationService {
     const report = await this.platformReportModel.findById(reportId);
 
     if (!report) {
-      throw new NotFoundException('Denúncia não encontrada');
+      throw new NotFoundException('Reportagem não encontrada');
     }
 
     const action = (dto.action || 'none') as ModerationAction;
@@ -677,7 +677,7 @@ export class ModerationService {
       action: 'report_reviewed',
       targetType: 'report',
       targetId: report._id.toString(),
-      description: `Denúncia ${report._id.toString()} revisada manualmente`,
+      description: `Reportagem ${report._id.toString()} revisada manualmente`,
       metadata: {
         reportId: report._id.toString(),
         status: report.status,
@@ -732,7 +732,7 @@ export class ModerationService {
   ) {
     if (dto.source === 'chat') {
       if (!dto.conversationId) {
-        throw new BadRequestException('Informe a conversa vinculada à denúncia');
+        throw new BadRequestException('Informe a conversa vinculada à reportagem');
       }
 
       const conversation = await this.conversationModel.findById(dto.conversationId).lean();
@@ -758,7 +758,7 @@ export class ModerationService {
     }
 
     if (!dto.bookingId) {
-      throw new BadRequestException('Informe o serviço vinculado à denúncia');
+      throw new BadRequestException('Informe o serviço vinculado à reportagem');
     }
 
     const booking = await this.bookingModel
@@ -779,7 +779,7 @@ export class ModerationService {
 
     if (booking.status !== 'completed') {
       throw new BadRequestException(
-        'Denúncias do serviço só podem ser feitas após a conclusão do atendimento',
+        'Reportagens do serviço só podem ser feitas após a conclusão do atendimento',
       );
     }
 
@@ -788,7 +788,7 @@ export class ModerationService {
 
     if (reporterRole === 'client') {
       if (clientId !== reporterId) {
-        throw new ForbiddenException('Você não pode denunciar este serviço');
+        throw new ForbiddenException('Você não pode reportar este serviço');
       }
       if (!caregiverUserId) {
         throw new NotFoundException('Cuidador do serviço não encontrado');
@@ -802,7 +802,7 @@ export class ModerationService {
 
     if (reporterRole === 'caregiver') {
       if (caregiverUserId !== reporterId) {
-        throw new ForbiddenException('Você não pode denunciar este serviço');
+        throw new ForbiddenException('Você não pode reportar este serviço');
       }
       return {
         bookingId: booking._id.toString(),
@@ -811,7 +811,7 @@ export class ModerationService {
       };
     }
 
-    throw new ForbiddenException('Seu perfil não pode enviar denúncias');
+    throw new ForbiddenException('Seu perfil não pode enviar reportagens');
   }
 
   private async evaluateAutomatedModeration(report: PlatformReportDocument) {
@@ -846,7 +846,7 @@ export class ModerationService {
     ]);
 
     if (!user) {
-      throw new NotFoundException('Usuário denunciado não encontrado');
+      throw new NotFoundException('Usuário reportado não encontrado');
     }
 
     const historicalPenalty =
@@ -873,7 +873,7 @@ export class ModerationService {
       await this.applyUserModerationAction(
         user._id.toString(),
         'ban',
-        `Banimento automático após ${sameReasonCount} denúncias recorrentes de ${REASON_LABELS[reason] || reason}`,
+        `Banimento automático após ${sameReasonCount} reportagens recorrentes de ${REASON_LABELS[reason] || reason}`,
         'system',
         undefined,
         {
@@ -891,7 +891,7 @@ export class ModerationService {
       await this.applyUserModerationAction(
         user._id.toString(),
         'watchlist',
-        `Observação automática após ${sameReasonCount} denúncias recorrentes de ${REASON_LABELS[reason] || reason}`,
+        `Observação automática após ${sameReasonCount} reportagens recorrentes de ${REASON_LABELS[reason] || reason}`,
         'system',
         undefined,
         {
@@ -1082,15 +1082,15 @@ export class ModerationService {
       notifications.push({
         severity: 'high',
         title: 'Novos reports aguardando revisão',
-        description: `${params.pendingReports} denúncias pendentes na fila manual`,
+        description: `${params.pendingReports} reportagens pendentes na fila manual`,
       });
     }
 
     if (params.recentReportRate >= 20) {
       notifications.push({
         severity: 'medium',
-        title: 'Taxa de denúncias acima do normal',
-        description: `${params.recentReportRate}% dos serviços concluídos geraram reports recentes`,
+        title: 'Taxa de reportagens acima do normal',
+        description: `${params.recentReportRate}% dos serviços concluídos geraram reportagens recentes`,
       });
     }
 

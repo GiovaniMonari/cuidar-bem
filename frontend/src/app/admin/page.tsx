@@ -224,11 +224,11 @@ export default function AdminPage() {
         notes: reviewNotes.trim() || undefined,
       });
       setSelectedReportDetail(response);
-      setNotice('Denúncia revisada com sucesso.');
+      setNotice('Report revisada com sucesso.');
       setReviewNotes('');
       await refreshEverything();
     } catch (error: any) {
-      setNotice(error.message || 'Não foi possível revisar a denúncia.');
+      setNotice(error.message || 'Não foi possível revisar a reportagem.');
     } finally {
       setBusyAction(false);
     }
@@ -246,7 +246,7 @@ export default function AdminPage() {
               </div>
               <h1 className="mt-4 text-3xl font-semibold tracking-tight">Painel Administrativo</h1>
               <p className="mt-2 max-w-2xl text-sm text-slate-200">
-                Monitore a plataforma em tempo quase real, revise denúncias, acompanhe contas sensíveis e mantenha a operação sob controle.
+                Monitore a plataforma em tempo quase real, revise reportagens, acompanhe contas sensíveis e mantenha a operação sob controle.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -293,10 +293,10 @@ export default function AdminPage() {
             </div>
 
             <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
-              <PanelCard title="Crescimento da plataforma" subtitle="Usuários, serviços e denúncias dos últimos 7 dias.">
+              <PanelCard title="Crescimento da plataforma" subtitle="Usuários, serviços e reportagens dos últimos 7 dias.">
                 <ChartBlock label="Usuários" data={dashboard.growth.users} color="#0f766e" />
                 <ChartBlock label="Serviços" data={dashboard.growth.services} color="#2563eb" />
-                <ChartBlock label="Denúncias" data={dashboard.growth.reports} color="#dc2626" />
+                <ChartBlock label="Reportagens" data={dashboard.growth.reports} color="#dc2626" />
               </PanelCard>
 
               <PanelCard title="Alertas e notificações" subtitle="Sinais operacionais que merecem atenção.">
@@ -409,7 +409,7 @@ export default function AdminPage() {
               </div>
             </PanelCard>
 
-            <PanelCard title="Detalhe do usuário" subtitle="Ações rápidas, histórico e denúncias recebidas.">
+            <PanelCard title="Detalhe do usuário" subtitle="Ações rápidas, histórico e reportagens recebidas.">
               {!selectedUserDetail && <EmptyState text="Selecione um usuário para visualizar detalhes." />}
               {selectedUserDetail && (
                 <div className="space-y-5">
@@ -451,7 +451,7 @@ export default function AdminPage() {
                     </div>
 
                     <div>
-                      <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Histórico de denúncias</h3>
+                      <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Histórico de reportagens</h3>
                       <div className="space-y-3">
                         {selectedUserDetail.reportsReceived.map((report) => (
                           <button
@@ -482,7 +482,7 @@ export default function AdminPage() {
 
         {tab === 'reports' && (
           <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-            <PanelCard title="Fila de denúncias" subtitle="Reports do chat e do fluxo pós-serviço.">
+            <PanelCard title="Fila de reportagens" subtitle="Reports do chat e do fluxo pós-serviço.">
               <div className="mb-4 grid grid-cols-2 gap-3">
                 <select value={reportStatusFilter} onChange={(e) => setReportStatusFilter(e.target.value)} className="rounded-2xl border border-slate-200 px-3 py-3 text-sm">
                   <option value="all">Todos status</option>
@@ -503,7 +503,7 @@ export default function AdminPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-semibold">{REPORT_REASON_LABELS[report.reason] || report.reason}</p>
-                        <p className={`mt-1 text-sm ${selectedReportId === report._id ? 'text-slate-300' : 'text-slate-500'}`}>{(report.reporterId as any)?.name} denunciou {(report.reportedUserId as any)?.name}</p>
+                        <p className={`mt-1 text-sm ${selectedReportId === report._id ? 'text-slate-300' : 'text-slate-500'}`}>{(report.reporterId as any)?.name} reportou {(report.reportedUserId as any)?.name}</p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <StatusBadge status={report.status} />
                           <InlinePill label={report.source === 'chat' ? 'chat' : 'pós-serviço'} />
@@ -517,12 +517,12 @@ export default function AdminPage() {
             </PanelCard>
 
             <PanelCard title="Revisão manual" subtitle="Evidências, histórico e decisão administrativa.">
-              {!selectedReportDetail && <EmptyState text="Selecione uma denúncia para revisar." />}
+              {!selectedReportDetail && <EmptyState text="Selecione uma reportagem para revisar." />}
               {selectedReportDetail && (
                 <div className="space-y-5">
                   <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
                     <p className="text-xl font-semibold text-slate-900">{REPORT_REASON_LABELS[selectedReportDetail.report.reason] || selectedReportDetail.report.reason}</p>
-                    <p className="mt-1 text-sm text-slate-500">{(selectedReportDetail.report.reporterId as any)?.name} denunciou {(selectedReportDetail.report.reportedUserId as any)?.name}</p>
+                    <p className="mt-1 text-sm text-slate-500">{(selectedReportDetail.report.reporterId as any)?.name} reportou {(selectedReportDetail.report.reportedUserId as any)?.name}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <StatusBadge status={selectedReportDetail.report.status} />
                       <InlinePill label={`auto: ${selectedReportDetail.report.autoAction}`} />
@@ -546,7 +546,7 @@ export default function AdminPage() {
                     <div>
                       <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Evidências do chat</h3>
                       <div className="space-y-3">
-                        {selectedReportDetail.evidence.messages.length === 0 && <EmptyState text="Sem mensagens anexadas para esta denúncia." />}
+                        {selectedReportDetail.evidence.messages.length === 0 && <EmptyState text="Sem mensagens anexadas para esta reportagem." />}
                         {selectedReportDetail.evidence.messages.map((message) => (
                           <div key={message._id} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                             <p className="font-semibold text-slate-900">{message.senderId?.name || 'Usuário'}</p>

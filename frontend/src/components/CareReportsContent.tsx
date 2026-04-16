@@ -280,7 +280,7 @@ export default function CareReportsContent() {
               className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100"
             >
               <ShieldAlert className="h-4 w-4" />
-              Denunciar usuário
+              Reportar usuário
             </button>
           )}
         </div>

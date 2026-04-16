@@ -84,7 +84,7 @@ export function ReportUserModal({
         reason,
         description: description.trim() || undefined,
       });
-      setFeedback('Denúncia registrada. A equipe administrativa foi notificada.');
+      setFeedback('Reportagem registrada. A equipe administrativa foi notificada.');
       onReported?.();
       setTimeout(() => {
         setDescription('');
@@ -92,7 +92,7 @@ export function ReportUserModal({
         onClose();
       }, 900);
     } catch (error: any) {
-      setFeedback(error.message || 'Não foi possível registrar a denúncia.');
+      setFeedback(error.message || 'Não foi possível registrar a reportagem.');
     } finally {
       setLoading(false);
     }
@@ -108,7 +108,7 @@ export function ReportUserModal({
               Segurança
             </div>
             <h3 className="mt-3 text-xl font-semibold">
-              Denunciar {reportedUserName}
+              Reportar {reportedUserName}
             </h3>
             <p className="mt-1 text-sm text-slate-300">
               Contexto: {contextLabel}
@@ -125,7 +125,7 @@ export function ReportUserModal({
 
         <div className="space-y-5 px-6 py-6 overflow-y-auto">
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            A denúncia fica disponível para revisão manual e pode gerar observação ou banimento automático conforme recorrência e histórico.
+            A reportagem fica disponível para revisão manual e pode gerar observação ou banimento automático conforme recorrência e histórico.
           </div>
 
           <div className="space-y-3">
@@ -194,7 +194,7 @@ export function ReportUserModal({
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldAlert className="h-4 w-4" />}
-            Enviar denúncia
+            Enviar reportagem
           </button>
         </div>
       </div>

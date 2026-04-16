@@ -57,7 +57,10 @@ export function AvailabilityCalendar({
     selectedDates.forEach((item) =>
       map.set(item.date, {
         ...item,
-        timeRanges: getNormalizedTimeRanges(item),
+        timeRanges:
+          item.isAvailable === false
+            ? []
+            : getNormalizedTimeRanges(item),
       }),
     );
     return map;
@@ -95,39 +98,43 @@ export function AvailabilityCalendar({
     return result;
   }, [currentMonth, currentYear]);
 
-  const toggleDate = (dateStr: string) => {
-    if (readOnly && onSelectDate) {
-      onSelectDate(dateStr);
-      return;
-    }
+const toggleDate = (dateStr: string) => {
+  if (readOnly && onSelectDate) {
+    onSelectDate(dateStr);
+    return;
+  }
 
-    if (readOnly || !onChange) return;
-    if (bookedSet.has(dateStr)) return;
+  if (readOnly || !onChange) return;
+  if (bookedSet.has(dateStr)) return;
 
-    const dateObj = new Date(dateStr + 'T00:00:00');
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
+  const existing = selectedDates.find((d) => d.date === dateStr);
 
-    if (dateObj < now) return;
+  // 🚨 BLOQUEIA indisponível
+  if (existing?.isAvailable === false) return;
 
-    const exists = selectedDates.find((d) => d.date === dateStr);
+  const dateObj = new Date(dateStr + 'T00:00:00');
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
 
-    if (exists) {
-      setActiveEditDate(dateStr);
-      return;
-    }
+  if (dateObj < now) return;
 
-    onChange([
-      ...selectedDates,
-        {
-          date: dateStr,
-          slots: ['integral'],
-          timeRanges: [{ ...DEFAULT_TIME_RANGE }],
-          isAvailable: true,
-        },
-    ]);
+  if (existing) {
     setActiveEditDate(dateStr);
-  };
+    return;
+  }
+
+  onChange([
+    ...selectedDates,
+    {
+      date: dateStr,
+      slots: ['integral'],
+      timeRanges: [{ ...DEFAULT_TIME_RANGE }],
+      isAvailable: true,
+    },
+  ]);
+
+  setActiveEditDate(dateStr);
+};
 
   const updateTimeRange = (
     date: string,
@@ -197,7 +204,13 @@ export function AvailabilityCalendar({
 
   const removeDateAvailability = (date: string) => {
     if (!onChange || readOnly) return;
-    onChange(selectedDates.filter((item) => item.date !== date));
+    onChange(
+      selectedDates.map((item) =>
+        item.date === date
+          ? { ...item, isAvailable: false, timeRanges: [] }
+          : item
+      )
+    );
     if (activeEditDate === date) {
       setActiveEditDate(null);
     }
@@ -277,25 +290,31 @@ export function AvailabilityCalendar({
           const dateStr = formatDate(day);
           const selectedDateItem = selectedMap.get(dateStr);
           const isPicked = selectedDate === dateStr;
-          const isSelected = Boolean(selectedDateItem) || isPicked;
+          const isSelected = isPicked;
           const isBooked = bookedSet.has(dateStr);
           const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
           const isToday = formatDate(day) === formatDate(new Date());
+          const isUnavailable =
+            selectedDateItem?.isAvailable === false;
+
+          const hasAvailability =
+            selectedDateItem?.isAvailable === true &&
+            selectedDateItem.timeRanges?.length > 0;
 
           return (
             <button
               key={dateStr}
               type="button"
-              disabled={isPast || isBooked}
+              disabled={
+                isPast ||
+                isBooked ||
+                selectedDateItem?.isAvailable !== true
+              }
               onClick={() => toggleDate(dateStr)}
               className={`${compact ? 'min-h-[48px] text-xs' : 'min-h-[64px] text-sm'} rounded-xl font-medium transition-all border relative px-1 py-2 ${
-                isBooked
+                isBooked || selectedDateItem?.isAvailable !== true
                   ? 'bg-red-100 text-red-700 border-red-200 cursor-not-allowed'
-                  : isSelected
-                  ? 'bg-primary-600 text-white border-primary-600'
-                  : isToday
-                  ? 'border-primary-300 text-primary-700 bg-primary-50'
-                  : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 hover:bg-primary-50'
+                  : 'bg-green-100 text-green-700 border-green-200'
               } ${isPast ? 'opacity-30 cursor-not-allowed' : ''}`}
             >
               <div className="flex h-full flex-col items-center justify-center gap-1">

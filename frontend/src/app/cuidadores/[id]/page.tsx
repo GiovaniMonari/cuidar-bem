@@ -1177,8 +1177,9 @@ const handleReview = async (e: React.FormEvent) => {
 
                         <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                           <h4 className="text-sm font-medium text-gray-700">
-                            Dados do Paciente (opcional)
+                            Dados do Paciente
                           </h4>
+
                           <div className="grid grid-cols-2 gap-3">
                             <input
                               type="text"
@@ -1191,7 +1192,9 @@ const handleReview = async (e: React.FormEvent) => {
                               }
                               className="input-field"
                               placeholder="Nome do paciente"
+                              required
                             />
+
                             <input
                               type="number"
                               value={bookingForm.patientAge}
@@ -1203,8 +1206,10 @@ const handleReview = async (e: React.FormEvent) => {
                               }
                               className="input-field"
                               placeholder="Idade"
+                              required
                             />
                           </div>
+
                           <input
                             type="text"
                             value={bookingForm.patientCondition}
@@ -1216,6 +1221,7 @@ const handleReview = async (e: React.FormEvent) => {
                             }
                             className="input-field"
                             placeholder="Condição de saúde (ex: Alzheimer, pós-AVC)"
+                            required
                           />
                         </div>
 

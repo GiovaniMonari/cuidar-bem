@@ -99,8 +99,8 @@ export function ReportUserModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-950/55 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl max-h-[90vh] overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl flex flex-col">
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-950 px-6 py-5 text-white">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-100">
@@ -123,7 +123,7 @@ export function ReportUserModal({
           </button>
         </div>
 
-        <div className="space-y-5 px-6 py-6">
+        <div className="space-y-5 px-6 py-6 overflow-y-auto">
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             A denúncia fica disponível para revisão manual e pode gerar observação ou banimento automático conforme recorrência e histórico.
           </div>

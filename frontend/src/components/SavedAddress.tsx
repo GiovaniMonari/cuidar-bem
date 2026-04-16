@@ -56,7 +56,6 @@ export function SavedAddresses({ onSelect }: Props) {
                     {item.complement ? ` - ${item.complement}` : ''}
                   </p>
                 )}
-                <p className="text-xs text-gray-500">{item.address}</p>
               </div>
             </button>
 

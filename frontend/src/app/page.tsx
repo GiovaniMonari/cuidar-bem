@@ -125,7 +125,6 @@ function HeroGuest() {
             </Link>
           </div>
 
-          <HeroTrustPillars />
         </div>
       </div>
 
@@ -248,34 +247,6 @@ function HeroCaregiver({ user }: { user: NonNullable<ReturnType<typeof useAuth>[
   );
 }
 
-function HeroTrustPillars() {
-  const pillars = [
-    {
-      icon: <Heart className="w-5 h-5" />,
-      title: 'Cuidado humanizado',
-      desc: 'Profissionais com empatia e preparo',
-    },
-    {
-      icon: <Clock className="w-5 h-5" />,
-      title: 'Flexibilidade total',
-      desc: 'Horários que se adaptam à sua rotina',
-    },
-  ];
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-0 sm:divide-x sm:divide-white/[0.08] w-full max-w-3xl">
-      {pillars.map((item, i) => (
-        <div key={i} className="flex flex-col items-center text-center px-6 py-2">
-          <div className="w-10 h-10 rounded-xl bg-accent-500/10 border border-accent-400/20 flex items-center justify-center text-accent-300 mb-3">
-            {item.icon}
-          </div>
-          <span className="text-white font-semibold text-sm mb-1">{item.title}</span>
-          <span className="text-white/40 text-xs leading-relaxed">{item.desc}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 // ─── Hero dinâmico ────────────────────────────────────────────────────────────
 function DynamicHero() {

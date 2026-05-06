@@ -409,7 +409,7 @@ function CaregiverListContent() {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <p className="text-gray-700 font-medium text-lg">
-                    {caregivers.length} profissional{caregivers.length !== 1 ? 'is' : ''} encontrado{caregivers.length !== 1 ? 's' : ''}
+                    {caregivers.length} {caregivers.length !== 1 ? 'proficionais' : 'profissional'} encontrado{caregivers.length !== 1 ? 's' : ''}
                   </p>
                   <p className="text-sm text-gray-500 mt-0.5">
                     Página {currentPage} de {totalPages}

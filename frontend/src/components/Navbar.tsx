@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserAvatar } from '@/components/UserAvatar';
+import { usePathname } from "next/navigation";
 import {
   Heart,
   Menu,
@@ -21,6 +22,8 @@ export function Navbar() {
 
   const isAdmin = user?.role === 'admin';
   const isCaregiver = user?.role === 'caregiver';
+
+  const pathname = usePathname();
 
   return (
     <nav className="bg-white/80 backdrop-blur-lg border-b border-gray-100 sticky top-0 z-50">
@@ -44,7 +47,7 @@ export function Navbar() {
             {!isCaregiver && !isAdmin && (
               <Link
                 href="/cuidadores"
-                className="flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors"
+                className={`flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors ${pathname === "/cuidadores" ? "text-primary-600" : "" } `}
               >
                 <Search className="w-4 h-4" />
                 Buscar Cuidadores
@@ -54,7 +57,7 @@ export function Navbar() {
             {isAuthenticated && !isCaregiver && !isAdmin && (
               <Link
                 href="/favoritos"
-                className="flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors"
+                className={`flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors ${pathname === "/favoritos" ? "text-primary-600" : "" } `}
               >
                 <Heart className="w-4 h-4" />
                 Cuidadores Favoritos
@@ -66,7 +69,7 @@ export function Navbar() {
                 {!isAdmin && (
                   <Link
                     href="/chat"
-                    className="flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors"
+                    className={`flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors ${pathname === "/chat" ? "text-primary-600" : "" } `}
                   >
                     <MessageCircle className="w-4 h-4" />
                     Chat
@@ -75,7 +78,7 @@ export function Navbar() {
 
                 <Link
                   href={isAdmin ? '/admin' : '/dashboard'}
-                  className="flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors"
+                  className={`flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors ${pathname === "/admin" ? "text-primary-600" : "" } ${pathname === "/dashboard" ? "text-primary-600" : "" } `}
                 >
                   <Calendar className="w-4 h-4" />
                   {isAdmin ? 'Painel Admin' : 'Dashboard'}
@@ -84,7 +87,7 @@ export function Navbar() {
                 <div className="flex items-center gap-3 pl-3 border-l border-gray-200">
                   <Link
                     href="/perfil"
-                    className="flex items-center gap-2 text-gray-700 hover:text-primary-600 transition-colors"
+                    className={`flex items-center gap-1.5 text-gray-600 hover:text-primary-600 font-medium transition-colors ${pathname === "/perfil" ? "text-primary-600" : "" } `}
                   >
                     <UserAvatar
                       name={user?.name}
@@ -110,7 +113,7 @@ export function Navbar() {
               <div className="flex items-center gap-3">
                 <Link
                   href="/login"
-                  className="text-gray-600 hover:text-primary-600 font-medium transition-colors"
+                  className={`text-gray-600 hover:text-primary-600 font-medium transition-colors ${pathname === "/login" ? "text-primary-600" : "" }`}
                 >
                   Entrar
                 </Link>
@@ -137,7 +140,7 @@ export function Navbar() {
           {!isCaregiver && !isAdmin && (
             <Link
               href="/cuidadores"
-              className="block py-2 text-gray-600 hover:text-primary-600 font-medium"
+              className={`block py-2 text-gray-600 hover:text-primary-600 font-medium ${pathname === "/cuidadores" ? "text-primary-600" : "" }`}
               onClick={() => setMobileOpen(false)}
             >
               Buscar Cuidadores
@@ -147,7 +150,7 @@ export function Navbar() {
           {isAuthenticated && !isCaregiver && !isAdmin && (
             <Link
               href="/favoritos"
-              className="block py-2 text-gray-600 hover:text-primary-600 font-medium flex items-center gap-2"
+              className={`block py-2 text-gray-600 hover:text-primary-600 font-medium flex items-center gap-2 ${pathname === "/favoritos" ? "text-primary-600" : "" } ` }
               onClick={() => setMobileOpen(false)}
             >
               Cuidadores Favoritos
@@ -158,7 +161,7 @@ export function Navbar() {
             <>
               <Link
                 href={isAdmin ? '/admin' : '/dashboard'}
-                className="block py-2 text-gray-600 hover:text-primary-600 font-medium"
+                className={`block py-2 text-gray-600 hover:text-primary-600 font-medium ${pathname === "/admin" ? "text-primary-600" : "" } ${pathname === "/dashboard" ? "text-primary-600" : "" }`}
                 onClick={() => setMobileOpen(false)}
               >
                 {isAdmin ? 'Painel Admin' : 'Dashboard'}
@@ -166,7 +169,7 @@ export function Navbar() {
               {!isAdmin && (
                 <Link
                   href="/chat"
-                  className="block py-2 text-gray-600 hover:text-primary-600 font-medium"
+                  className={`block py-2 text-gray-600 hover:text-primary-600 font-medium ${pathname === "/chat" ? "text-primary-600" : "" }`}
                   onClick={() => setMobileOpen(false)}
                 >
                   Chat
@@ -174,7 +177,7 @@ export function Navbar() {
               )}
               <Link
                 href="/perfil"
-                className="block py-2 text-gray-600 hover:text-primary-600 font-medium"
+                className={`block py-2 text-gray-600 hover:text-primary-600 font-medium ${pathname === "/perfil" ? "text-primary-600" : "" }`}
                 onClick={() => setMobileOpen(false)}
               >
                 Meu Perfil
@@ -195,7 +198,7 @@ export function Navbar() {
             <>
               <Link
                 href="/login"
-                className="block py-2 text-gray-600 hover:text-primary-600 font-medium"
+                className={`block py-2 text-gray-600 hover:text-primary-600 font-medium ${pathname === "/login" ? "text-primary-600" : "" }`}
                 onClick={() => setMobileOpen(false)}
               >
                 Entrar

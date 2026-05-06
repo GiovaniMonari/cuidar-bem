@@ -1598,26 +1598,6 @@ const handleReview = async (e: React.FormEvent) => {
                     Agendar Atendimento
                   </button>
 
-                  {caregiverUser?.phone && (
-                    <a
-                      href={`tel:${caregiverUser.phone}`}
-                      className="btn-secondary w-full flex items-center justify-center gap-2"
-                    >
-                      <Phone className="w-4 h-4" />
-                      Ligar
-                    </a>
-                  )}
-
-                  {caregiverUser?.email && (
-                    <a
-                      href={`mailto:${caregiverUser.email}`}
-                      className="btn-secondary w-full flex items-center justify-center gap-2"
-                    >
-                      <Mail className="w-4 h-4" />
-                      Email
-                    </a>
-                  )}
-
                   {/* Seção do Chat */}
                   <div className="pt-2">
                     {canChat ? (

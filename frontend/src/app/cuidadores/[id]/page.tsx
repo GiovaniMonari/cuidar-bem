@@ -359,6 +359,29 @@ function CaregiverDetailContent() {
     setIsRangeAvailable(true);
   }, [bookingData.durationKey]);
 
+  // Efeito para preencher automaticamente a condição do paciente com base no serviço selecionado
+  useEffect(() => {
+    const serviceType = bookingData.serviceType;
+    
+    setBookingForm(prev => {
+      let newCondition = prev.patientCondition;
+      
+      if (serviceType === 'cuidado_pcd_intelectual') {
+        newCondition = 'TEA / Deficiência Intelectual';
+      } else if (serviceType === 'cuidado_pcd_fisico') {
+        newCondition = 'Deficiência Física';
+      } else if (serviceType === 'cuidado_alzheimer') {
+        newCondition = 'Alzheimer / Demência';
+      } else if (serviceType === 'cuidado_acamado') {
+        newCondition = 'Acamado';
+      } else if (serviceType === 'cuidado_basico_idoso') {
+        newCondition = ''; // Limpa se for cuidado padrão
+      }
+      
+      return { ...prev, patientCondition: newCondition };
+    });
+  }, [bookingData.serviceType]);
+
   useEffect(() => {
     if (bookingError) {
       setBookingError('');
@@ -1210,21 +1233,36 @@ const handleReview = async (e: React.FormEvent) => {
                             />
                           </div>
 
-                          <input
-                            type="text"
-                            value={bookingForm.patientCondition}
-                            onChange={(e) =>
-                              setBookingForm((prev) => ({
-                                ...prev,
-                                patientCondition: e.target.value,
-                              }))
-                            }
-                            className="input-field"
-                            placeholder="Condição de saúde (ex: Alzheimer, pós-AVC)"
-                            required
-                          />
+                          {bookingData.serviceType !== 'cuidado_basico_idoso' && (
+                            <input
+                              type="text"
+                              value={bookingForm.patientCondition}
+                              onChange={(e) =>
+                                setBookingForm((prev) => ({
+                                  ...prev,
+                                  patientCondition: e.target.value,
+                                }))
+                              }
+                              className={`input-field ${
+                                [
+                                  'cuidado_pcd_intelectual',
+                                  'cuidado_pcd_fisico',
+                                  'cuidado_alzheimer',
+                                  'cuidado_acamado',
+                                ].includes(bookingData.serviceType)
+                                  ? 'bg-gray-100 cursor-not-allowed'
+                                  : ''
+                              }`}
+                              placeholder="Condição do paciente"
+                              readOnly={[
+                                'cuidado_pcd_intelectual',
+                                'cuidado_pcd_fisico',
+                                'cuidado_alzheimer',
+                                'cuidado_acamado',
+                              ].includes(bookingData.serviceType)}
+                            />
+                          )}
                         </div>
-
                         <div>
                           <label className="text-sm font-medium text-gray-700 mb-1 block">
                             Observações adicionais

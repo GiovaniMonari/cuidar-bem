@@ -137,30 +137,6 @@ function HeroGuest() {
 function HeroClient({ user }: { user: NonNullable<ReturnType<typeof useAuth>['user']> }) {
   const firstName = user.name?.split(' ')[0] ?? 'você';
 
-  const quickActions = [
-    {
-      href: '/cuidadores',
-      icon: Search,
-      label: 'Buscar cuidadores',
-      desc: 'Encontre profissionais perto de você',
-      color: 'bg-white/[0.08] hover:bg-white/[0.14]',
-    },
-    {
-      href: '/dashboard',
-      icon: CalendarCheck,
-      label: 'Meus agendamentos',
-      desc: 'Acompanhe seus atendimentos',
-      color: 'bg-accent-500/20 hover:bg-accent-500/30',
-    },
-    {
-      href: '/favoritos',
-      icon: Heart,
-      label: 'Cuidadores favoritos',
-      desc: 'Cuidadores que você salvou',
-      color: 'bg-white/[0.08] hover:bg-white/[0.14]',
-    },
-  ];
-
   return (
     <section className="relative min-h-[75vh] flex items-center overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900" />
@@ -194,27 +170,6 @@ function HeroClient({ user }: { user: NonNullable<ReturnType<typeof useAuth>['us
             </p>
           </div>
 
-          <div className="lg:w-80 flex flex-col gap-3">
-            <p className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-1">
-              Acesso rápido
-            </p>
-            {quickActions.map((action) => (
-              <Link
-                key={action.href}
-                href={action.href}
-                className={`group ${action.color} backdrop-blur-md border border-white/[0.08] rounded-2xl p-4 flex items-center gap-4 transition-all hover:-translate-y-0.5`}
-              >
-                <div className="w-10 h-10 rounded-xl bg-white/[0.08] flex items-center justify-center text-white group-hover:bg-white/[0.12] transition-colors flex-shrink-0">
-                  <action.icon className="w-5 h-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white font-semibold text-sm">{action.label}</p>
-                  <p className="text-white/40 text-xs truncate">{action.desc}</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-white/30 group-hover:text-white/60 group-hover:translate-x-0.5 transition-all" />
-              </Link>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -225,30 +180,6 @@ function HeroClient({ user }: { user: NonNullable<ReturnType<typeof useAuth>['us
 // ─── Hero: cuidador autenticado ───────────────────────────────────────────────
 function HeroCaregiver({ user }: { user: NonNullable<ReturnType<typeof useAuth>['user']> }) {
   const firstName = user.name?.split(' ')[0] ?? 'você';
-
-  const quickActions = [
-    {
-      href: '/dashboard',
-      icon: LayoutDashboard,
-      label: 'Meu Dashboard',
-      desc: 'Visão geral dos seus atendimentos',
-      highlight: true,
-    },
-    {
-      href: '/perfil/cuidador',
-      icon: UserCheck,
-      label: 'Meu Perfil',
-      desc: 'Edite suas informações e disponibilidade',
-      highlight: false,
-    },
-    {
-      href: '/dashboard/avaliacoes',
-      icon: Star,
-      label: 'Avaliações',
-      desc: 'Veja o que os clientes estão dizendo',
-      highlight: false,
-    },
-  ];
 
   const stats = [
     { icon: TrendingUp, label: 'Perfil ativo', value: 'Online' },
@@ -310,38 +241,6 @@ function HeroCaregiver({ user }: { user: NonNullable<ReturnType<typeof useAuth>[
               ))}
             </div>
           </div>
-
-          <div className="lg:w-80 flex flex-col gap-3">
-            <p className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-1">
-              Acesso rápido
-            </p>
-            {quickActions.map((action) => (
-              <Link
-                key={action.href}
-                href={action.href}
-                className={`group ${
-                  action.highlight
-                    ? 'bg-accent-500/25 border-accent-400/30 hover:bg-accent-500/35'
-                    : 'bg-white/[0.06] border-white/[0.08] hover:bg-white/[0.12]'
-                } backdrop-blur-md border rounded-2xl p-4 flex items-center gap-4 transition-all hover:-translate-y-0.5`}
-              >
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
-                    action.highlight
-                      ? 'bg-accent-400/20 text-accent-300'
-                      : 'bg-white/[0.08] text-white group-hover:bg-white/[0.12]'
-                  }`}
-                >
-                  <action.icon className="w-5 h-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white font-semibold text-sm">{action.label}</p>
-                  <p className="text-white/40 text-xs truncate">{action.desc}</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-white/30 group-hover:text-white/60 group-hover:translate-x-0.5 transition-all" />
-              </Link>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -351,11 +250,6 @@ function HeroCaregiver({ user }: { user: NonNullable<ReturnType<typeof useAuth>[
 
 function HeroTrustPillars() {
   const pillars = [
-    {
-      icon: <ShieldCheck className="w-5 h-5" />,
-      title: 'Verificação rigorosa',
-      desc: 'Antecedentes e documentos checados',
-    },
     {
       icon: <Heart className="w-5 h-5" />,
       title: 'Cuidado humanizado',
@@ -369,7 +263,7 @@ function HeroTrustPillars() {
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-0 sm:divide-x sm:divide-white/[0.08] w-full max-w-3xl">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-0 sm:divide-x sm:divide-white/[0.08] w-full max-w-3xl">
       {pillars.map((item, i) => (
         <div key={i} className="flex flex-col items-center text-center px-6 py-2">
           <div className="w-10 h-10 rounded-xl bg-accent-500/10 border border-accent-400/20 flex items-center justify-center text-accent-300 mb-3">

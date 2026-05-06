@@ -37,7 +37,7 @@ export class AuthService {
   }
 
   private isStrongPassword(password: string) {
-    if (password.length < 8) {
+    if (password.length < 8 || password.includes("cuidarbem") || password.includes("123")){
       return false;
     }
 

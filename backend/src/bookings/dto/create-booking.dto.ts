@@ -59,11 +59,11 @@ export class CreateBookingDto {
 
   @IsOptional()
   @IsString()
-  clientName?: string;
+  clientName!: string;
 
   @IsOptional()
   @IsString()
-  clientPhone?: string;
+  clientPhone!: string;
 
   @IsOptional()
   @IsString()
@@ -81,15 +81,15 @@ export class CreateBookingDto {
 
   @IsOptional()
   @IsString()
-  patientName?: string;
+  patientName!: string;
 
   @IsOptional()
   @IsNumber()
-  patientAge?: number;
+  patientAge!: number;
 
   @IsOptional()
   @IsString()
-  patientCondition?: string;
+  patientCondition!: string;
 
   @IsOptional()
   @IsArray()

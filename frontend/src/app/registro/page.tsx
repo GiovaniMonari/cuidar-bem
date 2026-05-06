@@ -97,13 +97,6 @@ function RegisterForm() {
       </div>
 
       <div className="card p-8">
-        {error && (
-          <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl mb-6 flex items-start gap-2 text-sm">
-            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span>{error}</span>
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Role Selection */}
           <div>
@@ -268,6 +261,13 @@ function RegisterForm() {
               </span>
             </div>
           </div>
+
+          {error && (
+            <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl mb-6 flex items-start gap-2 text-sm">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
 
           <button
             type="submit"

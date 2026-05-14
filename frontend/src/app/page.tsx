@@ -1033,7 +1033,7 @@ function CaregiverAgendaSection() {
       badge: 'Novo',
     },
     {
-      href: '/agenda/avaliacoes',
+      href: '/cuidador/rating',
       icon: Star,
       title: 'Avaliações',
       desc: 'Acompanhe o que os clientes estão dizendo sobre você.',
@@ -1119,7 +1119,7 @@ function CaregiverTipsSection() {
       icon: Star,
       title: 'Avaliações constroem confiança',
       desc: 'Peça avaliações após cada atendimento. Uma nota alta te coloca no topo das buscas e atrai novos clientes.',
-      action: { label: 'Ver avaliações', href: '/agenda/avaliacoes' },
+      action: { label: 'Ver avaliações', href: '/cuidador/rating' },
       color: 'bg-yellow-50 border-yellow-100',
       iconColor: 'text-yellow-600 bg-yellow-100',
     },

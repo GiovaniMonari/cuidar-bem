@@ -274,7 +274,7 @@ function ChatContent() {
             {/* Botão de ação */}
             {user?.role === 'caregiver' ? (
               <button
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push('/agenda')}
                 className="btn-primary w-full flex items-center justify-center gap-2"
               >
                 <Calendar className="w-4 h-4" />

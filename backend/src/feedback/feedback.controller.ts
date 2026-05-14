@@ -17,7 +17,7 @@ import { CreateFeedbackDto } from './dto/create-feedback.dto';
 @Controller('feedback')
 @UseGuards(JwtAuthGuard)
 export class FeedbackController {
-  constructor(private readonly feedbackService: FeedbackService) {}
+  constructor(private readonly feedbackService: FeedbackService) { }
 
   @Post()
   async create(@Body() createFeedbackDto: CreateFeedbackDto, @Req() req: any) {

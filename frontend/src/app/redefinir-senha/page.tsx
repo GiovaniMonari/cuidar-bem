@@ -3,25 +3,11 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import { resetPasswordSchema, type ResetPasswordFormData } from '@/validations/schemas';
 import { AlertCircle, ArrowLeft, CheckCircle2, Lock } from 'lucide-react';
 import { api } from '@/services/api';
-
-const MIN_PASSWORD_LENGTH = 8;
-
-function isStrongPassword(password: string) {
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    return false;
-  }
-
-  const checks = [
-    /[a-z]/.test(password),
-    /[A-Z]/.test(password),
-    /\d/.test(password),
-    /[^A-Za-z0-9]/.test(password),
-  ].filter(Boolean).length;
-
-  return checks >= 2;
-}
 
 function ResetPasswordPageFallback() {
   return (
@@ -41,13 +27,20 @@ function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token') ?? '';
 
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
+  const [serverError, setServerError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [validatingToken, setValidatingToken] = useState(true);
   const [tokenValid, setTokenValid] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ResetPasswordFormData>({
+    resolver: yupResolver(resetPasswordSchema),
+    mode: 'onBlur',
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -55,7 +48,7 @@ function ResetPasswordContent() {
     const validateToken = async () => {
       if (!token) {
         if (isMounted) {
-          setError('Este link de redefinição é inválido ou expirou');
+          setServerError('Este link de redefinição é inválido ou expirou');
           setTokenValid(false);
           setValidatingToken(false);
         }
@@ -69,14 +62,14 @@ function ResetPasswordContent() {
         }
 
         setTokenValid(true);
-        setError('');
+        setServerError('');
       } catch (err: any) {
         if (!isMounted) {
           return;
         }
 
         setTokenValid(false);
-        setError(err.message || 'Este link de redefinição é inválido ou expirou');
+        setServerError(err.message || 'Este link de redefinição é inválido ou expirou');
       } finally {
         if (isMounted) {
           setValidatingToken(false);
@@ -91,30 +84,18 @@ function ResetPasswordContent() {
     };
   }, [token]);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError('');
-
-    if (!isStrongPassword(password)) {
-      setError('Escolha uma senha mais segura');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError('As senhas não coincidem');
-      return;
-    }
-
+  const onSubmit = async (data: ResetPasswordFormData) => {
+    setServerError('');
     setSubmitting(true);
 
     try {
-      const response = await api.resetPassword(token, password);
+      const response = await api.resetPassword(token, data.password);
       setSuccessMessage(response.message);
       setTokenValid(false);
     } catch (err: any) {
       const message =
         err.message || 'Não foi possível redefinir a senha neste momento.';
-      setError(message);
+      setServerError(message);
 
       if (message.toLowerCase().includes('inválido') || message.toLowerCase().includes('expirou')) {
         setTokenValid(false);
@@ -176,7 +157,7 @@ function ResetPasswordContent() {
                       Link inválido ou expirado
                     </p>
                     <p className="mt-1 text-sm text-red-800">
-                      {error || 'Solicite um novo link para redefinir a sua senha.'}
+                      {serverError || 'Solicite um novo link para redefinir a sua senha.'}
                     </p>
                   </div>
                 </div>
@@ -199,14 +180,14 @@ function ResetPasswordContent() {
             </div>
           ) : (
             <>
-              {error && (
+              {serverError && (
                 <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  {error}
+                  {serverError}
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} noValidate className="space-y-5">
+              <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Nova senha
@@ -215,14 +196,15 @@ function ResetPasswordContent() {
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="password"
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      className="input-field !pl-10"
+                      {...register('password')}
+                      className={`input-field !pl-10 ${errors.password ? '!border-red-400 !ring-red-100' : ''}`}
                       placeholder="Digite sua nova senha"
                       autoComplete="new-password"
-                      required
                     />
                   </div>
+                  {errors.password && (
+                    <p className="mt-1 text-xs text-red-500">{errors.password.message}</p>
+                  )}
                 </div>
 
                 <div>
@@ -233,14 +215,15 @@ function ResetPasswordContent() {
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="password"
-                      value={confirmPassword}
-                      onChange={(event) => setConfirmPassword(event.target.value)}
-                      className="input-field !pl-10"
+                      {...register('confirmPassword')}
+                      className={`input-field !pl-10 ${errors.confirmPassword ? '!border-red-400 !ring-red-100' : ''}`}
                       placeholder="Confirme sua nova senha"
                       autoComplete="new-password"
-                      required
                     />
                   </div>
+                  {errors.confirmPassword && (
+                    <p className="mt-1 text-xs text-red-500">{errors.confirmPassword.message}</p>
+                  )}
                 </div>
 
                 <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">

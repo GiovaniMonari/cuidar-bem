@@ -133,8 +133,8 @@ export class EmailService implements OnModuleInit {
         
         <p style="color: #475569; line-height: 1.6;">
           ${isCaregiver
-            ? 'Estamos muito felizes em tê-lo como cuidador na nossa plataforma! Agora você pode criar seu perfil profissional e começar a receber solicitações de atendimento.'
-            : 'Obrigado por se cadastrar! Agora você pode encontrar cuidadores qualificados para ajudar quem você ama.'}
+        ? 'Estamos muito felizes em tê-lo como cuidador na nossa plataforma! Agora você pode criar seu perfil profissional e começar a receber solicitações de atendimento.'
+        : 'Obrigado por se cadastrar! Agora você pode encontrar cuidadores qualificados para ajudar quem você ama.'}
         </p>
 
         <div class="info-box">
@@ -277,7 +277,7 @@ export class EmailService implements OnModuleInit {
         ` : ''}
 
         <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/dashboard" class="btn btn-accent">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/agenda" class="btn btn-accent">
             Ver no Dashboard
           </a>
         </div>
@@ -354,7 +354,7 @@ export class EmailService implements OnModuleInit {
         </div>
 
         <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/dashboard" class="btn">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/agenda" class="btn">
             Acompanhar no Dashboard
           </a>
         </div>
@@ -438,7 +438,7 @@ export class EmailService implements OnModuleInit {
         </div>
 
         <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/dashboard" class="btn">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/agenda" class="btn">
             Acompanhar no Dashboard
           </a>
         </div>
@@ -487,7 +487,7 @@ export class EmailService implements OnModuleInit {
         </div>
 
         <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/dashboard" class="btn">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/agenda" class="btn">
             Ver no Dashboard
           </a>
         </div>
@@ -550,7 +550,7 @@ export class EmailService implements OnModuleInit {
         </div>
 
         <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/dashboard" class="btn">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/agenda" class="btn">
             Ver no Dashboard
           </a>
         </div>
@@ -613,7 +613,7 @@ export class EmailService implements OnModuleInit {
         </div>
 
         <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/dashboard" class="btn btn-accent">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/agenda" class="btn btn-accent">
             Acompanhar Atendimento
           </a>
         </div>
@@ -723,7 +723,7 @@ export class EmailService implements OnModuleInit {
         </div>
 
         <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/dashboard" class="btn">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/agenda" class="btn">
             Ver Meus Pagamentos
           </a>
         </div>
@@ -776,11 +776,11 @@ export class EmailService implements OnModuleInit {
     dayNumber?: number;
     isFinal: boolean;
   }) {
-    const reportType = data.isFinal 
-      ? 'Relatório Final' 
-      : data.dayNumber 
-      ? `Relatório do Dia ${data.dayNumber}` 
-      : 'Novo Relatório';
+    const reportType = data.isFinal
+      ? 'Relatório Final'
+      : data.dayNumber
+        ? `Relatório do Dia ${data.dayNumber}`
+        : 'Novo Relatório';
 
     const content = `
       <div class="header" style="background: linear-gradient(135deg, #7c3aed, #6d28d9);">
@@ -836,7 +836,7 @@ export class EmailService implements OnModuleInit {
         `}
 
         <div style="text-align: center; margin: 32px 0;">
-          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/dashboard" class="btn" style="background: linear-gradient(135deg, #7c3aed, #6d28d9); font-size: 16px; padding: 16px 48px;">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/agenda" class="btn" style="background: linear-gradient(135deg, #7c3aed, #6d28d9); font-size: 16px; padding: 16px 48px;">
             📋 Consultar Relatório
           </a>
         </div>

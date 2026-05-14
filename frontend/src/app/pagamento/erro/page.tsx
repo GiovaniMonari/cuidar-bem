@@ -15,13 +15,13 @@ function ErrorContent() {
           Pagamento não realizado
         </h1>
         <p className="text-gray-500 mb-6">
-          Houve um problema com o pagamento. Tente novamente pelo Dashboard.
+          Houve um problema com o pagamento. Tente novamente pela sua Agenda.
         </p>
         <Link
-          href="/dashboard"
+          href="/agenda"
           className="btn-primary inline-flex items-center gap-2"
         >
-          Voltar ao Dashboard
+          Voltar à Agenda
           <ArrowRight className="w-4 h-4" />
         </Link>
       </div>

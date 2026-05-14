@@ -118,6 +118,7 @@ export interface Booking {
   patientCondition?: string;
   specialRequirements?: string[];
   createdAt: string;
+  updatedAt: string;
 }
 
 // types/index.ts ou types.ts

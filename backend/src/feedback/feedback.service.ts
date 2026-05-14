@@ -22,7 +22,7 @@ export class FeedbackService {
     @InjectModel(Booking.name)
     private bookingModel: Model<BookingDocument>,
     private emailService: EmailService, // 👈 Adicione esta linha
-  ) {}
+  ) { }
 
   async create(createFeedbackDto: CreateFeedbackDto, userId: string) {
     const { bookingId, feedbackDate, dayNumber, content, ...rest } = createFeedbackDto;
@@ -32,16 +32,16 @@ export class FeedbackService {
       .findById(bookingId)
       .populate('caregiverId', 'userId')
       .populate('clientId', 'email name'); // 👈 Adicione o populate do cliente
-      
+
     if (!booking) {
       throw new NotFoundException('Serviço não encontrado');
     }
 
     // Verificar se é o cuidador do serviço
     const caregiverUserId = (booking.caregiverId as any)?.userId?.toString();
-    
+
     this.logger.log(`Criando relatório: User ${userId} vs Caregiver User ${caregiverUserId}`);
-    
+
     if (caregiverUserId !== userId) {
       throw new ForbiddenException('Você não pode enviar relatório deste serviço');
     }
@@ -109,7 +109,7 @@ export class FeedbackService {
     try {
       const clientEmail = (booking.clientId as any)?.email;
       const clientName = (booking.clientId as any)?.name;
-      
+
       // Buscar o nome do cuidador
       const caregiverUser = await this.bookingModel
         .findById(bookingId)
@@ -117,7 +117,7 @@ export class FeedbackService {
           path: 'caregiverId',
           populate: { path: 'userId', select: 'name' }
         });
-      
+
       const caregiverName = (caregiverUser?.caregiverId as any)?.userId?.name || 'Seu cuidador';
 
       if (clientEmail) {
@@ -174,7 +174,7 @@ export class FeedbackService {
     const booking = await this.bookingModel
       .findById(bookingId)
       .populate('caregiverId', 'userId');
-      
+
     if (!booking) {
       throw new NotFoundException('Serviço não encontrado');
     }
@@ -211,7 +211,7 @@ export class FeedbackService {
     const bookings = await this.bookingModel
       .find()
       .populate('caregiverId', 'userId');
-    
+
     const myBookingIds = bookings
       .filter(b => (b.caregiverId as any)?.userId?.toString() === userId)
       .map(b => b._id);
@@ -241,7 +241,7 @@ export class FeedbackService {
   // Atualizar relatório (apenas cuidador que criou)
   async update(id: string, updateData: Partial<CreateFeedbackDto>, userId: string) {
     const feedback = await this.feedbackModel.findById(id);
-      
+
     if (!feedback) {
       throw new NotFoundException('Relatório não encontrado');
     }
@@ -252,7 +252,7 @@ export class FeedbackService {
       .populate('caregiverId', 'userId');
 
     const caregiverUserId = (booking?.caregiverId as any)?.userId?.toString();
-    
+
     if (caregiverUserId !== userId) {
       throw new ForbiddenException('Você não pode editar este relatório');
     }
@@ -274,7 +274,7 @@ export class FeedbackService {
   // Deletar relatório (apenas cuidador que criou)
   async delete(id: string, userId: string) {
     const feedback = await this.feedbackModel.findById(id);
-      
+
     if (!feedback) {
       throw new NotFoundException('Relatório não encontrado');
     }
@@ -285,7 +285,7 @@ export class FeedbackService {
       .populate('caregiverId', 'userId');
 
     const caregiverUserId = (booking?.caregiverId as any)?.userId?.toString();
-    
+
     if (caregiverUserId !== userId) {
       throw new ForbiddenException('Você não pode deletar este relatório');
     }
@@ -299,7 +299,7 @@ export class FeedbackService {
   // Helper para formatar feedback para o frontend
   private formatFeedback(feedback: any) {
     const f = feedback.toObject ? feedback.toObject() : feedback;
-    
+
     return {
       ...f,
       caregiverId: {

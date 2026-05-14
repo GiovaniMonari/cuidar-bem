@@ -1,4 +1,4 @@
-// app/dashboard/care-reports/page.tsx
+// app/agenda/care-reports/page.tsx
 'use client';
 
 import { Suspense } from 'react';

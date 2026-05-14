@@ -1,8 +1,13 @@
 import type { Metadata } from 'next';
-import { AuthProvider } from '@/contexts/AuthContext';
+import { Providers } from '@/components/Providers';
 import { Navbar } from '@/components/Navbar';
 import { CookieBanner } from '@/components/CookieBanner';
+import { Toaster } from '@/components/ui/sonner';
 import './globals.css';
+import { Inter } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
   title: 'CuidarBem - Encontre Cuidadores de Confiança',
@@ -16,13 +21,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className={cn("font-sans", inter.variable)}>
       <body className="min-h-screen">
-        <AuthProvider>
+        <Providers>
           <Navbar />
           <main>{children}</main>
           <CookieBanner />
-        </AuthProvider>
+          <Toaster position="top-center" richColors />
+        </Providers>
       </body>
     </html>
   );

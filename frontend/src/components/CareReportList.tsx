@@ -211,7 +211,7 @@ export function CareReportList({
                 <div 
                   key={report._id} 
                   className="px-3 py-2.5 hover:bg-gray-50 active:bg-gray-100 transition cursor-pointer group"
-                  onClick={() => router.push(`/dashboard/care-reports/${report._id}`)}
+                  onClick={() => router.push(`/agenda/care-reports/${report._id}`)}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
@@ -250,7 +250,7 @@ export function CareReportList({
             {/* Ver todos */}
             {reports.length > 3 && bookingId && (
               <Link
-                href={`/dashboard/care-reports/history?booking=${bookingId}`}
+                href={`/agenda/care-reports/history?booking=${bookingId}`}
                 className="flex items-center justify-center gap-1 py-2.5 text-sm text-blue-600 hover:bg-blue-50 active:bg-blue-100 transition border-t border-gray-100 font-medium"
               >
                 Ver todos ({reports.length})
@@ -318,7 +318,7 @@ export function CareReportList({
       {/* Ver histórico completo */}
       {reports.length > 3 && bookingId && (
         <Link
-          href={`/dashboard/care-reports/history?booking=${bookingId}`}
+          href={`/agenda/care-reports/history?booking=${bookingId}`}
           className="block bg-white rounded-xl border border-gray-200 p-3 text-center hover:bg-gray-50 active:bg-gray-100 transition"
         >
           <div className="flex items-center justify-center gap-2 text-blue-600 font-medium text-sm">
@@ -349,7 +349,7 @@ function ClientReportCard({
   return (
     <div 
       className="bg-white rounded-xl border border-gray-200 overflow-hidden cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all"
-      onClick={() => router.push(`/dashboard/care-reports/${report._id}`)}
+      onClick={() => router.push(`/agenda/care-reports/${report._id}`)}
     >
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-3 py-2">

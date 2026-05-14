@@ -77,7 +77,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!authLoading && isAuthenticated && user?.role !== 'admin') {
-      router.push('/dashboard');
+      router.push('/agenda');
     }
   }, [authLoading, isAuthenticated, user?.role, router]);
 
@@ -264,11 +264,10 @@ export default function AdminPage() {
               key={key}
               type="button"
               onClick={() => startTransition(() => setTab(key))}
-              className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition-all ${
-                tab === key
+              className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition-all ${tab === key
                   ? 'bg-slate-950 text-white shadow-lg shadow-slate-900/10'
                   : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-              }`}
+                }`}
             >
               <Icon className="h-4 w-4" />
               {label}

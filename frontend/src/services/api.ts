@@ -86,6 +86,14 @@ class ApiService {
     });
   }
 
+  async updateProfile(data: any) {
+    return this.request<any>('/users/me', {
+      method: 'PUT',
+      headers: this.headers(true),
+      body: JSON.stringify(data),
+    });
+  }
+
   async requestBanReview(email: string, message?: string) {
     return this.request<{ success: boolean; message: string }>('/auth/request-ban-review', {
       method: 'POST',
@@ -226,8 +234,8 @@ class ApiService {
   }
 
   async canReviewCaregiver(caregiverId: string) {
-    return this.request<{ 
-      canReview: boolean; 
+    return this.request<{
+      canReview: boolean;
       bookingId?: string;
       bookings?: Array<{
         _id: string;
@@ -243,13 +251,13 @@ class ApiService {
     );
   }
 
-    async getCaregiverAvailability(id: string) {
+  async getCaregiverAvailability(id: string) {
     return this.request<any>(`/caregivers/${id}/availability`, {
       headers: this.headers(),
     });
   }
 
-    async getCaregiverBookedDates(id: string) {
+  async getCaregiverBookedDates(id: string) {
     return this.request<string[]>(`/caregivers/${id}/booked-dates`, {
       headers: this.headers(),
     });
@@ -302,7 +310,7 @@ class ApiService {
     });
   }
 
-    async getOrCreateConversation(bookingId: string) {
+  async getOrCreateConversation(bookingId: string) {
     return this.request<any>(`/chat/booking/${bookingId}`, {
       method: 'POST',
       headers: this.headers(true),
@@ -370,19 +378,19 @@ class ApiService {
   }
 
   async favoriteCaregiver(caregiverId: string) {
-  return this.request<any>(`/users/me/favorite/${caregiverId}`, {
-    method: 'POST',
-    headers: this.headers(true),
-    // Remova o body, não é mais necessário
-  });
-}
+    return this.request<any>(`/users/me/favorite/${caregiverId}`, {
+      method: 'POST',
+      headers: this.headers(true),
+      // Remova o body, não é mais necessário
+    });
+  }
 
-async removeFavoriteCaregiver(caregiverId: string) {
-  return this.request<any>(`/users/me/favorite/${caregiverId}/remove`, {
-    method: 'POST',
-    headers: this.headers(true),
-  });
-}
+  async removeFavoriteCaregiver(caregiverId: string) {
+    return this.request<any>(`/users/me/favorite/${caregiverId}/remove`, {
+      method: 'POST',
+      headers: this.headers(true),
+    });
+  }
 
   async getFavoriteCaregivers() {
     return this.request<any[]>('/users/favorites/caregivers', {
@@ -405,7 +413,7 @@ async removeFavoriteCaregiver(caregiverId: string) {
   }
 
   async getAdminDashboard() {
-    return this.request<AdminDashboardResponse>('/admin/dashboard', {
+    return this.request<AdminDashboardResponse>('/admin/agenda', {
       headers: this.headers(true),
     });
   }

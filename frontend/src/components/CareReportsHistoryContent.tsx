@@ -256,7 +256,7 @@ export default function CareReportsHistoryContent() {
                     <button
                       onClick={() =>
                         router.push(
-                          `/dashboard/care-reports/history?booking=${bookingId}`
+                          `/agenda/care-reports/history?booking=${bookingId}`
                         )
                       }
                       className="w-full py-2 text-center text-xs text-blue-600 hover:bg-blue-50 transition"

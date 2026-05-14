@@ -1,3 +1,4 @@
+// app/cuidadores/page.tsx
 'use client';
 
 import { useState, useEffect, Suspense, useCallback } from 'react';
@@ -7,42 +8,147 @@ import { Caregiver, SPECIALTIES, STATES } from '@/types';
 import { CaregiverCard } from '@/components/CaregiverCard';
 import { Footer } from '@/components/Footer';
 import {
-  Search,
-  Filter,
-  MapPin,
-  X,
-  Loader2,
-  Heart,
-  ChevronLeft,
-  ChevronRight,
+  Search, MapPin, X, Loader2,
+  ChevronLeft, ChevronRight,
+  Star,
 } from 'lucide-react';
 import { useFavorites } from '../hooks/useFavorites';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+import { Card, CardContent } from '@/components/ui/card';
 
-// Hook para debounce (busca automática após parar de digitar)
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
   }, [value, delay]);
-
   return debouncedValue;
+}
+
+function CaregiverSkeleton() {
+  return (
+    <Card className="overflow-hidden border-none shadow-sm rounded-3xl">
+      <div className="h-48 bg-gray-100 animate-pulse" />
+      <CardContent className="p-6 space-y-4">
+        <div className="flex justify-between items-start">
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+          <Skeleton className="h-8 w-8 rounded-full" />
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-2/3" />
+        </div>
+        <div className="flex justify-between items-center pt-4">
+          <Skeleton className="h-6 w-20" />
+          <Skeleton className="h-10 w-24 rounded-xl" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Wrapper para lidar com selects controlados
+// Base UI pode não aceitar "" como value, então usamos "all" como sentinela
+function FilterSelect({
+  value,
+  onValueChange,
+  placeholder,
+  options,
+  allLabel = "Todos",
+  className,
+  triggerClassName,
+}: {
+  value: string;
+  onValueChange: (val: string) => void;
+  placeholder: string;
+  options: { value: string; label: string }[];
+  allLabel?: string;
+  className?: string;
+  triggerClassName?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectValue = value || 'todos';
+
+  const handleSelect = (val: string) => {
+    setOpen(false);
+    onValueChange(val === 'todos' ? '' : val);
+  };
+
+  return (
+    <Select
+      value={selectValue}
+      open={open}
+      onOpenChange={setOpen}
+      onValueChange={(...args: any[]) => {
+        let finalVal = '';
+        
+        const val1 = args[0];
+        const val2 = args[1];
+
+        if (typeof val1 === 'string') finalVal = val1;
+        else if (typeof val2 === 'string') finalVal = val2;
+        else if (Array.isArray(val1)) finalVal = String(val1[0] || '');
+        else if (Array.isArray(val2)) finalVal = String(val2[0] || '');
+        else if (val1 && typeof val1 === 'object' && 'value' in val1) finalVal = val1.value;
+        else if (val2 && typeof val2 === 'object' && 'value' in val2) finalVal = val2.value;
+        else finalVal = String(val1 || '');
+
+        if (finalVal === 'undefined' || finalVal === 'null') finalVal = '';
+
+        handleSelect(finalVal || 'todos');
+      }}
+    >
+      <SelectTrigger className={cn("h-14 bg-gray-50 border-transparent focus:bg-white focus:ring-primary-100 rounded-2xl font-medium", triggerClassName)}>
+        <SelectValue placeholder={placeholder}>
+          {selectValue === 'todos' ? allLabel : options.find((opt) => opt.value === selectValue)?.label || placeholder}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent className={className}>
+        <SelectItem 
+          value="todos"
+          onClick={() => handleSelect('todos')}
+        >
+          {allLabel}
+        </SelectItem>
+        {options.map((opt) => (
+          <SelectItem 
+            key={opt.value} 
+            value={opt.value}
+            onClick={() => handleSelect(opt.value)}
+          >
+            {opt.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
 }
 
 function CaregiverListContent() {
   const searchParams = useSearchParams();
   const initialSpecialty = searchParams.get('specialty') || '';
   const { isFavorited, toggleFavorite } = useFavorites();
+
   const [caregivers, setCaregivers] = useState<Caregiver[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalPages, setTotalPages] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
+
   const [filters, setFilters] = useState({
     city: '',
     state: '',
@@ -53,7 +159,6 @@ function CaregiverListContent() {
     page: '1',
   });
 
-  // Debounce para cidade (busca automática 500ms após parar de digitar)
   const debouncedCity = useDebounce(filters.city, 500);
 
   const fetchCaregivers = useCallback(async () => {
@@ -62,14 +167,10 @@ function CaregiverListContent() {
       const params: Record<string, string> = {};
       Object.entries(filters).forEach(([key, val]) => {
         if (val) {
-          // Normaliza a cidade para busca flexível
-          if (key === 'city') {
-            params[key] = val.trim();
-          } else {
-            params[key] = val;
-          }
+          params[key] = key === 'city' ? val.trim() : val;
         }
       });
+      console.log('Fetching with params:', params); // Debug
       const response = await api.getCaregivers(params);
       setCaregivers(response.data);
       setTotalPages(response.totalPages);
@@ -81,13 +182,12 @@ function CaregiverListContent() {
   }, [filters]);
 
   useEffect(() => {
-    setFilters(prev => ({ ...prev, specialty: initialSpecialty, page: '1' }));
+    setFilters((prev) => ({ ...prev, specialty: initialSpecialty, page: '1' }));
   }, [initialSpecialty]);
 
-  // Busca automática quando cidade, estado ou especialidade mudam
   useEffect(() => {
     fetchCaregivers();
-  }, [debouncedCity, filters.state, filters.specialty, filters.page]);
+  }, [debouncedCity, filters.state, filters.specialty, filters.minRating, filters.page]);
 
   const handleSearch = () => {
     setFilters((prev) => ({ ...prev, page: '1' }));
@@ -106,321 +206,297 @@ function CaregiverListContent() {
     });
   };
 
-  const hasActiveFilters = filters.city || filters.state || filters.specialty || 
+  const hasActiveFilters =
+    filters.city || filters.state || filters.specialty ||
     filters.minRate || filters.maxRate || filters.minRating;
 
   const currentPage = parseInt(filters.page);
 
-  return (
-    <div className="min-h-screen flex flex-col">
-      {/* Header de Busca com Gradiente Moderno */}
-      <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 relative overflow-hidden">
-        {/* Elementos decorativos de fundo */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-white rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-white rounded-full blur-3xl"></div>
-        </div>
+  // Opções para os selects
+  const stateOptions = STATES.map((s) => ({ value: s, label: s }));
+  const specialtyOptions = Object.entries(SPECIALTIES).map(([key, label]) => ({
+    value: key,
+    label,
+  }));
+  const ratingOptions = [
+    { value: '3', label: '3.0+ Estrelas' },
+    { value: '4', label: '4.0+ Estrelas' },
+    { value: '4.5', label: '4.5+ Estrelas' },
+  ];
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
-          {/* Título e Descrição */}
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center gap-2 mb-3">
-              <h1 className="text-4xl font-bold text-white">
-                {filters.specialty 
-                  ? SPECIALTIES[filters.specialty] || filters.specialty
-                  : 'Encontre o Cuidador Ideal'}
-              </h1>
-            </div>
-            <p className="text-primary-100 text-lg">
-              {filters.specialty 
-                ? `Profissionais especializados prontos para ajudar`
-                : 'Conectamos você aos melhores profissionais de saúde'}
-            </p>
+  return (
+    <div className="min-h-screen flex flex-col bg-gray-50/50">
+      {/* Header */}
+      <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 relative overflow-hidden pb-12">
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-white/5 rounded-full -mr-32 -mt-32 blur-3xl animate-pulse" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-primary-400/10 rounded-full -ml-32 -mb-32 blur-3xl" />
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-8 relative z-10 text-center">
+          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 mb-6">
+            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
+            <span className="text-white text-xs font-bold uppercase tracking-widest">
+              Apoiando famílias em todo o Brasil
+            </span>
           </div>
 
-          {/* Barra de Busca Principal - Design Moderno */}
-          <div className="bg-white rounded-2xl shadow-2xl p-6 backdrop-blur-sm">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-              {/* Campo de Cidade com Ícone */}
-              <div className="md:col-span-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Localização
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-400" />
-                  <input
-                    type="text"
-                    placeholder="Digite sua cidade..."
-                    value={filters.city}
-                    onChange={(e) =>
-                      setFilters((prev) => ({ ...prev, city: e.target.value, page: '1' }))
-                    }
-                    className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:ring-4 focus:ring-primary-100 transition-all outline-none text-gray-700 placeholder-gray-400"
-                  />
-                  {filters.city && (
-                    <button
-                      onClick={() => setFilters(prev => ({ ...prev, city: '' }))}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-                <p className="text-xs text-gray-500 mt-1.5 ml-1">
-                  Ex: São Paulo, Rio, Belo Horizonte
-                </p>
+          <h1 className="text-4xl md:text-6xl font-black text-white tracking-tight mb-4">
+            {filters.specialty
+              ? SPECIALTIES[filters.specialty] || filters.specialty
+              : 'Cuidados com Alma.'}
+          </h1>
+          <p className="text-primary-100 text-lg md:text-xl font-medium max-w-2xl mx-auto opacity-90">
+            Encontre profissionais verificados e apaixonados pelo que fazem, pertinho de você.
+          </p>
+        </div>
+
+        {/* Search Card */}
+        <div className="max-w-6xl mx-auto px-4 relative z-10 -mb-8">
+          <Card className="border-none shadow-2xl rounded-[32px] overflow-hidden bg-white/95 backdrop-blur-sm">
+            <div className="p-2 sm:p-4 grid grid-cols-1 md:grid-cols-3 gap-2">
+              {/* Cidade */}
+              <div className="relative group">
+                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-400 z-10 group-focus-within:text-primary-600 transition-colors" />
+                <Input
+                  type="text"
+                  placeholder="Cidade (ex: São Paulo)"
+                  value={filters.city}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, city: e.target.value, page: '1' }))
+                  }
+                  className="h-14 pl-12 pr-10 bg-gray-50 border-transparent focus:bg-white focus:ring-primary-100 rounded-2xl font-medium transition-all"
+                />
+                {filters.city && (
+                  <button
+                    onClick={() => setFilters((prev) => ({ ...prev, city: '' }))}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
               </div>
 
               {/* Estado */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Estado
-                </label>
-                <select
-                  value={filters.state}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, state: e.target.value, page: '1' }))
-                  }
-                  className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:ring-4 focus:ring-primary-100 transition-all outline-none text-gray-700 bg-white"
-                >
-                  <option value="">Todos</option>
-                  {STATES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <FilterSelect
+                value={filters.state}
+                onValueChange={(val) => {
+                  console.log('State changed to:', val); // Debug
+                  setFilters((prev) => ({ ...prev, state: val, page: '1' }));
+                }}
+                placeholder="Estado"
+                options={stateOptions}
+                allLabel="Todos os Estados"
+              />
 
               {/* Especialidade */}
-              <div className="md:col-span-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Especialidade
-                </label>
-                <select
-                  value={filters.specialty}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, specialty: e.target.value, page: '1' }))
-                  }
-                  className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:ring-4 focus:ring-primary-100 transition-all outline-none text-gray-700 bg-white"
-                >
-                  <option value="">Todas as Especialidades</option>
-                  {Object.entries(SPECIALTIES).map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Botões de Ação */}
-              <div className="md:col-span-2 flex flex-col justify-end gap-2">
-                <button 
-                  onClick={handleSearch} 
-                  className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3.5 px-6 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-xl active:scale-95"
-                >
-                  <Search className="w-5 h-5" />
-                  Buscar
-                </button>
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`w-full font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all ${
-                    showFilters 
-                      ? 'bg-gray-800 text-white' 
-                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                  }`}
-                >
-                  <Filter className="w-4 h-4" />
-                  {showFilters ? 'Ocultar' : 'Filtros'}
-                </button>
-              </div>
+              <FilterSelect
+                value={filters.specialty}
+                onValueChange={(val) => {
+                  console.log('Specialty changed to:', val); // Debug
+                  setFilters((prev) => ({ ...prev, specialty: val, page: '1' }));
+                }}
+                placeholder="Especialidade"
+                options={specialtyOptions}
+                allLabel="Todas as Especialidades"
+              />
             </div>
 
-            {/* Filtros Avançados - Expansível */}
+            {/* Filtros Avançados */}
             {showFilters && (
-              <div className="mt-6 pt-6 border-t-2 border-gray-100">
-                <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                  <Filter className="w-4 h-4" />
-                  Filtros Avançados
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div className="mt-6 pt-6 border-t border-gray-100 px-4 pb-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-gray-600 font-bold text-xs uppercase tracking-wider">
                       Preço Mínimo (R$/h)
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       type="number"
                       value={filters.minRate}
                       onChange={(e) =>
                         setFilters((prev) => ({ ...prev, minRate: e.target.value }))
                       }
-                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-100 transition-all outline-none"
+                      className="h-12 bg-gray-50 border-transparent focus:bg-white rounded-xl"
                       placeholder="0"
-                      min="0"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <div className="space-y-2">
+                    <Label className="text-gray-600 font-bold text-xs uppercase tracking-wider">
                       Preço Máximo (R$/h)
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       type="number"
                       value={filters.maxRate}
                       onChange={(e) =>
                         setFilters((prev) => ({ ...prev, maxRate: e.target.value }))
                       }
-                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-100 transition-all outline-none"
+                      className="h-12 bg-gray-50 border-transparent focus:bg-white rounded-xl"
                       placeholder="200"
-                      min="0"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <div className="space-y-2">
+                    <Label className="text-gray-600 font-bold text-xs uppercase tracking-wider">
                       Avaliação Mínima
-                    </label>
-                    <select
+                    </Label>
+                    <FilterSelect
                       value={filters.minRating}
-                      onChange={(e) =>
-                        setFilters((prev) => ({
-                          ...prev,
-                          minRating: e.target.value,
-                        }))
+                      onValueChange={(val) =>
+                        setFilters((prev) => ({ ...prev, minRating: val }))
                       }
-                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-100 transition-all outline-none bg-white"
-                    >
-                      <option value="">Todas</option>
-                      <option value="3"> 3.0+</option>
-                      <option value="4"> 4.0+</option>
-                      <option value="4.5"> 4.5+</option>
-                    </select>
+                      placeholder="Todas"
+                      options={ratingOptions}
+                      allLabel="Todas"
+                      triggerClassName="h-12"
+                    />
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Tags de Filtros Ativos */}
-            {hasActiveFilters && (
-              <div className="mt-4 pt-4 border-t-2 border-gray-100">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium text-gray-600">Filtros ativos:</span>
+            {/* Botão filtros + tags */}
+            <div className="px-4 pb-4">
+              <Button
+                variant="ghost"
+                onClick={() => setShowFilters(!showFilters)}
+                className="text-xs font-bold text-gray-500 hover:text-primary-600 gap-1.5 h-auto py-2 px-3 rounded-xl"
+              >
+                {showFilters ? 'Ocultar filtros avançados' : 'Filtros avançados'}
+              </Button>
+
+              {hasActiveFilters && (
+                <div className="flex flex-wrap items-center gap-2 mt-3">
+                  <span className="text-xs font-black text-gray-400 uppercase tracking-widest mr-2">
+                    Filtros:
+                  </span>
                   {filters.city && (
-                    <span className="inline-flex items-center gap-1.5 bg-primary-100 text-primary-700 px-3 py-1.5 rounded-full text-sm font-medium">
-                      <MapPin className="w-3.5 h-3.5" />
+                    <Badge
+                      variant="secondary"
+                      className="gap-1 pl-2 pr-1 py-1.5 bg-primary-50 text-primary-700 rounded-full font-bold"
+                    >
+                      <MapPin className="w-3 h-3" />
                       {filters.city}
-                      <button
-                        onClick={() => setFilters(prev => ({ ...prev, city: '' }))}
-                        className="hover:bg-primary-200 rounded-full p-0.5 transition-colors"
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 rounded-full hover:bg-primary-100"
+                        onClick={() => setFilters((prev) => ({ ...prev, city: '' }))}
                       >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </span>
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </Badge>
                   )}
                   {filters.state && (
-                    <span className="inline-flex items-center gap-1.5 bg-primary-100 text-primary-700 px-3 py-1.5 rounded-full text-sm font-medium">
+                    <Badge
+                      variant="secondary"
+                      className="gap-1 pl-3 pr-1 py-1.5 bg-primary-50 text-primary-700 rounded-full font-bold"
+                    >
                       {filters.state}
-                      <button
-                        onClick={() => setFilters(prev => ({ ...prev, state: '' }))}
-                        className="hover:bg-primary-200 rounded-full p-0.5 transition-colors"
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 rounded-full hover:bg-primary-100"
+                        onClick={() => setFilters((prev) => ({ ...prev, state: '' }))}
                       >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </span>
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </Badge>
                   )}
                   {filters.specialty && (
-                    <span className="inline-flex items-center gap-1.5 bg-primary-100 text-primary-700 px-3 py-1.5 rounded-full text-sm font-medium">
+                    <Badge
+                      variant="secondary"
+                      className="gap-1 pl-3 pr-1 py-1.5 bg-primary-50 text-primary-700 rounded-full font-bold"
+                    >
                       {SPECIALTIES[filters.specialty]}
-                      <button
-                        onClick={() => setFilters(prev => ({ ...prev, specialty: '' }))}
-                        className="hover:bg-primary-200 rounded-full p-0.5 transition-colors"
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 rounded-full hover:bg-primary-100"
+                        onClick={() => setFilters((prev) => ({ ...prev, specialty: '' }))}
                       >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </span>
-                  )}
-                  {(filters.minRate || filters.maxRate) && (
-                    <span className="inline-flex items-center gap-1.5 bg-primary-100 text-primary-700 px-3 py-1.5 rounded-full text-sm font-medium">
-                      R$ {filters.minRate || '0'} - {filters.maxRate || '∞'}
-                      <button
-                        onClick={() => setFilters(prev => ({ ...prev, minRate: '', maxRate: '' }))}
-                        className="hover:bg-primary-200 rounded-full p-0.5 transition-colors"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </span>
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </Badge>
                   )}
                   {filters.minRating && (
-                    <span className="inline-flex items-center gap-1.5 bg-primary-100 text-primary-700 px-3 py-1.5 rounded-full text-sm font-medium">
-                       {filters.minRating}+
-                      <button
-                        onClick={() => setFilters(prev => ({ ...prev, minRating: '' }))}
-                        className="hover:bg-primary-200 rounded-full p-0.5 transition-colors"
+                    <Badge
+                      variant="secondary"
+                      className="gap-1 pl-3 pr-1 py-1.5 bg-yellow-50 text-yellow-700 rounded-full font-bold"
+                    >
+                      <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" />
+                      {filters.minRating}+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 rounded-full hover:bg-yellow-100"
+                        onClick={() => setFilters((prev) => ({ ...prev, minRating: '' }))}
                       >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </span>
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </Badge>
                   )}
-                  <button
+                  <Button
+                    variant="link"
                     onClick={clearFilters}
-                    className="text-sm text-gray-600 hover:text-gray-800 font-medium underline underline-offset-2"
+                    className="text-xs font-bold text-gray-500 hover:text-primary-600 h-auto p-0"
                   >
                     Limpar tudo
-                  </button>
+                  </Button>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          </Card>
         </div>
       </div>
 
       {/* Conteúdo Principal */}
-      <div className="flex-1 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="flex-1 bg-gray-50/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           {loading ? (
-            <div className="flex flex-col justify-center items-center py-20">
-              <Loader2 className="w-12 h-12 text-primary-600 animate-spin mb-4" />
-              <p className="text-gray-500">Buscando cuidadores...</p>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <CaregiverSkeleton key={i} />
+              ))}
             </div>
           ) : caregivers.length === 0 ? (
-            <div className="text-center py-20 bg-white rounded-2xl shadow-sm">
-              <div className="max-w-md mx-auto">
-                <Heart className="w-20 h-20 text-gray-300 mx-auto mb-6" />
-                <h3 className="text-2xl font-bold text-gray-700 mb-3">
+            <Card className="border-none shadow-sm rounded-[32px] p-16 text-center bg-white/50 border-2 border-dashed border-gray-200">
+              <div className="max-w-md mx-auto space-y-6">
+                <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Search className="w-10 h-10 text-gray-300" />
+                </div>
+                <h3 className="text-3xl font-black text-gray-900 tracking-tight">
                   Nenhum cuidador encontrado
                 </h3>
-                <p className="text-gray-500 mb-6">
-                  Não encontramos cuidadores com os filtros selecionados.
-                  <br />
-                  Tente ajustar sua busca.
+                <p className="text-gray-500 font-medium leading-relaxed">
+                  Não encontramos cuidadores com os filtros selecionados. Tente ajustar sua busca.
                 </p>
                 {hasActiveFilters && (
-                  <button
+                  <Button
                     onClick={clearFilters}
-                    className="btn-primary inline-flex items-center gap-2"
+                    variant="default"
+                    className="rounded-2xl h-12 px-8 font-bold"
                   >
-                    <X className="w-4 h-4" />
                     Limpar todos os filtros
-                  </button>
+                  </Button>
                 )}
               </div>
-            </div>
+            </Card>
           ) : (
             <>
-              {/* Cabeçalho de Resultados */}
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-10 gap-4">
                 <div>
-                  <p className="text-gray-700 font-medium text-lg">
-                    {caregivers.length} profissional{caregivers.length !== 1 ? 'is' : ''} encontrado{caregivers.length !== 1 ? 's' : ''}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-0.5">
+                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                    {caregivers.length} Profissiona
+                    {caregivers.length !== 1 ? 'is' : 'l'} encontrado
+                    {caregivers.length !== 1 ? 's' : ''}
+                  </h2>
+                  <p className="text-gray-400 font-bold text-xs uppercase tracking-widest mt-1">
                     Página {currentPage} de {totalPages}
                   </p>
                 </div>
               </div>
 
-              {/* Grid de Cuidadores */}
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {caregivers.map((caregiver) => (
                   <CaregiverCard
+                    key={caregiver._id}
                     caregiver={caregiver}
                     isFavorited={isFavorited(caregiver._id)}
                     onToggleFavorite={toggleFavorite}
@@ -428,71 +504,62 @@ function CaregiverListContent() {
                 ))}
               </div>
 
-              {/* Paginação Melhorada */}
               {totalPages > 1 && (
-                <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-12">
-                  <div className="flex items-center gap-2">
-                    <button
+                <div className="flex flex-col items-center gap-6 mt-20">
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="icon"
                       disabled={currentPage <= 1}
                       onClick={() =>
-                        setFilters((prev) => ({
-                          ...prev,
-                          page: String(currentPage - 1),
-                        }))
+                        setFilters((prev) => ({ ...prev, page: String(currentPage - 1) }))
                       }
-                      className="p-2.5 rounded-lg bg-white border-2 border-gray-200 hover:border-primary-500 hover:bg-primary-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                      className="h-12 w-12 rounded-2xl border-gray-200 hover:border-primary-500 transition-all"
                     >
                       <ChevronLeft className="w-5 h-5" />
-                    </button>
-                    
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                    </Button>
+
+                    <div className="flex items-center gap-2">
+                      {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
                         let pageNum;
-                        if (totalPages <= 7) {
-                          pageNum = i + 1;
-                        } else if (currentPage <= 4) {
-                          pageNum = i + 1;
-                        } else if (currentPage >= totalPages - 3) {
-                          pageNum = totalPages - 6 + i;
-                        } else {
-                          pageNum = currentPage - 3 + i;
-                        }
-                        
+                        if (totalPages <= 5) pageNum = i + 1;
+                        else if (currentPage <= 3) pageNum = i + 1;
+                        else if (currentPage >= totalPages - 2)
+                          pageNum = totalPages - 4 + i;
+                        else pageNum = currentPage - 2 + i;
+
                         return (
-                          <button
+                          <Button
                             key={pageNum}
+                            variant={currentPage === pageNum ? 'default' : 'outline'}
                             onClick={() =>
                               setFilters((prev) => ({ ...prev, page: String(pageNum) }))
                             }
-                            className={`min-w-[40px] h-10 rounded-lg font-semibold transition-all ${
+                            className={cn(
+                              'h-12 w-12 rounded-2xl font-black transition-all',
                               currentPage === pageNum
-                                ? 'bg-primary-600 text-white shadow-lg scale-110'
-                                : 'bg-white border-2 border-gray-200 hover:border-primary-500 hover:bg-primary-50 text-gray-700'
-                            }`}
+                                ? 'shadow-lg shadow-primary-500/20 scale-110'
+                                : 'border-gray-200'
+                            )}
                           >
                             {pageNum}
-                          </button>
+                          </Button>
                         );
                       })}
                     </div>
 
-                    <button
+                    <Button
+                      variant="outline"
+                      size="icon"
                       disabled={currentPage >= totalPages}
                       onClick={() =>
-                        setFilters((prev) => ({
-                          ...prev,
-                          page: String(currentPage + 1),
-                        }))
+                        setFilters((prev) => ({ ...prev, page: String(currentPage + 1) }))
                       }
-                      className="p-2.5 rounded-lg bg-white border-2 border-gray-200 hover:border-primary-500 hover:bg-primary-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                      className="h-12 w-12 rounded-2xl border-gray-200 hover:border-primary-500 transition-all"
                     >
                       <ChevronRight className="w-5 h-5" />
-                    </button>
+                    </Button>
                   </div>
-                  
-                  <span className="text-sm text-gray-500">
-                    de {totalPages} {totalPages === 1 ? 'página' : 'páginas'}
-                  </span>
                 </div>
               )}
             </>
@@ -509,9 +576,11 @@ export default function CaregiverListPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-          <Loader2 className="w-12 h-12 text-primary-600 animate-spin mb-4" />
-          <p className="text-gray-600">Carregando...</p>
+        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
+          <Loader2 className="w-10 h-10 text-primary-600 animate-spin" />
+          <p className="text-gray-500 font-black uppercase tracking-widest animate-pulse">
+            Carregando Cuidadores...
+          </p>
         </div>
       }
     >

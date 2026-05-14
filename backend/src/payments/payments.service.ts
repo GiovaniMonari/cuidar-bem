@@ -213,75 +213,7 @@ export class PaymentsService {
       }
     }
   }
-
-  async releasePayment(bookingId: string): Promise<PaymentDocument> {
-    const payment = await this.paymentModel.findOne({ bookingId });
-    if (!payment) throw new NotFoundException('Pagamento não encontrado');
-
-    if (payment.status !== 'held' && payment.status !== 'paid') {
-      throw new BadRequestException(
-        `Não é possível liberar pagamento com status: ${payment.status}`,
-      );
-    }
-
-    payment.status = 'released';
-    payment.releasedAt = new Date();
-    payment.history.push({
-      status: 'released',
-      date: new Date(),
-      description: `Valor de R$ ${payment.caregiverAmount.toFixed(2)} liberado para o cuidador`,
-    });
-
-    await payment.save();
-
-    const booking = await this.bookingsService.findOne(bookingId);
-    const clientUser = booking?.clientId as any;
-    const caregiver = booking?.caregiverId as any;
-
-    await this.emailService.sendServiceCompletedEmail({
-      toClient: clientUser?.email,
-      toCaregiver: caregiver?.userId?.email,
-      clientName: clientUser?.name || 'Cliente',
-      caregiverName: caregiver?.userId?.name || 'Cuidador',
-      amount: payment.amount,
-      platformFee: payment.platformFee,
-      caregiverAmount: payment.caregiverAmount,
-    });
-
-    this.logger.log(`💰 Pagamento ${payment.transactionId} liberado: R$ ${payment.caregiverAmount}`);
-    return payment;
-  }
-
-  async refundPayment(bookingId: string): Promise<PaymentDocument> {
-    const payment = await this.paymentModel.findOne({ bookingId });
-    if (!payment) throw new NotFoundException('Pagamento não encontrado');
-
-    if (!['held', 'paid'].includes(payment.status)) {
-      throw new BadRequestException('Pagamento não pode ser reembolsado');
-    }
-
-    if (payment.mpPaymentId) {
-      try {
-        const mpPaymentApi = new MPPayment(this.mpClient);
-        await mpPaymentApi.cancel({ id: payment.mpPaymentId });
-      } catch (error) {
-        this.logger.error(`Erro no reembolso MP}`);
-      }
-    }
-
-    payment.status = 'refunded';
-    payment.refundedAt = new Date();
-    payment.history.push({
-      status: 'refunded',
-      date: new Date(),
-      description: `Reembolso de R$ ${payment.amount.toFixed(2)} realizado`,
-    });
-
-    await payment.save();
-    this.logger.log(`↩️ Reembolso ${payment.transactionId}: R$ ${payment.amount}`);
-    return payment;
-  }
-
+  
   async findByBooking(bookingId: string): Promise<PaymentDocument | null> {
     return this.paymentModel.findOne({ bookingId });
   }

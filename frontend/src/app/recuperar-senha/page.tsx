@@ -2,34 +2,36 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import { forgotPasswordSchema, type ForgotPasswordFormData } from '@/validations/schemas';
 import { AlertCircle, ArrowLeft, CheckCircle2, Mail } from 'lucide-react';
 import { api } from '@/services/api';
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState('');
-  const [error, setError] = useState('');
+  const [serverError, setServerError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError('');
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<ForgotPasswordFormData>({
+    resolver: yupResolver(forgotPasswordSchema),
+    mode: 'onBlur',
+  });
 
-    const normalizedEmail = email.trim();
-    if (!EMAIL_REGEX.test(normalizedEmail)) {
-      setError('Digite um e-mail válido');
-      return;
-    }
-
+  const onSubmit = async (data: ForgotPasswordFormData) => {
+    setServerError('');
     setLoading(true);
 
     try {
-      const response = await api.requestPasswordReset(normalizedEmail);
+      const response = await api.requestPasswordReset(data.email.trim());
       setSuccessMessage(response.message);
     } catch (err: any) {
-      setError(err.message || 'Não foi possível enviar o link agora.');
+      setServerError(err.message || 'Não foi possível enviar o link agora.');
     } finally {
       setLoading(false);
     }
@@ -75,7 +77,7 @@ export default function ForgotPasswordPage() {
                   type="button"
                   onClick={() => {
                     setSuccessMessage('');
-                    setEmail('');
+                    reset();
                   }}
                   className="btn-secondary w-full"
                 >
@@ -85,14 +87,14 @@ export default function ForgotPasswordPage() {
             </div>
           ) : (
             <>
-              {error && (
+              {serverError && (
                 <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  {error}
+                  {serverError}
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} noValidate className="space-y-5">
+              <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     E-mail
@@ -101,14 +103,15 @@ export default function ForgotPasswordPage() {
                     <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="email"
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      className="input-field !pl-10"
+                      {...register('email')}
+                      className={`input-field !pl-10 ${errors.email ? '!border-red-400 !ring-red-100' : ''}`}
                       placeholder="seu@email.com"
                       autoComplete="email"
-                      required
                     />
                   </div>
+                  {errors.email && (
+                    <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>
+                  )}
                 </div>
 
                 <button type="submit" disabled={loading} className="btn-primary w-full">

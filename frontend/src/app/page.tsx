@@ -37,6 +37,13 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserAvatar } from '@/components/UserAvatar';
+import { Button } from '@/components/ui/button';
+import { useQuery } from '@tanstack/react-query';
+import { cn } from '@/lib/utils';
+import { buttonVariants } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 const SERVICES = [
   {
@@ -111,17 +118,23 @@ function HeroGuest() {
           <div className="flex flex-col sm:flex-row items-center gap-4 mb-16">
             <Link
               href="/cuidadores"
-              className="btn-accent !px-10 !py-4 flex items-center gap-3 text-lg font-semibold shadow-lg shadow-accent-500/25 hover:shadow-xl hover:shadow-accent-500/30 transition-all hover:-translate-y-0.5"
+              className={cn(
+                buttonVariants({ variant: "default", size: "lg" }),
+                "!px-10 !py-7 text-lg font-bold shadow-xl shadow-primary-500/20 hover:scale-105 transition-all"
+              )}
             >
-              <Search className="w-5 h-5" />
+              <Search className="w-5 h-5 mr-2" />
               Encontrar Cuidador
             </Link>
             <Link
               href="/registro?role=caregiver"
-              className="group bg-white/[0.06] backdrop-blur-md text-white px-10 py-4 rounded-xl font-semibold hover:bg-white/[0.12] transition-all border border-white/[0.1] flex items-center gap-3 hover:-translate-y-0.5"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "bg-white/5 backdrop-blur-md text-white border-white/20 !px-10 !py-7 text-lg font-bold hover:bg-white/10 hover:text-white transition-all"
+              )}
             >
               Quero Cuidar
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
 
@@ -137,12 +150,34 @@ function HeroGuest() {
 function HeroClient({ user }: { user: NonNullable<ReturnType<typeof useAuth>['user']> }) {
   const firstName = user.name?.split(' ')[0] ?? 'você';
 
+  const steps = [
+    {
+      step: '1',
+      title: 'Busque e filtre',
+      desc: 'Use os filtros de especialidade, localização e avaliação para encontrar o profissional certo.',
+      icon: Search,
+    },
+    {
+      step: '2',
+      title: 'Analise o perfil',
+      desc: 'Leia avaliações reais de outros clientes, veja certificações e experiência do cuidador.',
+      icon: Users,
+    },
+    {
+      step: '3',
+      title: 'Agende com segurança',
+      desc: 'Entre em contato pelo app e agende. Todo histórico fica registrado na sua agenda.',
+      icon: CheckCircle2,
+    },
+  ];
+
   return (
-    <section className="relative min-h-[75vh] flex items-center overflow-hidden">
+    <section className="relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900" />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-24 w-full">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-12">
+        {/* Greeting row */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8 mb-14">
           <div className="flex-1 max-w-xl">
             <div className="flex items-center gap-3 mb-6">
               <UserAvatar
@@ -161,18 +196,44 @@ function HeroClient({ user }: { user: NonNullable<ReturnType<typeof useAuth>['us
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-[1.1] tracking-tight mb-5">
-              Olá, {firstName}!{' '}
+              Olá, {firstName}!
             </h1>
 
-            <p className="text-white/60 text-lg leading-relaxed mb-8 font-light">
+            <p className="text-white/60 text-lg leading-relaxed font-light">
               Pronto para encontrar o cuidado ideal hoje? Explore nossos
               profissionais verificados ou acompanhe seus agendamentos ativos.
             </p>
           </div>
+        </div>
 
+        {/* How-to steps */}
+        <div className="border-t border-white/10 pt-10">
+          <p className="text-white/50 text-sm font-semibold uppercase tracking-widest mb-6">
+            Como agendar um atendimento
+          </p>
+          <div className="grid sm:grid-cols-3 gap-4">
+            {steps.map((item, i) => (
+              <div
+                key={i}
+                className="bg-white/[0.06] border border-white/[0.1] rounded-2xl px-5 py-5 flex items-start gap-4 hover:bg-white/[0.1] transition-colors"
+              >
+                <div className="relative flex-shrink-0">
+                  <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center">
+                    <item.icon className="w-5 h-5 text-accent-300" />
+                  </div>
+                  <div className="absolute -top-1.5 -right-1.5 bg-accent-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold">
+                    {item.step}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white text-sm mb-1">{item.title}</h3>
+                  <p className="text-white/50 text-xs leading-relaxed">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-
     </section>
   );
 }
@@ -348,6 +409,35 @@ function ServicesSection() {
   );
 }
 
+function CaregiverSkeleton() {
+  return (
+    <div className="p-6 border border-gray-100 rounded-2xl bg-white space-y-4">
+      <div className="flex items-start gap-4">
+        <Skeleton className="w-16 h-16 rounded-2xl shrink-0" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-4 w-24" />
+          <div className="flex gap-2 pt-1">
+            <Skeleton className="h-6 w-12" />
+            <Skeleton className="h-6 w-16" />
+          </div>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-3/4" />
+      </div>
+      <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
+        <div className="flex gap-3">
+          <Skeleton className="h-4 w-12" />
+          <Skeleton className="h-4 w-12" />
+        </div>
+        <Skeleton className="h-5 w-16" />
+      </div>
+    </div>
+  );
+}
+
 function TopCaregiversSection({ caregivers, loading }: { caregivers: Caregiver[]; loading: boolean }) {
   return (
     <section className="py-20 bg-gradient-to-b from-white to-gray-50">
@@ -367,108 +457,112 @@ function TopCaregiversSection({ caregivers, loading }: { caregivers: Caregiver[]
           </div>
           <Link
             href="/cuidadores"
-            className="btn-secondary flex items-center gap-2 self-start md:self-auto"
+            className={cn(buttonVariants({ variant: "outline" }), "rounded-full")}
           >
             Ver todos
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-4 h-4 ml-1" />
           </Link>
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[...Array(6)].map((_, i) => (
+              <CaregiverSkeleton key={i} />
+            ))}
           </div>
         ) : caregivers.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500">Nenhum cuidador encontrado</p>
-          </div>
+          <Card className="border-none shadow-sm rounded-[32px] p-16 text-center bg-white/50 border-2 border-dashed border-gray-200">
+            <div className="max-w-md mx-auto space-y-4">
+              <p className="text-gray-500 font-medium">Nenhum cuidador encontrado no momento.</p>
+            </div>
+          </Card>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {caregivers.map((caregiver, index) => {
               const caregiverUser = caregiver.userId;
               return (
                 <Link
                   key={caregiver._id}
                   href={`/cuidadores/${caregiver._id}`}
-                  className="card-hover p-6 relative group"
+                  className="group relative"
                 >
-                  {index < 3 && (
-                    <div
-                      className={`absolute -top-2 -right-2 w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg ${
-                        index === 0
-                          ? 'bg-gradient-to-br from-yellow-400 to-yellow-600'
-                          : index === 1
-                          ? 'bg-gradient-to-br from-gray-300 to-gray-500'
-                          : 'bg-gradient-to-br from-amber-600 to-amber-800'
-                      }`}
-                    >
-                      {index + 1}º
-                    </div>
-                  )}
-                  <div className="flex items-start gap-4">
-                    <UserAvatar
-                      name={caregiverUser?.name}
-                      avatar={caregiverUser?.avatar}
-                      size={64}
-                      className="rounded-2xl border border-gray-200 flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-lg text-gray-900 truncate">
-                        {caregiverUser?.name}
-                      </h3>
-                      <div className="flex items-center gap-1 text-sm text-gray-500 mt-0.5">
-                        <MapPin className="w-3.5 h-3.5" />
-                        {caregiver.city}, {caregiver.state}
+                  <Card className="border-none shadow-xl shadow-gray-200/50 rounded-[32px] overflow-hidden bg-white hover:shadow-2xl hover:shadow-primary-500/10 transition-all duration-500 group-hover:-translate-y-2">
+                    {index < 3 && (
+                      <div
+                        className={cn(
+                          "absolute top-4 right-4 w-10 h-10 rounded-2xl flex items-center justify-center text-white font-black text-sm shadow-lg z-10 backdrop-blur-md",
+                          index === 0 ? "bg-amber-400 shadow-amber-500/40" : 
+                          index === 1 ? "bg-slate-400 shadow-slate-500/40" : 
+                          "bg-orange-600 shadow-orange-500/40"
+                        )}
+                      >
+                        #{index + 1}
                       </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <div className="flex items-center gap-1 bg-yellow-50 px-2 py-1 rounded-lg">
-                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                          <span className="font-bold text-gray-900">
-                            {caregiver.rating.toFixed(1)}
+                    )}
+                    
+                    <CardContent className="p-8">
+                      <div className="flex items-start gap-5">
+                        <div className="relative">
+                          <UserAvatar
+                            name={caregiverUser?.name}
+                            avatar={caregiverUser?.avatar}
+                            size={72}
+                            className="rounded-3xl border-2 border-white shadow-xl flex-shrink-0"
+                          />
+                          <div className="absolute -bottom-1 -right-1 bg-emerald-500 border-2 border-white w-5 h-5 rounded-full" />
+                        </div>
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <h3 className="font-black text-xl text-gray-900 truncate tracking-tight">
+                            {caregiverUser?.name}
+                          </h3>
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-gray-400 uppercase tracking-widest">
+                            <MapPin className="w-3.5 h-3.5 text-primary-500" />
+                            {caregiver.city}, {caregiver.state}
+                          </div>
+                          <div className="flex items-center gap-2 mt-2">
+                            <div className="flex items-center gap-1.5 bg-yellow-50 text-yellow-700 px-2.5 py-1 rounded-xl">
+                              <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
+                              <span className="font-black text-sm">
+                                {caregiver.rating.toFixed(1)}
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                              {caregiver.reviewCount} avaliações
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <p className="text-gray-500 font-medium text-sm mt-6 line-clamp-2 leading-relaxed italic">
+                        "{caregiver.bio}"
+                      </p>
+
+                      <div className="flex flex-wrap gap-2 mt-6">
+                        {caregiver.specialties.slice(0, 3).map((spec) => (
+                          <Badge
+                            key={spec}
+                            variant="secondary"
+                            className="bg-primary-50/50 text-primary-700 hover:bg-primary-50 border-none font-bold text-[10px] px-3 py-1 rounded-lg"
+                          >
+                            {SPECIALTIES[spec] || spec}
+                          </Badge>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
+                        <div className="flex items-center gap-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="w-4 h-4 text-primary-400" />
+                            {caregiver.experienceYears}a Exp.
                           </span>
                         </div>
-                        <span className="text-xs text-gray-400">
-                          ({caregiver.reviewCount} avaliações)
-                        </span>
+                        <div className="text-xl font-black text-primary-600 tracking-tighter">
+                          R$ {caregiver.hourlyRate}<span className="text-xs text-gray-400 font-bold ml-0.5">/h</span>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-
-                  <p className="text-gray-600 text-sm mt-4 line-clamp-2">{caregiver.bio}</p>
-
-                  <div className="flex flex-wrap gap-1.5 mt-4">
-                    {caregiver.specialties.slice(0, 3).map((spec) => (
-                      <span
-                        key={spec}
-                        className="text-xs bg-primary-50 text-primary-700 px-2 py-1 rounded-lg font-medium"
-                      >
-                        {SPECIALTIES[spec] || spec}
-                      </span>
-                    ))}
-                    {caregiver.specialties.length > 3 && (
-                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-lg">
-                        +{caregiver.specialties.length - 3}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-                    <div className="flex items-center gap-3 text-sm text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        {caregiver.experienceYears} anos
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Award className="w-3.5 h-3.5" />
-                        {caregiver.certifications?.length || 0} cert.
-                      </span>
-                    </div>
-                    <div className="font-bold text-primary-600">
-                      R$ {caregiver.hourlyRate}/h
-                    </div>
-                  </div>
-
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 to-accent-500 transform scale-x-0 group-hover:scale-x-100 transition-transform rounded-b-2xl" />
+                    </CardContent>
+                    <div className="h-2 bg-gradient-to-r from-primary-500 to-accent-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </Card>
                 </Link>
               );
             })}
@@ -698,20 +792,22 @@ function ClientTopCaregiversSection({
           </div>
           <Link
             href="/cuidadores"
-            className="btn-secondary flex items-center gap-2 self-start md:self-auto"
+            className={cn(buttonVariants({ variant: "outline" }), "rounded-full")}
           >
             Ver todos
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-4 h-4 ml-1" />
           </Link>
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(3)].map((_, i) => (
+              <CaregiverSkeleton key={i} />
+            ))}
           </div>
         ) : caregivers.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500">Nenhum cuidador encontrado</p>
+          <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
+            <p className="text-gray-500">Nenhum cuidador disponível no momento.</p>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -840,7 +936,7 @@ function ClientHowItWorksSection() {
             {
               step: '3',
               title: 'Agende com segurança',
-              desc: 'Entre em contato pelo app e agende. Todo histórico fica registrado no seu dashboard.',
+              desc: 'Entre em contato pelo app e agende. Todo histórico fica registrado na sua agenda.',
               icon: CheckCircle2,
             },
           ].map((item, i) => (
@@ -885,11 +981,11 @@ function ClientCTASection({ user }: { user: NonNullable<ReturnType<typeof useAut
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link
-                href="/dashboard"
+                href="/agenda"
                 className="btn-accent !px-8 text-lg flex items-center gap-2"
               >
                 <CheckCircle2 className="w-5 h-5" />
-                Ir para Dashboard
+                Ir para Agenda
               </Link>
               <Link
                 href="/cuidadores"
@@ -910,12 +1006,12 @@ function ClientCTASection({ user }: { user: NonNullable<ReturnType<typeof useAut
 // SEÇÕES EXCLUSIVAS PARA CUIDADORES LOGADOS
 // ══════════════════════════════════════════════════════════════════════════════
 
-function CaregiverDashboardSection() {
+function CaregiverAgendaSection() {
   const tools = [
     {
-      href: '/dashboard',
+      href: '/agenda',
       icon: LayoutDashboard,
-      title: 'Dashboard',
+      title: 'Agenda',
       desc: 'Veja seus atendimentos, solicitações e métricas de desempenho.',
       color: 'from-primary-500 to-primary-600',
       badge: null,
@@ -937,7 +1033,7 @@ function CaregiverDashboardSection() {
       badge: 'Novo',
     },
     {
-      href: '/dashboard/avaliacoes',
+      href: '/agenda/avaliacoes',
       icon: Star,
       title: 'Avaliações',
       desc: 'Acompanhe o que os clientes estão dizendo sobre você.',
@@ -945,7 +1041,7 @@ function CaregiverDashboardSection() {
       badge: null,
     },
     {
-      href: '/dashboard',
+      href: '/agenda',
       icon: Wallet,
       title: 'Meus Ganhos',
       desc: 'Histórico de pagamentos e relatório financeiro.',
@@ -1023,7 +1119,7 @@ function CaregiverTipsSection() {
       icon: Star,
       title: 'Avaliações constroem confiança',
       desc: 'Peça avaliações após cada atendimento. Uma nota alta te coloca no topo das buscas e atrai novos clientes.',
-      action: { label: 'Ver avaliações', href: '/dashboard/avaliacoes' },
+      action: { label: 'Ver avaliações', href: '/agenda/avaliacoes' },
       color: 'bg-yellow-50 border-yellow-100',
       iconColor: 'text-yellow-600 bg-yellow-100',
     },
@@ -1121,11 +1217,11 @@ function CaregiverStatsSection() {
 
           <div className="relative z-10 mt-10 flex flex-wrap justify-center lg:justify-start gap-4">
             <Link
-              href="/dashboard"
+              href="/agenda"
               className="btn-accent !px-8 flex items-center gap-2"
             >
               <LayoutDashboard className="w-4 h-4" />
-              Ir para Dashboard
+              Ir para Agenda
             </Link>
             <Link
               href="/perfil/cuidador"
@@ -1172,7 +1268,6 @@ function ClientHome({
       <HeroClient user={user} />
       <ClientServicesSection />
       <ClientTopCaregiversSection caregivers={caregivers} loading={loading} />
-      <ClientHowItWorksSection />
       <ClientCTASection user={user} />
     </>
   );
@@ -1186,7 +1281,7 @@ function CaregiverHome({
   return (
     <>
       <HeroCaregiver user={user} />
-      <CaregiverDashboardSection />
+      <CaregiverAgendaSection />
       <CaregiverTipsSection />
       <CaregiverStatsSection />
     </>

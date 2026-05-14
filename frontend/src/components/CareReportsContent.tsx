@@ -1,4 +1,4 @@
-// app/dashboard/care-reports/CareReportsContent.tsx
+// app/agenda/care-reports/CareReportsContent.tsx
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -150,8 +150,8 @@ export default function CareReportsContent() {
 
     const nextDayToReport = isMultiDay
       ? Array.from({ length: currentDay }, (_, i) => i + 1).find(
-          (d) => !daysWithReport.includes(d)
-        ) || currentDay
+        (d) => !daysWithReport.includes(d)
+      ) || currentDay
       : 1;
 
     return {

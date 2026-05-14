@@ -18,10 +18,10 @@ function PendingContent() {
           Seu pagamento está sendo processado. Você receberá um email quando for confirmado.
         </p>
         <Link
-          href="/dashboard"
+          href="/agenda"
           className="btn-primary inline-flex items-center gap-2"
         >
-          Ir para Dashboard
+          Ir para Agenda
           <ArrowRight className="w-4 h-4" />
         </Link>
       </div>

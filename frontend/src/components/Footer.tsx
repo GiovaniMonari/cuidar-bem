@@ -87,7 +87,7 @@ export function Footer() {
               {[
                 { label: 'Cadastrar-se', href: '/registro?role=caregiver' },
                 { label: 'Meu Perfil', href: '/perfil/cuidador' },
-                { label: 'Dashboard', href: '/dashboard' },
+                { label: 'Agenda', href: '/agenda' },
                 { label: 'Configurar Pagamento', href: '/perfil' },
               ].map((link) => (
                 <li key={link.href}>

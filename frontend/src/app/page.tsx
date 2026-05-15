@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Footer } from '@/components/Footer';
 import { api } from '@/services/api';
-import { Caregiver, SPECIALTIES } from '@/types';
+import { Caregiver } from '@/types';
 import {
   Heart,
   Search,
@@ -16,11 +16,9 @@ import {
   Stethoscope,
   Accessibility,
   HeartIcon,
-  MapPin,
   Award,
   Loader2,
   ChevronRight,
-  ShieldCheck,
   LayoutDashboard,
   CalendarCheck,
   TrendingUp,
@@ -34,16 +32,17 @@ import {
   PlusCircle,
   BarChart3,
   Wallet,
+  Medal,
+  Trophy,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Button } from '@/components/ui/button';
-import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { CaregiverCard } from '@/components/CaregiverCard';
+import { useFavorites } from './hooks/useFavorites';
 
 const SERVICES = [
   {
@@ -438,7 +437,21 @@ function CaregiverSkeleton() {
   );
 }
 
-function TopCaregiversSection({ caregivers, loading }: { caregivers: Caregiver[]; loading: boolean }) {
+function TopCaregiversSection({
+  caregivers,
+  loading,
+}: {
+  caregivers: Caregiver[];
+  loading: boolean;
+}) {
+  const { isFavorited, toggleFavorite } = useFavorites();
+
+  const medals: Record<number, React.ReactNode> = {
+    1: <Trophy className="w-4 h-4 text-yellow-500" />,
+    2: <Medal className="w-4 h-4 text-gray-400" />,
+    3: <Award className="w-4 h-4 text-amber-600" />,
+  };
+
   return (
     <section className="py-20 bg-gradient-to-b from-white to-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -448,16 +461,22 @@ function TopCaregiversSection({ caregivers, loading }: { caregivers: Caregiver[]
               <Award className="w-4 h-4" />
               Destaque
             </div>
+
             <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
               Cuidadores Melhores Avaliados
             </h2>
+
             <p className="text-gray-500 text-lg">
               Profissionais com as melhores avaliações dos nossos clientes
             </p>
           </div>
+
           <Link
             href="/cuidadores"
-            className={cn(buttonVariants({ variant: "outline" }), "rounded-full")}
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "rounded-full"
+            )}
           >
             Ver todos
             <ChevronRight className="w-4 h-4 ml-1" />
@@ -465,105 +484,37 @@ function TopCaregiversSection({ caregivers, loading }: { caregivers: Caregiver[]
         </div>
 
         {loading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...Array(6)].map((_, i) => (
               <CaregiverSkeleton key={i} />
             ))}
           </div>
         ) : caregivers.length === 0 ? (
-          <Card className="border-none shadow-sm rounded-[32px] p-16 text-center bg-white/50 border-2 border-dashed border-gray-200">
-            <div className="max-w-md mx-auto space-y-4">
-              <p className="text-gray-500 font-medium">Nenhum cuidador encontrado no momento.</p>
-            </div>
-          </Card>
+          <div className="text-center py-16">
+            <p className="text-gray-500 font-medium">
+              Nenhum cuidador encontrado no momento.
+            </p>
+          </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {caregivers.map((caregiver, index) => {
-              const caregiverUser = caregiver.userId;
+              const ranking = index + 1;
+
               return (
-                <Link
-                  key={caregiver._id}
-                  href={`/cuidadores/${caregiver._id}`}
-                  className="group relative"
-                >
-                  <Card className="border-none shadow-xl shadow-gray-200/50 rounded-[32px] overflow-hidden bg-white hover:shadow-2xl hover:shadow-primary-500/10 transition-all duration-500 group-hover:-translate-y-2">
-                    {index < 3 && (
-                      <div
-                        className={cn(
-                          "absolute top-4 right-4 w-10 h-10 rounded-2xl flex items-center justify-center text-white font-black text-sm shadow-lg z-10 backdrop-blur-md",
-                          index === 0 ? "bg-amber-400 shadow-amber-500/40" : 
-                          index === 1 ? "bg-slate-400 shadow-slate-500/40" : 
-                          "bg-orange-600 shadow-orange-500/40"
-                        )}
-                      >
-                        #{index + 1}
-                      </div>
-                    )}
-                    
-                    <CardContent className="p-8">
-                      <div className="flex items-start gap-5">
-                        <div className="relative">
-                          <UserAvatar
-                            name={caregiverUser?.name}
-                            avatar={caregiverUser?.avatar}
-                            size={72}
-                            className="rounded-3xl border-2 border-white shadow-xl flex-shrink-0"
-                          />
-                          <div className="absolute -bottom-1 -right-1 bg-emerald-500 border-2 border-white w-5 h-5 rounded-full" />
-                        </div>
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <h3 className="font-black text-xl text-gray-900 truncate tracking-tight">
-                            {caregiverUser?.name}
-                          </h3>
-                          <div className="flex items-center gap-1.5 text-xs font-bold text-gray-400 uppercase tracking-widest">
-                            <MapPin className="w-3.5 h-3.5 text-primary-500" />
-                            {caregiver.city}, {caregiver.state}
-                          </div>
-                          <div className="flex items-center gap-2 mt-2">
-                            <div className="flex items-center gap-1.5 bg-yellow-50 text-yellow-700 px-2.5 py-1 rounded-xl">
-                              <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
-                              <span className="font-black text-sm">
-                                {caregiver.rating.toFixed(1)}
-                              </span>
-                            </div>
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                              {caregiver.reviewCount} avaliações
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+                <div key={caregiver._id} className="relative">
+                  {ranking <= 3 && (
+                    <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-md border border-yellow-200 text-gray-800 px-3 py-1 rounded-full text-sm font-bold shadow-lg flex items-center gap-2">
+                      {medals[ranking]}
+                      <span>{ranking}° Lugar</span>
+                    </div>
+                  )}
 
-                      <p className="text-gray-500 font-medium text-sm mt-6 line-clamp-2 leading-relaxed italic">
-                        "{caregiver.bio}"
-                      </p>
-
-                      <div className="flex flex-wrap gap-2 mt-6">
-                        {caregiver.specialties.slice(0, 3).map((spec) => (
-                          <Badge
-                            key={spec}
-                            variant="secondary"
-                            className="bg-primary-50/50 text-primary-700 hover:bg-primary-50 border-none font-bold text-[10px] px-3 py-1 rounded-lg"
-                          >
-                            {SPECIALTIES[spec] || spec}
-                          </Badge>
-                        ))}
-                      </div>
-
-                      <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
-                        <div className="flex items-center gap-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                          <span className="flex items-center gap-1.5">
-                            <Clock className="w-4 h-4 text-primary-400" />
-                            {caregiver.experienceYears}a Exp.
-                          </span>
-                        </div>
-                        <div className="text-xl font-black text-primary-600 tracking-tighter">
-                          R$ {caregiver.hourlyRate}<span className="text-xs text-gray-400 font-bold ml-0.5">/h</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                    <div className="h-2 bg-gradient-to-r from-primary-500 to-accent-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </Card>
-                </Link>
+                  <CaregiverCard
+                    caregiver={caregiver}
+                    isFavorited={isFavorited(caregiver._id)}
+                    onToggleFavorite={toggleFavorite}
+                  />
+                </div>
               );
             })}
           </div>
@@ -767,144 +718,8 @@ function ClientServicesSection() {
   );
 }
 
-function ClientTopCaregiversSection({
-  caregivers,
-  loading,
-}: {
-  caregivers: Caregiver[];
-  loading: boolean;
-}) {
-  return (
-    <section className="py-20 bg-gradient-to-b from-white to-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10">
-          <div>
-            <div className="inline-flex items-center gap-2 bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm font-medium mb-3">
-              <Award className="w-4 h-4" />
-              Recomendados para você
-            </div>
-            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
-              Cuidadores Mais Bem Avaliados
-            </h2>
-            <p className="text-gray-500 text-lg">
-              Profissionais verificados, prontos para atender
-            </p>
-          </div>
-          <Link
-            href="/cuidadores"
-            className={cn(buttonVariants({ variant: "outline" }), "rounded-full")}
-          >
-            Ver todos
-            <ChevronRight className="w-4 h-4 ml-1" />
-          </Link>
-        </div>
 
-        {loading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(3)].map((_, i) => (
-              <CaregiverSkeleton key={i} />
-            ))}
-          </div>
-        ) : caregivers.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
-            <p className="text-gray-500">Nenhum cuidador disponível no momento.</p>
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {caregivers.map((caregiver, index) => {
-              const caregiverUser = caregiver.userId;
-              return (
-                <Link
-                  key={caregiver._id}
-                  href={`/cuidadores/${caregiver._id}`}
-                  className="card-hover p-6 relative group"
-                >
-                  {index < 3 && (
-                    <div
-                      className={`absolute -top-2 -right-2 w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg ${
-                        index === 0
-                          ? 'bg-gradient-to-br from-yellow-400 to-yellow-600'
-                          : index === 1
-                          ? 'bg-gradient-to-br from-gray-300 to-gray-500'
-                          : 'bg-gradient-to-br from-amber-600 to-amber-800'
-                      }`}
-                    >
-                      {index + 1}º
-                    </div>
-                  )}
-                  <div className="flex items-start gap-4">
-                    <UserAvatar
-                      name={caregiverUser?.name}
-                      avatar={caregiverUser?.avatar}
-                      size={64}
-                      className="rounded-2xl border border-gray-200 flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-lg text-gray-900 truncate">
-                        {caregiverUser?.name}
-                      </h3>
-                      <div className="flex items-center gap-1 text-sm text-gray-500 mt-0.5">
-                        <MapPin className="w-3.5 h-3.5" />
-                        {caregiver.city}, {caregiver.state}
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <div className="flex items-center gap-1 bg-yellow-50 px-2 py-1 rounded-lg">
-                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                          <span className="font-bold text-gray-900">
-                            {caregiver.rating.toFixed(1)}
-                          </span>
-                        </div>
-                        <span className="text-xs text-gray-400">
-                          ({caregiver.reviewCount} avaliações)
-                        </span>
-                      </div>
-                    </div>
-                  </div>
 
-                  <p className="text-gray-600 text-sm mt-4 line-clamp-2">{caregiver.bio}</p>
-
-                  <div className="flex flex-wrap gap-1.5 mt-4">
-                    {caregiver.specialties.slice(0, 3).map((spec) => (
-                      <span
-                        key={spec}
-                        className="text-xs bg-primary-50 text-primary-700 px-2 py-1 rounded-lg font-medium"
-                      >
-                        {SPECIALTIES[spec] || spec}
-                      </span>
-                    ))}
-                    {caregiver.specialties.length > 3 && (
-                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-lg">
-                        +{caregiver.specialties.length - 3}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-                    <div className="flex items-center gap-3 text-sm text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        {caregiver.experienceYears} anos
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Award className="w-3.5 h-3.5" />
-                        {caregiver.certifications?.length || 0} cert.
-                      </span>
-                    </div>
-                    <div className="font-bold text-primary-600">
-                      R$ {caregiver.hourlyRate}/h
-                    </div>
-                  </div>
-
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 to-accent-500 transform scale-x-0 group-hover:scale-x-100 transition-transform rounded-b-2xl" />
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
 
 function ClientHowItWorksSection() {
   return (
@@ -1027,13 +842,13 @@ function CaregiverAgendaSection() {
     {
       href: '/perfil/cuidador',
       icon: CalendarCheck,
-      title: 'Minha Agenda',
+      title: 'Minha Disponibilidade',
       desc: 'Gerencie seus horários e confirme novos agendamentos.',
       color: 'from-green-500 to-green-600',
       badge: 'Novo',
     },
     {
-      href: '/cuidador/rating',
+      href: '/perfil/cuidador/rating',
       icon: Star,
       title: 'Avaliações',
       desc: 'Acompanhe o que os clientes estão dizendo sobre você.',
@@ -1119,7 +934,7 @@ function CaregiverTipsSection() {
       icon: Star,
       title: 'Avaliações constroem confiança',
       desc: 'Peça avaliações após cada atendimento. Uma nota alta te coloca no topo das buscas e atrai novos clientes.',
-      action: { label: 'Ver avaliações', href: '/cuidador/rating' },
+      action: { label: 'Ver avaliações', href: '/perfil/cuidador/rating' },
       color: 'bg-yellow-50 border-yellow-100',
       iconColor: 'text-yellow-600 bg-yellow-100',
     },
@@ -1267,7 +1082,7 @@ function ClientHome({
     <>
       <HeroClient user={user} />
       <ClientServicesSection />
-      <ClientTopCaregiversSection caregivers={caregivers} loading={loading} />
+      <TopCaregiversSection caregivers={caregivers} loading={loading} />
       <ClientCTASection user={user} />
     </>
   );

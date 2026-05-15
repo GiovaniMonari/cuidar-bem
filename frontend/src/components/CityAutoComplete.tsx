@@ -4,6 +4,46 @@ import { useState, useRef } from 'react';
 import { MapPin, Loader2 } from 'lucide-react';
 import { addressService } from '@/services/address';
 
+// Mapeamento nome completo do estado (Nominatim) → sigla
+const STATE_NAME_TO_UF: Record<string, string> = {
+  'Acre': 'AC',
+  'Alagoas': 'AL',
+  'Amapá': 'AP',
+  'Amazonas': 'AM',
+  'Bahia': 'BA',
+  'Ceará': 'CE',
+  'Distrito Federal': 'DF',
+  'Espírito Santo': 'ES',
+  'Goiás': 'GO',
+  'Maranhão': 'MA',
+  'Mato Grosso': 'MT',
+  'Mato Grosso do Sul': 'MS',
+  'Minas Gerais': 'MG',
+  'Pará': 'PA',
+  'Paraíba': 'PB',
+  'Paraná': 'PR',
+  'Pernambuco': 'PE',
+  'Piauí': 'PI',
+  'Rio de Janeiro': 'RJ',
+  'Rio Grande do Norte': 'RN',
+  'Rio Grande do Sul': 'RS',
+  'Rondônia': 'RO',
+  'Roraima': 'RR',
+  'Santa Catarina': 'SC',
+  'São Paulo': 'SP',
+  'Sergipe': 'SE',
+  'Tocantins': 'TO',
+};
+
+function normalizeStateToUF(state: string): string {
+  if (!state) return '';
+  const trimmed = state.trim();
+  // Já é uma sigla de 2 letras
+  if (/^[A-Za-z]{2}$/.test(trimmed)) return trimmed.toUpperCase();
+  // Tenta converter nome completo para sigla
+  return STATE_NAME_TO_UF[trimmed] || trimmed.toUpperCase();
+}
+
 interface Props {
   value: string;
   onChange: (data: {
@@ -101,7 +141,8 @@ export function CityAutocomplete({ value, onChange }: Props) {
     const city =
       addr.city || addr.town || addr.village || '';
 
-    const state = addr.state || '';
+    // Converte nome completo do estado (ex: "São Paulo") para sigla ("SP")
+    const state = normalizeStateToUF(addr.state || '');
 
     onChange({
       city,

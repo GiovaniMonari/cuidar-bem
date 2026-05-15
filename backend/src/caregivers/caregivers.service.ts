@@ -42,7 +42,9 @@ export class CaregiversService {
       query.city = { $regex: filters.city, $options: 'i' };
     }
     if (filters.state) {
-      query.state = filters.state.toUpperCase();
+      // Suporta sigla (ex: "SP") e nomes completos legados (ex: "São Paulo")
+      // usando regex case-insensitive para compatibilidade máxima
+      query.state = { $regex: `^${filters.state.trim()}$`, $options: 'i' };
     }
     if (filters.specialty) {
       query.specialties = { $in: [filters.specialty] };

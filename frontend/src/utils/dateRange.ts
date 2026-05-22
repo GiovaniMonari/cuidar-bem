@@ -1,3 +1,11 @@
+function pad(value: number) {
+  return String(value).padStart(2, '0');
+}
+
+function formatLocalDate(date: Date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 export function getDatesInRange(startDate: string, endDate: string): string[] {
   const dates: string[] = [];
 
@@ -5,7 +13,7 @@ export function getDatesInRange(startDate: string, endDate: string): string[] {
   const end = new Date(endDate + 'T00:00:00');
 
   while (current <= end) {
-    dates.push(current.toISOString().split('T')[0]);
+    dates.push(formatLocalDate(current));
     current.setDate(current.getDate() + 1);
   }
 

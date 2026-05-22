@@ -6,8 +6,9 @@ import {
   getAvailableStartTimes, 
   getComputedEndDateTime, 
   isHourlyDuration, 
-  isMultiDayDuration,
-  combineDateAndTime
+  combineDateAndTime,
+  formatDateKey,
+  parseTimeToMinutes,
 } from '@/utils/booking';
 import { getDatesInRange } from '@/utils/dateRange';
 import { api } from '@/services/api';
@@ -64,6 +65,9 @@ export function useBookingForm({ caregiverId, availableDates, user, onSuccess }:
 
   const { watch, setValue, reset } = form;
   const values = watch();
+  const now = new Date();
+  const todayDateKey = formatDateKey(now);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
   // Mutation
   const bookingMutation = useMutation({
@@ -92,39 +96,72 @@ export function useBookingForm({ caregiverId, availableDates, user, onSuccess }:
     }
   });
 
-  // Memos for hourly booking
-  const hourlyDateOptions = useMemo(
+  const schedulableAvailableDates = useMemo(
     () =>
       availableDates
-        .filter((item) => item.isAvailable)
         .filter(
           (item) =>
-            getAvailableStartTimes(
-              availableDates,
-              item.date,
-              bookingData.durationHours,
-            ).length > 0,
+            item?.isAvailable &&
+            typeof item?.date === 'string' &&
+            item.date >= todayDateKey,
         )
         .sort((a, b) => a.date.localeCompare(b.date)),
-    [availableDates, bookingData.durationHours],
+    [availableDates, todayDateKey],
   );
 
-  const availableStartTimes = useMemo(
-    () =>
-      values.startDate
-        ? getAvailableStartTimes(
-            availableDates,
-            values.startDate,
-            bookingData.durationHours,
-          )
-        : [],
-    [availableDates, bookingData.durationHours, values.startDate],
-  );
+  // Memos for hourly booking
+  const hourlyDateOptions = useMemo(() => {
+    const available = schedulableAvailableDates;
 
-  const availableStartTimesOnHour = useMemo(
-    () => availableStartTimes.filter((time) => time.endsWith(':00')),
-    [availableStartTimes],
-  );
+    if (!bookingData.durationHours) {
+      return available;
+    }
+
+    return available.filter(
+      (item) => {
+        const times = getAvailableStartTimes(
+          schedulableAvailableDates,
+          item.date,
+          bookingData.durationHours,
+        );
+
+        if (item.date === todayDateKey) {
+          return times.some((time) => parseTimeToMinutes(time) > nowMinutes);
+        }
+
+        return times.length > 0;
+      },
+    );
+  }, [
+    bookingData.durationHours,
+    nowMinutes,
+    schedulableAvailableDates,
+    todayDateKey,
+  ]);
+
+  const availableStartTimes = useMemo(() => {
+    if (!values.startDate || !bookingData.durationHours) {
+      return [];
+    }
+
+    const times = getAvailableStartTimes(
+      schedulableAvailableDates,
+      values.startDate,
+      bookingData.durationHours,
+    );
+
+    if (values.startDate !== todayDateKey) {
+      return times;
+    }
+
+    return times.filter((time) => parseTimeToMinutes(time) > nowMinutes);
+  }, [
+    bookingData.durationHours,
+    nowMinutes,
+    schedulableAvailableDates,
+    todayDateKey,
+    values.startDate,
+  ]);
 
   const computedHourlyEnd = useMemo(
     () =>
@@ -144,10 +181,16 @@ export function useBookingForm({ caregiverId, availableDates, user, onSuccess }:
       return true;
     }
 
+    if (startDate < todayDateKey) {
+      setDateRangeError('A data de início não pode ser no passado.');
+      setIsRangeAvailable(false);
+      return false;
+    }
+
     const allDates = getDatesInRange(startDate, endDate);
-    const availableDateStrings = availableDates
-      .filter((item) => item.isAvailable)
-      .map((item) => item.date);
+    const availableDateStrings = schedulableAvailableDates.map(
+      (item) => item.date,
+    );
 
     const unavailableDates = allDates.filter((date) => !availableDateStrings.includes(date));
 
@@ -181,7 +224,7 @@ export function useBookingForm({ caregiverId, availableDates, user, onSuccess }:
       return;
     }
 
-    if (values.startTime && !availableStartTimesOnHour.includes(values.startTime)) {
+    if (values.startTime && !availableStartTimes.includes(values.startTime)) {
       setValue('startTime', '');
       setValue('endTime', '');
       return;
@@ -197,7 +240,7 @@ export function useBookingForm({ caregiverId, availableDates, user, onSuccess }:
       setValue('endTime', nextEndTime);
       setValue('endDate', nextEndDate);
     }
-  }, [availableStartTimesOnHour, bookingData.durationKey, values.startDate, values.startTime, computedHourlyEnd]);
+  }, [availableStartTimes, bookingData.durationKey, values.startDate, values.startTime, computedHourlyEnd]);
 
   // Handle service change
   useEffect(() => {
@@ -239,11 +282,22 @@ export function useBookingForm({ caregiverId, availableDates, user, onSuccess }:
       }
       finalStartDate = combineDateAndTime(data.startDate, data.startTime);
       finalEndDate = combineDateAndTime(computedHourlyEnd.endDate, computedHourlyEnd.endTime);
+
+      if (new Date(finalStartDate) <= new Date()) {
+        setBookingError('Selecione um horário futuro para iniciar o atendimento.');
+        return;
+      }
     } else {
       if (!data.startDate || !data.endDate) {
         setBookingError('Selecione a data de início e a data de término.');
         return;
       }
+
+      if (data.startDate < todayDateKey) {
+        setBookingError('Selecione uma data de início igual ou posterior a hoje.');
+        return;
+      }
+
       finalStartDate = `${data.startDate}T08:00:00`;
       finalEndDate = `${data.endDate}T23:59:59`;
     }
@@ -284,7 +338,8 @@ export function useBookingForm({ caregiverId, availableDates, user, onSuccess }:
     isAddressValidated,
     setIsAddressValidated,
     hourlyDateOptions,
-    availableStartTimesOnHour,
+    multiDayDateOptions: schedulableAvailableDates,
+    availableStartTimes,
     computedHourlyEnd,
     validateDateRange,
     handleBookingSubmit,

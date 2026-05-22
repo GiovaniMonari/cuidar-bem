@@ -37,15 +37,12 @@ import {
 import { saveAddress } from '@/utils/savedAddresses';
 import { SavedAddresses } from '@/components/SavedAddress';
 import {
-  combineDateAndTime,
-  getAvailableStartTimes,
-  getComputedEndDateTime,
+  formatDateKey,
   getSuggestedEndDate,
   isHourlyDuration,
   isMultiDayDuration,
 } from '@/utils/booking';
 import { buildFullAddress } from '@/utils/addressFields';
-import { getDatesInRange } from '@/utils/dateRange';
 import { AvailabilityCalendar } from '@/components/AvailabilityCalendar';
 import { useCaregiverData } from '@/hooks/useCaregiverData';
 import { useBookingForm } from '@/hooks/useBookingForm';
@@ -113,7 +110,8 @@ function CaregiverDetailContent() {
     isAddressValidated,
     setIsAddressValidated,
     hourlyDateOptions,
-    availableStartTimesOnHour,
+    multiDayDateOptions,
+    availableStartTimes,
     computedHourlyEnd,
     validateDateRange,
     handleBookingSubmit,
@@ -470,7 +468,7 @@ function CaregiverDetailContent() {
                                   Entre atendimentos existe um intervalo de 1 hora para deslocamento.
                                 </p>
                                 <div className="flex flex-wrap gap-2">
-                                  {availableStartTimesOnHour.map((time) => (
+                                  {availableStartTimes.map((time) => (
                                     <button
                                       key={time}
                                       type="button"
@@ -500,7 +498,7 @@ function CaregiverDetailContent() {
                               />
                             </div>
 
-                            {bookingForm.startDate && availableStartTimesOnHour.length === 0 && (
+                            {bookingForm.startDate && availableStartTimes.length === 0 && (
                               <div className="bg-red-50 border border-red-200 rounded-xl p-3">
                                 <p className="text-sm text-red-700">
                                   Não há horários livres suficientes nesta data para a duração selecionada.
@@ -545,11 +543,18 @@ function CaregiverDetailContent() {
                                 value={bookingForm.startDate ?? ''}
                                 onChange={(e) => {
                                   const startDate = e.target.value;
+                                  if (!startDate) {
+                                    setValue('startDate', '');
+                                    setValue('endDate', '');
+                                    validateDateRange('', '');
+                                    return;
+                                  }
+
                                   const suggestedEnd = getSuggestedEndDate(
                                     new Date(startDate + 'T00:00:00'),
                                     bookingData.durationKey,
                                   );
-                                  const endDate = suggestedEnd.toISOString().split('T')[0];
+                                  const endDate = formatDateKey(suggestedEnd);
                                   setValue('startDate', startDate);
                                   setValue('endDate', endDate);
                                   validateDateRange(startDate, endDate);
@@ -557,10 +562,7 @@ function CaregiverDetailContent() {
                                 className="input-field"
                               >
                                 <option value="">Selecione a data inicial</option>
-                                {availableDates
-                                  .filter((item) => item.isAvailable)
-                                  .sort((a, b) => a.date.localeCompare(b.date))
-                                  .map((item) => (
+                                {multiDayDateOptions.map((item) => (
                                     <option key={item.date} value={item.date}>
                                       {new Date(item.date + 'T00:00:00').toLocaleDateString(
                                         'pt-BR',

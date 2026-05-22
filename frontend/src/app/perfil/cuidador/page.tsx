@@ -171,6 +171,14 @@ export default function CaregiverProfilePage() {
     const normalizedSpecialties = deriveSpecialtiesFromServices(
       normalizedServicePrices,
     );
+    const normalizedAvailability = (availabilityCalendar || [])
+      .filter((item) => typeof item?.date === 'string' && item.date.trim().length > 0)
+      .map((item) => ({
+        date: item.date,
+        slots: Array.isArray(item.slots) ? item.slots : [],
+        timeRanges: Array.isArray(item.timeRanges) ? item.timeRanges : [],
+        isAvailable: item.isAvailable !== false,
+      }));
 
     try {
         const payload = {
@@ -181,7 +189,7 @@ export default function CaregiverProfilePage() {
         experienceYears: data.experienceYears,
         specialties: normalizedSpecialties,
         servicePrices: normalizedServicePrices,
-        availabilityCalendar: data.availabilityCalendar,
+        availabilityCalendar: normalizedAvailability,
         certifications: data.certifications,
         isAvailable: data.isAvailable,
       };
@@ -568,7 +576,13 @@ export default function CaregiverProfilePage() {
                 <AvailabilityCalendar
                   selectedDates={availabilityCalendar}
                   bookedDates={bookedDates}
-                  onChange={(dates) => setValue('availabilityCalendar', dates, { shouldValidate: true })}
+                  onChange={(dates) =>
+                    setValue('availabilityCalendar', dates, {
+                      shouldValidate: true,
+                      shouldDirty: true,
+                      shouldTouch: true,
+                    })
+                  }
                 />
               </div>
 

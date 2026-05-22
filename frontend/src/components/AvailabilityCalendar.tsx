@@ -28,7 +28,10 @@ const DEFAULT_TIME_RANGE: AvailabilityTimeRange = {
 };
 
 function formatDate(date: Date) {
-  return date.toISOString().split('T')[0];
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function getNormalizedTimeRanges(date: AvailabilityDate) {
@@ -99,19 +102,27 @@ export function AvailabilityCalendar({
   }, [currentMonth, currentYear]);
 
 const toggleDate = (dateStr: string) => {
+  const selectedDateItem = selectedMap.get(dateStr);
+  const hasAvailability =
+    selectedDateItem?.isAvailable === true &&
+    selectedDateItem.timeRanges?.length > 0;
+
+  const dateObj = new Date(dateStr + 'T00:00:00');
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
   if (readOnly && onSelectDate) {
-    onSelectDate(dateStr);
+    if (hasAvailability && !bookedSet.has(dateStr) && dateObj >= now) {
+      onSelectDate(dateStr);
+    }
     return;
   }
 
   if (readOnly || !onChange) return;
   if (bookedSet.has(dateStr)) return;
+  if (dateObj < now) return;
 
   const existing = selectedDates.find((d) => d.date === dateStr);
-
-  const dateObj = new Date(dateStr + 'T00:00:00');
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
 
   if (dateObj < now) return;
 
@@ -318,7 +329,7 @@ const toggleDate = (dateStr: string) => {
             selectedDateItem?.isAvailable === true &&
             selectedDateItem.timeRanges?.length > 0;
 
-          const isDisabled = isPast || isBooked;
+          const isDisabled = isPast || isBooked || (readOnly && !hasAvailability);
 
           return (
             <button
@@ -331,6 +342,8 @@ const toggleDate = (dateStr: string) => {
                   ? 'bg-red-100 text-red-700 border-red-200 cursor-not-allowed'
                   : isUnavailable
                   ? 'bg-red-100 text-red-700 border-red-200'
+                  : !hasAvailability
+                  ? 'bg-gray-100 text-gray-400 border-gray-200'
                   : 'bg-green-100 text-green-700 border-green-200'
               } ${isPast ? 'opacity-30 cursor-not-allowed' : ''}`}
             >
@@ -366,7 +379,7 @@ const toggleDate = (dateStr: string) => {
           Dia selecionado
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded bg-red-100 border border-red-200 inline-block" />
+          <span className="w-3 h-3 rounded bg-gray-100 border border-gray-200 inline-block" />
           Dia sem horários livres
         </div>
         <div className="flex items-center gap-2">

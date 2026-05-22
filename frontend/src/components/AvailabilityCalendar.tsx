@@ -109,14 +109,31 @@ const toggleDate = (dateStr: string) => {
 
   const existing = selectedDates.find((d) => d.date === dateStr);
 
-  // 🚨 BLOQUEIA indisponível
-  if (existing?.isAvailable === false) return;
-
   const dateObj = new Date(dateStr + 'T00:00:00');
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
   if (dateObj < now) return;
+
+  if (existing?.isAvailable === false) {
+    onChange(
+      selectedDates.map((item) =>
+        item.date === dateStr
+          ? {
+              ...item,
+              isAvailable: true,
+              timeRanges:
+                item.timeRanges && item.timeRanges.length > 0
+                  ? item.timeRanges
+                  : [{ ...DEFAULT_TIME_RANGE }],
+              slots: item.slots && item.slots.length > 0 ? item.slots : ['integral'],
+            }
+          : item,
+      ),
+    );
+    setActiveEditDate(dateStr);
+    return;
+  }
 
   if (existing) {
     setActiveEditDate(dateStr);
@@ -301,19 +318,19 @@ const toggleDate = (dateStr: string) => {
             selectedDateItem?.isAvailable === true &&
             selectedDateItem.timeRanges?.length > 0;
 
+          const isDisabled = isPast || isBooked;
+
           return (
             <button
               key={dateStr}
               type="button"
-              disabled={
-                isPast ||
-                isBooked ||
-                selectedDateItem?.isAvailable !== true
-              }
+              disabled={isDisabled}
               onClick={() => toggleDate(dateStr)}
               className={`${compact ? 'min-h-[48px] text-xs' : 'min-h-[64px] text-sm'} rounded-xl font-medium transition-all border relative px-1 py-2 ${
-                isBooked || selectedDateItem?.isAvailable !== true
+                isBooked
                   ? 'bg-red-100 text-red-700 border-red-200 cursor-not-allowed'
+                  : isUnavailable
+                  ? 'bg-red-100 text-red-700 border-red-200'
                   : 'bg-green-100 text-green-700 border-green-200'
               } ${isPast ? 'opacity-30 cursor-not-allowed' : ''}`}
             >
@@ -339,7 +356,7 @@ const toggleDate = (dateStr: string) => {
       {!compact && (
       <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500">
         <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded bg-primary-600 inline-block" />
+          <span className="w-3 h-3 rounded bg-green-100 border border-green-200 inline-block" />
           Disponível
         </div>
         <div className="flex items-center gap-2">

@@ -45,14 +45,6 @@ export function Footer() {
                 <Mail className="w-4 h-4" />
                 contato@cuidarbem.com.br
               </div>
-              <div className="flex items-center gap-2 text-gray-400">
-                <Phone className="w-4 h-4" />
-                (11) 3000-0000
-              </div>
-              <div className="flex items-center gap-2 text-gray-400">
-                <MapPin className="w-4 h-4" />
-                São Paulo, SP - Brasil
-              </div>
             </div>
           </div>
 
@@ -146,9 +138,6 @@ export function Footer() {
       <div className="border-t border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-gray-500 text-sm text-center md:text-left">
-              © {new Date().getFullYear()} CuidarBem. Todos os direitos reservados. CNPJ: 00.000.000/0001-00
-            </p>
             <div className="flex items-center gap-4 text-xs text-gray-500">
               <span className="flex items-center gap-1">
                 <Heart className="w-3 h-3 text-red-500" />

@@ -137,7 +137,8 @@ export const caregiverProfileSchema = yup.object({
       }),
     )
     .test('at-least-one-available', 'Selecione pelo menos um serviço', (val) => {
-      return val?.some((item) => item.isAvailable) ?? false;
+      if (!val || val.length === 0) return false;
+      return val.some((item) => item.isAvailable === true);
     }),
   availabilityCalendar: yup.array().of(yup.object()).optional(),
 });

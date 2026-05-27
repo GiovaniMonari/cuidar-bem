@@ -212,6 +212,27 @@ export default function CaregiverProfilePage() {
     }
   };
 
+  const onValidationError = (errs: any) => {
+    const messages: string[] = [];
+    if (errs.bio) messages.push(`Bio: ${errs.bio.message}`);
+    if (errs.city) messages.push(`Cidade: ${errs.city.message}`);
+    if (errs.state) messages.push(`Estado: ${errs.state.message}`);
+    if (errs.hourlyRate) messages.push(`Valor/hora: ${errs.hourlyRate.message}`);
+    if (errs.experienceYears) messages.push(`Experiência: ${errs.experienceYears.message}`);
+    if (errs.servicePrices) messages.push(`Serviços: ${errs.servicePrices.message}`);
+
+    toast.error('Corrija os erros antes de salvar', {
+      description: messages.length > 0 ? messages.join(' • ') : 'Verifique todos os campos obrigatórios.',
+    });
+
+    // Rola para o primeiro campo com erro
+    const firstErrorKey = Object.keys(errs)[0];
+    const el = document.querySelector(`[name="${firstErrorKey}"], #${firstErrorKey}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
   const groupedServices = serviceTypes.reduce((acc, service) => {
     if (!acc[service.category]) acc[service.category] = [];
     acc[service.category].push(service);
@@ -265,7 +286,7 @@ export default function CaregiverProfilePage() {
           </Button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
+        <form onSubmit={handleSubmit(onSubmit, onValidationError)} className="space-y-10">
           {/* Bio Section */}
           <Card className="border-none shadow-xl shadow-gray-200/40 rounded-[32px] overflow-hidden">
             <CardHeader className="bg-gray-50/50 border-b border-gray-100/50 p-8 sm:p-10">

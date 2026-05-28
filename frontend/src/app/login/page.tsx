@@ -8,7 +8,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/services/api';
 import { loginSchema, type LoginFormData } from '@/validations/schemas';
-import { Heart, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
+import { Heart, Mail, Lock, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +23,7 @@ export default function LoginPage() {
   const [reviewMessage, setReviewMessage] = useState('');
   const [reviewStatus, setReviewStatus] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false)
   const { login } = useAuth();
   const router = useRouter();
 
@@ -155,11 +156,26 @@ export default function LoginPage() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     {...register('password')}
                     className={cn("pl-10 h-11", errors.password && "border-red-500 focus-visible:ring-red-100")}
                     placeholder="••••••••"
                   />
+                
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+
                 </div>
                 {errors.password && (
                   <p className="text-xs font-medium text-red-500">{errors.password.message}</p>

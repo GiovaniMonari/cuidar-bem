@@ -11,7 +11,9 @@ import { maskPhone } from '@/utils/masks';
 import { 
   User, Mail, Lock, Phone, AlertCircle, Users, 
   Stethoscope, Loader2, FileText, Shield, 
-  CheckCircle2, ArrowRight
+  CheckCircle2, ArrowRight,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +27,7 @@ import { cn } from '@/lib/utils';
 function RegisterForm() {
   const searchParams = useSearchParams();
   const defaultRole = searchParams.get('role') || 'client';
-
+  const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState('');
   const [loading, setLoading] = useState(false);
   const { register: authRegister } = useAuth();
@@ -211,11 +213,24 @@ function RegisterForm() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
                     <Input
                       id="password"
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       {...register('password')}
                       className={cn("pl-10 h-11", errors.password && "border-red-500 focus-visible:ring-red-100")}
                       placeholder="••••••"
                     />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -224,11 +239,24 @@ function RegisterForm() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
                     <Input
                       id="confirmPassword"
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       {...register('confirmPassword')}
                       className={cn("pl-10 h-11", errors.confirmPassword && "border-red-500 focus-visible:ring-red-100")}
                       placeholder="••••••"
                     />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
                 </div>
                 {(errors.password || errors.confirmPassword) && (

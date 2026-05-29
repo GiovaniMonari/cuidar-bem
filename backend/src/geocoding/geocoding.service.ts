@@ -193,6 +193,10 @@ export class GeocodingService {
       const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
 
       if (!response.ok) {
+        const errorBody = await response.text().catch(() => 'Não foi possível ler o body');
+        console.error(
+          `Erro HTTP ViaCEP (${response.status} ${response.statusText}): ${errorBody.slice(0, 500)}`,
+        );
         throw new Error('Erro ao buscar CEP');
       }
 

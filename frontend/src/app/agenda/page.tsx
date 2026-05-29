@@ -327,17 +327,17 @@ export default function AgendaPage() {
       <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pb-24">
         <div className="w-full space-y-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-col">
-            <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-              <h2 className="text-2xl font-black text-gray-900 flex items-center gap-3">
+            <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <h2 className="flex items-center gap-3 text-2xl font-black text-gray-900">
                 <LayoutDashboard className="w-6 h-6 text-primary-600" />
                 Sua Agenda
               </h2>
-              <TabsList className="bg-white p-1.5 h-auto rounded-2xl border border-gray-200 shadow-sm flex-wrap">
+              <TabsList className="grid !h-auto w-full grid-cols-2 gap-1.5 rounded-2xl border border-gray-200 bg-white p-1.5 shadow-sm sm:grid-cols-3 xl:inline-flex xl:w-fit xl:flex-nowrap">
                 {TABS.map((t) => (
                   <TabsTrigger 
                     key={t.key} 
                     value={t.key} 
-                    className="rounded-xl px-6 py-2.5 data-[state=active]:bg-primary-600 data-[state=active]:text-white transition-all font-bold text-xs uppercase tracking-widest"
+                    className="h-auto min-h-10 w-full whitespace-normal rounded-xl px-3 py-2 text-center text-[11px] font-bold uppercase leading-tight tracking-wide transition-all data-[active]:bg-primary-600 data-[active]:text-white sm:text-xs sm:tracking-widest xl:w-auto xl:flex-none xl:whitespace-nowrap xl:px-6 xl:py-2.5"
                   >
                     {t.label}
                   </TabsTrigger>

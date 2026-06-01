@@ -34,6 +34,9 @@ import {
   Wallet,
   Medal,
   Trophy,
+  Smartphone,
+  Download,
+  WifiOff,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -334,6 +337,65 @@ function HeroTrustPillars() {
         </div>
       ))}
     </div>
+  );
+}
+
+function PWAInfoSection() {
+  const benefits = [
+    {
+      icon: Smartphone,
+      title: 'Instale no celular',
+      desc: 'Adicione o CuidarBem à tela inicial e acesse tudo com um toque.',
+    },
+    {
+      icon: Download,
+      title: 'Experiência de app',
+      desc: 'Abra em tela cheia, com navegação mais rápida e visual próprio.',
+    },
+    {
+      icon: WifiOff,
+      title: 'Mais preparado offline',
+      desc: 'Se a conexão cair, mostramos uma tela de orientação para voltar rápido.',
+    },
+  ];
+
+  return (
+    <section className="relative z-10 -mt-10 pb-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="rounded-3xl border border-primary-100 bg-white p-6 lg:p-8 shadow-2xl shadow-primary-900/10">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
+            <div className="max-w-xl">
+              <div className="inline-flex items-center gap-2 bg-accent-100 text-accent-700 px-3 py-1 rounded-full text-sm font-semibold mb-4">
+                <Sparkles className="w-4 h-4" />
+                Novidade no CuidarBem
+              </div>
+              <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-3">
+                Agora você pode instalar o site como app no celular
+              </h2>
+              <p className="text-gray-500 leading-relaxed">
+                No Android, toque em “Instalar app” quando o aviso aparecer. No iPhone,
+                abra o menu de compartilhar e escolha “Adicionar à Tela de Início”.
+              </p>
+            </div>
+
+            <div className="grid sm:grid-cols-3 lg:min-w-[560px] gap-3">
+              {benefits.map((benefit) => (
+                <div
+                  key={benefit.title}
+                  className="rounded-2xl bg-gradient-to-b from-primary-50 to-white border border-primary-100 p-4"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-primary-600 text-white flex items-center justify-center mb-3">
+                    <benefit.icon className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-bold text-gray-900 text-sm mb-1">{benefit.title}</h3>
+                  <p className="text-gray-500 text-xs leading-relaxed">{benefit.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1060,6 +1122,7 @@ function GuestHome({ caregivers, loading }: { caregivers: Caregiver[]; loading: 
   return (
     <>
       <HeroGuest />
+      <PWAInfoSection />
       <ServicesSection />
       <TopCaregiversSection caregivers={caregivers} loading={loading} />
       <HowItWorksSection />
@@ -1081,6 +1144,7 @@ function ClientHome({
   return (
     <>
       <HeroClient user={user} />
+      <PWAInfoSection />
       <ClientServicesSection />
       <TopCaregiversSection caregivers={caregivers} loading={loading} />
       <ClientCTASection user={user} />
@@ -1096,6 +1160,7 @@ function CaregiverHome({
   return (
     <>
       <HeroCaregiver user={user} />
+      <PWAInfoSection />
       <CaregiverAgendaSection />
       <CaregiverTipsSection />
       <CaregiverStatsSection />

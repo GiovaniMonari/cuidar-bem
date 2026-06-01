@@ -10,6 +10,18 @@ import { ptBR } from 'date-fns/locale';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from "lucide-react";
 
+const DEFAULT_EMPTY_REVIEWS_MESSAGE = {
+  title: 'Nenhuma avaliação disponível ainda',
+  description:
+    'Isso não é um erro: seu perfil ainda não recebeu avaliações. Quando clientes avaliarem atendimentos concluídos, as notas e comentários aparecerão aqui.',
+};
+
+const MISSING_CAREGIVER_PROFILE_MESSAGE = {
+  title: 'Perfil de cuidador ainda não configurado',
+  description:
+    'Finalize seu perfil de cuidador para começar a receber atendimentos. Depois que clientes avaliarem serviços concluídos, as avaliações aparecerão aqui.',
+};
+
 interface ReviewWithBooking {
   _id: string;
   rating: number;
@@ -37,6 +49,7 @@ export default function CaregiverRatingsPage() {
   const [filterService, setFilterService] = useState<string>('all');
   const [filterRating, setFilterRating] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
+  const [emptyReviewsMessage, setEmptyReviewsMessage] = useState(DEFAULT_EMPTY_REVIEWS_MESSAGE);
 
   useEffect(() => {
     // Aguardar o carregamento da autenticação
@@ -60,18 +73,30 @@ export default function CaregiverRatingsPage() {
       try {
         setLoading(true);
         setError(null);
+        setEmptyReviewsMessage(DEFAULT_EMPTY_REVIEWS_MESSAGE);
         
         console.log('Buscando avaliações para cuidador:', user.id);
         
         const reviewsData = await api.getMyReviews();
+        const safeReviews = Array.isArray(reviewsData) ? reviewsData : [];
         
-        console.log('Avaliações recebidas:', reviewsData);
+        console.log('Avaliações recebidas:', safeReviews);
         
-        setReviews(reviewsData);
-        setFilteredReviews(reviewsData);
+        setReviews(safeReviews);
+        setFilteredReviews(safeReviews);
       } catch (error: any) {
         console.error('Erro ao buscar avaliações:', error);
-        setError(error.response?.data?.message || 'Erro ao carregar avaliações');
+        const errorMessage = error?.response?.data?.message || error?.message || 'Erro ao carregar avaliações';
+
+        if (errorMessage === 'Perfil de cuidador não encontrado') {
+          setReviews([]);
+          setFilteredReviews([]);
+          setEmptyReviewsMessage(MISSING_CAREGIVER_PROFILE_MESSAGE);
+          setError(null);
+          return;
+        }
+
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -206,8 +231,8 @@ export default function CaregiverRatingsPage() {
             <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
             </svg>
-            <p className="text-gray-500 text-lg">Você ainda não recebeu avaliações</p>
-            <p className="text-gray-400 text-sm mt-2">Avaliações aparecerão aqui após a conclusão de atendimentos</p>
+            <p className="text-gray-500 text-lg">{emptyReviewsMessage.title}</p>
+            <p className="text-gray-400 text-sm mt-2 max-w-md mx-auto">{emptyReviewsMessage.description}</p>
           </div>
         )}
       </div>

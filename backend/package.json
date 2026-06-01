@@ -6,7 +6,8 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
-    "seed": "ts-node src/seed.ts"
+    "seed": "ts-node src/seed.ts",
+    "create:admin": "ts-node src/create-admin.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",

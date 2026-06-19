@@ -1,3 +1,6 @@
+// 1. ESTA LINHA DEVE SER A PRIMEIRA DO ARQUIVO (Importante para Produção/Railway)
+import 'dotenv/config'; 
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
@@ -8,18 +11,18 @@ async function bootstrap() {
     logger: ['error', 'warn', 'debug', 'log', 'verbose'],
   });
 
-  // 1. CONFIGURAÇÕES HTTP GLOBAIS (Devem vir primeiro)
+  // Configurações Globais HTTP
   app.setGlobalPrefix('api');
 
   app.enableCors({
     origin: [
       'http://localhost:3000',
-      'https://cuidar-bem-giovanimonaris-projects.vercel.app',
-      'https://cuidar-bem-pink.vercel.app',
+      'https://vercel.app',
+      'https://vercel.app',
     ],
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS', // Força os métodos aceitos
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
-    allowedHeaders: 'Content-Type, Accept, Authorization', // Força os headers permitidos
+    allowedHeaders: 'Content-Type, Accept, Authorization',
   });
 
   app.useGlobalPipes(
@@ -30,12 +33,11 @@ async function bootstrap() {
     }),
   );
 
-  // 2. CONFIGURAÇÃO DE WEBSOCKETS COM REDIS
+  // Inicialização do Adaptador Redis (Agora ele lerá a URL com sucesso!)
   const redisIoAdapter = new RedisIoAdapter(app);
   await redisIoAdapter.connectToRedis();
   app.useWebSocketAdapter(redisIoAdapter);
 
-  // 3. INICIALIZAÇÃO DO SERVIDOR
   const port = process.env.PORT || 3001;
   await app.listen(port);
   console.log(`🚀 API rodando em http://localhost:${port}/api`);

@@ -16,6 +16,8 @@ import { ChatModule } from './chat/chat.module';
 import { GeocodingModule } from './geocoding/geocoding.module';
 import { FeedbackModule } from './feedback/feedback.module';
 import { ModerationModule } from './moderation/moderation.module';
+import { RedisModule } from './redis/redis.module';
+import { QueueModule } from './queue/queue.module';
 
 @Module({
   imports: [
@@ -23,6 +25,8 @@ import { ModerationModule } from './moderation/moderation.module';
     MongooseModule.forRoot(
       process.env.MONGODB_URI || 'mongodb://localhost:27017/cuidar-bem',
     ),
+    RedisModule,
+    QueueModule,
     EmailModule,
     AuthModule,
     UsersModule,

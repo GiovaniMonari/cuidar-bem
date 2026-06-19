@@ -1,17 +1,18 @@
 // chat.module.ts
-import { Module, forwardRef } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { ScheduleModule } from '@nestjs/schedule';
-import { ChatGateway } from './chat.gateway';
-import { ChatService } from './chat.service';
-import { ChatController } from './chat.controller';
-import { ChatCleanupService } from './chat-cleanup.service';
 import { Conversation, ConversationSchema } from './schemas/conversation.schema';
 import { Message, MessageSchema } from './schemas/message.schema';
-import { BookingsModule } from '../bookings/bookings.module';
-import { UsersModule } from '../users/users.module';
-import { Booking, BookingSchema } from '../bookings/schemas/booking.schema';
-import { AuthModule } from '../auth/auth.module';
+import { Booking, BookingSchema } from 'src/bookings/schemas/booking.schema';
+import { ScheduleModule } from '@nestjs/schedule';
+import { BookingsModule } from 'src/bookings/bookings.module';
+import { UsersModule } from 'src/users/users.module';
+import { RedisModule } from 'src/redis/redis.module';
+import { ChatService } from './chat.service';
+import { ChatCleanupService } from './chat-cleanup.service';
+import { ChatController } from './chat.controller';
+import { ChatGateway } from './chat.gateway';
+import { AuthModule } from 'src/auth/auth.module';
 
 @Module({
   imports: [
@@ -23,7 +24,8 @@ import { AuthModule } from '../auth/auth.module';
     ScheduleModule.forRoot(),
     forwardRef(() => BookingsModule),
     UsersModule,
-    AuthModule,
+    RedisModule,
+    AuthModule
   ],
   controllers: [ChatController],
   providers: [ChatGateway, ChatService, ChatCleanupService],

@@ -11,10 +11,10 @@ import { Model, Types } from 'mongoose';
 import { Conversation, ConversationDocument } from './schemas/conversation.schema';
 import { Message, MessageDocument } from './schemas/message.schema';
 import { BookingsService } from '../bookings/bookings.service';
+import { RedisLockService } from 'src/redis/redis-lock.service';
 
 @Injectable()
 export class ChatService {
-  private conversationLocks = new Map<string, Promise<ConversationDocument>>();
 
   constructor(
     @InjectModel(Conversation.name)
@@ -23,20 +23,17 @@ export class ChatService {
     private messageModel: Model<MessageDocument>,
     @Inject(forwardRef(() => BookingsService))
     private bookingsService: BookingsService,
+    private readonly redisLockService: RedisLockService,
   ) {}
 
+  
   async getOrCreateConversation(bookingId: string, userId: string) {
-    console.log('💬 getOrCreateConversation chamado');
-    console.log('bookingId:', bookingId);
-    console.log('userId:', userId);
-
     const booking = await this.bookingsService.findOne(bookingId);
 
     if (!booking) {
       throw new NotFoundException('Agendamento não encontrado');
     }
 
-    // ⬇️ NOVO: Verificar se o booking permite chat
     const canChat = await this.canAccessChat(booking);
     if (!canChat.allowed) {
       throw new ForbiddenException(canChat.reason);
@@ -47,9 +44,6 @@ export class ChatService {
 
     const clientIdStr = client?._id?.toString();
     const caregiverUserIdStr = caregiver?.userId?._id?.toString();
-
-    console.log('clientIdStr:', clientIdStr);
-    console.log('caregiverUserIdStr:', caregiverUserIdStr);
 
     if (!clientIdStr || !caregiverUserIdStr) {
       throw new NotFoundException('Participantes da conversa não encontrados');
@@ -62,24 +56,14 @@ export class ChatService {
       throw new ForbiddenException('Você não participa desta conversa');
     }
 
-    const lockKey = `${clientIdStr}_${caregiverUserIdStr}`;
+    const lockResource = `conversation:${clientIdStr}:${caregiverUserIdStr}`;
 
-    const existingLock = this.conversationLocks.get(lockKey);
-    if (existingLock) {
-      console.log(`⏳ Aguardando criação em andamento para par ${lockKey}`);
-      return existingLock;
-    }
-
-    const promise = this._getOrCreateConversation(
-      clientIdStr,
-      caregiverUserIdStr,
-      bookingId,
-    ).finally(() => {
-      this.conversationLocks.delete(lockKey);
-    });
-
-    this.conversationLocks.set(lockKey, promise);
-    return promise;
+    // substitui o Map por lock distribuído
+    return this.redisLockService.withLock(
+      lockResource,
+      () => this._getOrCreateConversation(clientIdStr, caregiverUserIdStr, bookingId),
+      5000, // 5 segundos de TTL para o lock
+    );
   }
 
   // ⬇️ NOVO: Verificar se pode acessar o chat

@@ -18,6 +18,8 @@ import {
   AdminActionLog,
   AdminActionLogSchema,
 } from './schemas/admin-action-log.schema';
+import { JwtBlacklistService } from 'src/redis/jwt-blacklist.service';
+import { RedisModule } from 'src/redis/redis.module';
 
 @Module({
   imports: [
@@ -31,9 +33,10 @@ import {
       { name: PlatformReport.name, schema: PlatformReportSchema },
       { name: AdminActionLog.name, schema: AdminActionLogSchema },
     ]),
+    RedisModule,
   ],
   controllers: [ReportsController, AdminController],
-  providers: [ModerationService, AdminGuard],
+  providers: [ModerationService, AdminGuard,],
   exports: [ModerationService],
 })
 export class ModerationModule {}

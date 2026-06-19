@@ -11,6 +11,7 @@ import * as bcrypt from 'bcryptjs';
 import { UsersService } from '../users/users.service';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { EmailService } from '../email/email.service';
+import { EmailProducer } from 'src/queue/email.producer';
 
 @Injectable()
 export class AuthService {
@@ -19,7 +20,7 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
-    private emailService: EmailService,
+    private emailProducer: EmailProducer,
   ) {}
 
   private getPasswordResetExpirationMinutes() {
@@ -61,7 +62,7 @@ export class AuthService {
 
     // Enviar email de boas-vindas
     try {
-      await this.emailService.sendWelcomeEmail({
+      await this.emailProducer.sendWelcome({
         to: user.email,
         name: user.name,
         role: user.role as 'client' | 'caregiver',
@@ -149,18 +150,12 @@ export class AuthService {
       expiresAt,
     );
 
-    const result = await this.emailService.sendPasswordResetEmail({
+    const result = await this.emailProducer.sendPasswordReset({
       to: user.email,
       name: user.name,
       resetUrl: this.buildPasswordResetUrl(rawToken),
       expiresInMinutes,
     });
-
-    if (!result.success) {
-      this.logger.warn(
-        `Falha ao enviar email de redefinição para ${user.email}: ${result.error || 'erro desconhecido'}`,
-      );
-    }
 
     return safeResponse;
   }

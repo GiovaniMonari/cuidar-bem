@@ -32,6 +32,7 @@ import {
   PlatformReport,
   PlatformReportDocument,
 } from './schemas/platform-report.schema';
+import { JwtBlacklistService } from 'src/redis/jwt-blacklist.service';
 
 type ModerationAction = 'none' | 'watchlist' | 'ban' | 'dismiss' | 'unban';
 type UserAction = 'ban' | 'unban' | 'watchlist' | 'clear_watch';
@@ -82,6 +83,7 @@ export class ModerationService {
     private readonly platformReportModel: Model<PlatformReportDocument>,
     @InjectModel(AdminActionLog.name)
     private readonly adminActionLogModel: Model<AdminActionLogDocument>,
+    private readonly jwtBlacklistService: JwtBlacklistService
   ) {}
 
   async createReport(
@@ -934,15 +936,20 @@ export class ModerationService {
     const now = new Date();
 
     if (action === 'ban') {
-      user.moderationStatus = 'banned';
-      user.isActive = false;
-      user.banReason = reason;
-      user.banSource = actorType === 'system' ? 'automatic' : 'manual';
-      user.bannedAt = now;
-      user.lastModerationAt = now;
-      user.moderationReason = reason;
-      user.isOnline = false;
-    } else if (action === 'unban') {
+    user.moderationStatus = 'banned';
+    user.isActive = false;
+    user.banReason = reason;
+    user.banSource = actorType === 'system' ? 'automatic' : 'manual';
+    user.bannedAt = now;
+    user.lastModerationAt = now;
+    user.moderationReason = reason;
+    user.isOnline = false;
+
+    // TTL de 7 dias (tempo máximo que um JWT costuma viver)
+    // ajuste conforme seu JWT_EXPIRATION
+    const jwtTtlSeconds = 60 * 60 * 24 * 7;
+    await this.jwtBlacklistService.addUser(user._id.toString(), jwtTtlSeconds);
+  } else if (action === 'unban') {
       user.moderationStatus = 'active';
       user.isActive = true;
       user.banReason = '';
@@ -953,6 +960,9 @@ export class ModerationService {
       if (user.reviewRequestStatus === 'pending') {
         user.reviewRequestStatus = 'accepted';
       }
+
+      // remove da blacklist para permitir login novamente
+      await this.jwtBlacklistService.removeUser(user._id.toString());
     } else if (action === 'watchlist') {
       user.moderationStatus = 'watchlist';
       user.isActive = true;

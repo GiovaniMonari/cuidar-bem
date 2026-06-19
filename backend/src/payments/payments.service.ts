@@ -8,6 +8,7 @@ import { BookingsService } from '../bookings/bookings.service';
 import { CaregiversService } from '../caregivers/caregivers.service';
 import { UsersService } from '../users/users.service';
 import { EmailService } from '../email/email.service';
+import { EmailProducer } from 'src/queue/email.producer';
 
 const PLATFORM_FEE_PERCENT = 10;
 
@@ -21,7 +22,7 @@ export class PaymentsService {
     private bookingsService: BookingsService,
     private caregiversService: CaregiversService,
     private usersService: UsersService,
-    private emailService: EmailService,
+    private emailProducer: EmailProducer,
   ) {
     this.mpClient = new MercadoPagoConfig({
       accessToken: process.env.MP_ACCESS_TOKEN || '',
@@ -129,7 +130,7 @@ export class PaymentsService {
     const start = new Date(booking.startDate);
     
     try {
-      await this.emailService.sendPaymentEmail({
+      await this.emailProducer.sendPaymentEmail({
         to: clientUser?.email,
         clientName: clientUser?.name || booking.clientName || 'Cliente',
         caregiverName,
@@ -183,7 +184,7 @@ export class PaymentsService {
           const clientUser = booking?.clientId as any;
           const caregiver = booking?.caregiverId as any;
 
-          await this.emailService.sendPaymentConfirmedEmail({
+          await this.emailProducer.sendPaymentConfirmed({
             to: clientUser?.email,
             clientName: clientUser?.name || 'Cliente',
             caregiverName: caregiver?.userId?.name || 'Cuidador',
@@ -248,7 +249,7 @@ export class PaymentsService {
     const caregiver = booking?.caregiverId as any;
 
     if (clientUser?.email) {
-      await this.emailService.sendPaymentConfirmedEmail({
+      await this.emailProducer.sendPaymentConfirmed({
         to: clientUser.email,
         clientName: clientUser.name || 'Cliente',
         caregiverName: caregiver?.userId?.name || 'Cuidador',

@@ -11,6 +11,7 @@ import { Feedback, FeedbackDocument } from './schemas/feedback.schema';
 import { Booking, BookingDocument } from '../bookings/schemas/booking.schema';
 import { CreateFeedbackDto } from './dto/create-feedback.dto';
 import { EmailService } from 'src/email/email.service';
+import { EmailProducer } from 'src/queue/email.producer';
 
 @Injectable()
 export class FeedbackService {
@@ -21,7 +22,7 @@ export class FeedbackService {
     private feedbackModel: Model<FeedbackDocument>,
     @InjectModel(Booking.name)
     private bookingModel: Model<BookingDocument>,
-    private emailService: EmailService, // 👈 Adicione esta linha
+    private emailProducer: EmailProducer, // 👈 Adicione esta linha
   ) { }
 
   async create(createFeedbackDto: CreateFeedbackDto, userId: string) {
@@ -121,7 +122,7 @@ export class FeedbackService {
       const caregiverName = (caregiverUser?.caregiverId as any)?.userId?.name || 'Seu cuidador';
 
       if (clientEmail) {
-        await this.emailService.sendNewFeedbackAvailableEmail({
+        await this.emailProducer.sendNewFeedbackAvailableEmail({
           to: clientEmail,
           clientName: clientName || 'Cliente',
           caregiverName,

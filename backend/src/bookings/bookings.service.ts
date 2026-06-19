@@ -18,6 +18,7 @@ import {
   isIntervalCoveredByAvailability,
   normalizeAvailabilityCalendar,
 } from '../common/utils/availability';
+import { EmailProducer } from 'src/queue/email.producer';
 
 @Injectable()
 export class BookingsService {
@@ -35,7 +36,7 @@ export class BookingsService {
 
   constructor(
     @InjectModel(Booking.name) private bookingModel: Model<BookingDocument>,
-    private emailService: EmailService,
+    private emailProducer: EmailProducer,
     @Inject(forwardRef(() => ChatService))
     private chatService: ChatService,
   ) {}
@@ -51,31 +52,6 @@ export class BookingsService {
   // ═══════════════════════════════════════════
   // HELPER: Enviar email com log adequado
   // ═══════════════════════════════════════════
-  private async sendEmailSafely(
-    emailType: string,
-    recipient: string,
-    sendFn: () => Promise<any>,
-  ): Promise<boolean> {
-    try {
-      this.logger.log(`📧 Enviando ${emailType} para ${recipient}...`);
-      const result = await sendFn();
-
-      if (result?.success) {
-        this.logger.log(`✅ ${emailType} enviado para ${recipient}`);
-        return true;
-      } else {
-        this.logger.warn(
-          `⚠️ ${emailType} falhou para ${recipient}: ${result?.error || 'desconhecido'}`,
-        );
-        return false;
-      }
-    } catch (error: any) {
-      this.logger.error(
-        `❌ Erro ao enviar ${emailType} para ${recipient}: ${error.message}`,
-      );
-      return false;
-    }
-  }
 
   private isValidCoordinate(value: unknown): value is number {
     return typeof value === 'number' && Number.isFinite(value);
@@ -271,49 +247,38 @@ export class BookingsService {
 
     // Email para o cuidador
     if (caregiverUser?.email) {
-      emailPromises.push(
-        this.sendEmailSafely(
-          'Nova Solicitação (cuidador)',
-          caregiverUser.email,
-          () =>
-            this.emailService.sendNewBookingRequestEmail({
-              to: caregiverUser.email,
-              caregiverName: caregiverUser.name,
-              clientName: dto.clientName || client?.name || 'Cliente',
-              clientPhone: dto.clientPhone || client?.phone || '',
-              serviceName: dto.serviceName || dto.serviceType || 'Atendimento',
-              durationLabel: dto.durationLabel || `${dto.durationHours}h`,
-              startDate: new Date(dto.startDate).toLocaleString('pt-BR'),
-              address: dto.address || '',
-              totalAmount: dto.totalAmount,
-              notes: dto.notes,
-            }),
-        ),
-      );
+      await this.emailProducer.sendNewBookingRequest({
+        to: caregiverUser.email,
+        caregiverName: caregiverUser.name,
+        clientName: dto.clientName || client?.name || 'Cliente',
+        clientPhone: dto.clientPhone || client?.phone || '',
+        serviceName: dto.serviceName || dto.serviceType || 'Atendimento',
+        durationLabel: dto.durationLabel || `${dto.durationHours}h`,
+        startDate: new Date(dto.startDate).toLocaleString('pt-BR'),
+        address: dto.address || '',
+        totalAmount: dto.totalAmount,
+        notes: dto.notes,
+      });
     } else {
       this.logger.warn('⚠️ Cuidador sem email cadastrado');
     }
 
     // Email para o cliente
     if (client?.email) {
-      emailPromises.push(
-        this.sendEmailSafely(
-          'Confirmação Solicitação (cliente)',
-          client.email,
-          () =>
-            this.emailService.sendBookingConfirmationToClientEmail({
-              to: client.email,
-              clientName: client.name,
-              caregiverName: caregiverUser?.name || 'Cuidador',
-              serviceName: dto.serviceName || dto.serviceType || 'Atendimento',
-              durationLabel: dto.durationLabel || `${dto.durationHours}h`,
-              startDate: new Date(dto.startDate).toLocaleString('pt-BR'),
-              totalAmount: dto.totalAmount,
-            }),
-        ),
-      );
+      await this.emailProducer.sendNewBookingRequest({
+        to: caregiverUser.email,
+        caregiverName: caregiverUser.name,
+        clientName: dto.clientName || client?.name || 'Cliente',
+        clientPhone: dto.clientPhone || client?.phone || '',
+        serviceName: dto.serviceName || dto.serviceType || 'Atendimento',
+        durationLabel: dto.durationLabel || `${dto.durationHours}h`,
+        startDate: new Date(dto.startDate).toLocaleString('pt-BR'),
+        address: dto.address || '',
+        totalAmount: dto.totalAmount,
+        notes: dto.notes,
+      });
     } else {
-      this.logger.warn('⚠️ Cliente sem email cadastrado');
+      this.logger.warn('⚠️ Cuidador sem email cadastrado');
     }
 
     // ✅ Aguardar emails mas não falhar se não enviar
@@ -432,11 +397,7 @@ export class BookingsService {
     const client = booking.clientId as any;
 
     if (client?.email) {
-      await this.sendEmailSafely(
-        'Check-in do cuidador',
-        client.email,
-        () =>
-          this.emailService.sendCaregiverCheckInEmail({
+      await this.emailProducer.sendCaregiverCheckin(({
             to: client.email,
             clientName: client.name || booking.clientName || 'Cliente',
             caregiverName: caregiverUser?.name || 'Cuidador',
@@ -557,11 +518,7 @@ export class BookingsService {
   ) {
     try {
       if (client?.email) {
-        await this.sendEmailSafely(
-          'Confirmação do agendamento',
-          client.email,
-          () =>
-            this.emailService.sendBookingApprovedEmail({
+        await this.emailProducer.sendBookingApproved(({
               to: client.email,
               clientName: client.name || booking.clientName || 'Cliente',
               caregiverName: caregiverUser?.name || 'Cuidador',
@@ -698,58 +655,34 @@ export class BookingsService {
         }
       }
 
-      const emailPromises: Promise<boolean>[] = [];
 
       // ✅ Email para CLIENTE (solicitar avaliação)
       if (client?.email) {
-        emailPromises.push(
-          this.sendEmailSafely(
-            'Serviço Concluído (cliente)',
-            client.email,
-            () =>
-              this.emailService.sendServiceCompletedToClientEmail({
-                to: client.email,
-                clientName: client.name,
-                caregiverName: caregiverUser?.name || 'Cuidador',
-                serviceName:
-                  booking.serviceName || booking.serviceType || 'Atendimento',
-                caregiverId: caregiver._id.toString(),
-                bookingId: booking._id.toString(),
-                paymentCreated: true,
-              }),
-          ),
-        );
+          this.emailProducer.sendServiceCompletedClient(({
+            to: client.email,
+            clientName: client.name,
+            caregiverName: caregiverUser?.name || 'Cuidador',
+            serviceName:
+              booking.serviceName || booking.serviceType || 'Atendimento',
+            caregiverId: caregiver._id.toString(),
+            bookingId: booking._id.toString(),
+            paymentCreated: true,
+          }),
+        )
       }
 
       // ✅ Email para CUIDADOR apenas quando o pagamento tiver sido realmente liberado
       if (caregiverUser?.email && paymentReleased) {
-        emailPromises.push(
-          this.sendEmailSafely(
-            'Pagamento Liberado (cuidador)',
-            caregiverUser.email,
-            () =>
-              this.emailService.sendServiceCompletedToCaregiverEmail({
-                to: caregiverUser.email,
-                caregiverName: caregiverUser.name,
-                clientName: client?.name || 'Cliente',
-                serviceName:
-                  booking.serviceName || booking.serviceType || 'Atendimento',
-                amount: paymentData.amount,
-                platformFee: paymentData.platformFee,
-                caregiverAmount: paymentData.caregiverAmount,
-              }),
-          ),
-        );
-      }
-
-      // Enviar emails
-      if (emailPromises.length > 0) {
-        const results = await Promise.allSettled(emailPromises);
-        const successCount = results.filter(
-          (r) => r.status === 'fulfilled' && r.value === true,
-        ).length;
-        this.logger.log(
-          `📧 Emails de conclusão: ${successCount}/${emailPromises.length}`,
+        this.emailProducer.sendServiceCompletedCaregiver(({
+              to: caregiverUser.email,
+              caregiverName: caregiverUser.name,
+              clientName: client?.name || 'Cliente',
+              serviceName:
+                booking.serviceName || booking.serviceType || 'Atendimento',
+              amount: paymentData.amount,
+              platformFee: paymentData.platformFee,
+              caregiverAmount: paymentData.caregiverAmount,
+            }),
         );
       }
 

@@ -10,8 +10,9 @@ import { EMAIL_QUEUE } from './queue.constants';
   imports: [
     BullModule.forRoot({
       connection: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379'),
+        // CORREÇÃO: Passa a URL completa injetada pela Railway.
+        // Se estiver em ambiente local e não encontrar a variável, usa o localhost.
+        url: process.env.REDIS_URL || 'redis://localhost:6379',
         keyPrefix: 'cuidarbem',
       },
     }),

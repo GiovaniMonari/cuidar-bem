@@ -9,9 +9,10 @@ import { RedisLockService } from './redis-lock.service';
     {
       provide: REDIS_CLIENT,
       useFactory: () => {
-        return new Redis({
-          host: process.env.REDIS_HOST || 'localhost',
-          port: parseInt(process.env.REDIS_PORT || '6379'),
+        // CORREÇÃO: Pega a URL completa da Railway ou usa o localhost como padrão
+        const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+        
+        return new Redis(redisUrl, {
           keyPrefix: 'cuidarbem:',
         });
       },

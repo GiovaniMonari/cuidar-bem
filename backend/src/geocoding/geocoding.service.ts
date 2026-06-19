@@ -1,19 +1,25 @@
-// src/geocoding/geocoding.service.ts
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Inject, Logger } from '@nestjs/common';
+import Redis from 'ioredis';
+import { REDIS_CLIENT } from '../redis/redis.constants';
 
 @Injectable()
 export class GeocodingService {
+  private readonly logger = new Logger(GeocodingService.name);
   private readonly NOMINATIM_URL = 'https://nominatim.openstreetmap.org';
   
-  // ⬇️ NOVO: Cache para evitar requisições repetidas
-  private cache = new Map<string, { data: any; timestamp: number }>();
-  private readonly CACHE_TTL = 1000 * 60 * 60; // 1 hora
+  // 🔄 CONFIGURAÇÃO DO CACHE NO REDIS
+  private readonly CACHE_TTL_SECONDS = 60 * 60; // 1 hora em segundos (0.1.1)
   
-  // ⬇️ NOVO: Rate limiting
+  // ⬇️ Rate limiting interno (Mantido por instância)
   private lastRequestTime = 0;
   private readonly MIN_REQUEST_INTERVAL = 1100; // 1.1 segundos entre requisições
 
-  // ⬇️ NOVO: Aguardar rate limit
+  constructor(
+    // Injeta o cliente ioredis que consolidamos nas etapas anteriores
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+  ) {}
+
+  // ⬇️ Aguardar rate limit
   private async waitForRateLimit(): Promise<void> {
     const now = Date.now();
     const timeSinceLastRequest = now - this.lastRequestTime;
@@ -26,33 +32,32 @@ export class GeocodingService {
     this.lastRequestTime = Date.now();
   }
 
-  // ⬇️ NOVO: Verificar cache
-  private getFromCache(key: string): any | null {
-    const cached = this.cache.get(key);
-    
-    if (cached) {
-      const isExpired = Date.now() - cached.timestamp > this.CACHE_TTL;
-      
-      if (!isExpired) {
-        console.log(`📦 Cache hit: ${key}`);
-        return cached.data;
+  // ⬇️ AUXILIAR: Buscar dados estruturados do Redis
+  private async getFromRedisCache(key: string): Promise<any | null> {
+    try {
+      const cached = await this.redis.get(key);
+      if (cached) {
+        this.logger.log(`📦 Cache hit (Redis): ${key}`);
+        return JSON.parse(cached);
       }
-      
-      // Limpar cache expirado
-      this.cache.delete(key);
+    } catch (error: any) {
+      this.logger.error(`Falha ao ler cache do Redis para a chave ${key}: ${error.message}`);
     }
-    
     return null;
   }
 
-  // ⬇️ NOVO: Salvar no cache
-  private saveToCache(key: string, data: any): void {
-    this.cache.set(key, { data, timestamp: Date.now() });
-    
-    // Limpar cache antigo se ficar muito grande
-    if (this.cache.size > 1000) {
-      const oldestKey = this.cache.keys().next().value;
-      if (oldestKey) this.cache.delete(oldestKey);
+  // ⬇️ AUXILIAR: Salvar dados com expiração nativa no Redis
+  private async saveToRedisCache(key: string, data: any): Promise<void> {
+    try {
+      // Salva a string JSON definindo o TTL usando a flag 'EX' (0.1.1)
+      await this.redis.set(
+        key,
+        JSON.stringify(data),
+        'EX',
+        this.CACHE_TTL_SECONDS
+      );
+    } catch (error: any) {
+      this.logger.error(`Falha ao salvar cache no Redis para a chave ${key}: ${error.message}`);
     }
   }
 
@@ -76,10 +81,10 @@ export class GeocodingService {
       return [];
     }
 
-    const cacheKey = `search:${query.trim().toLowerCase()}`;
+    const cacheKey = `cuidarbem:geocoding:search:${query.trim().toLowerCase()}`;
     
-    // Verificar cache primeiro
-    const cached = this.getFromCache(cacheKey);
+    // Verificar cache distribuído primeiro
+    const cached = await this.getFromRedisCache(cacheKey);
     if (cached) {
       return cached;
     }
@@ -100,7 +105,7 @@ export class GeocodingService {
 
       const response = await fetch(`${this.NOMINATIM_URL}/search?${params}`, {
         headers: {
-          'User-Agent': 'CuidarBem/1.0 (contact@cuidarbem.com)', // ⬅️ User-Agent obrigatório
+          'User-Agent': 'CuidarBem/1.0 (contact@cuidarbem.com)',
           'Accept-Language': 'pt-BR,pt',
         },
       });
@@ -108,7 +113,6 @@ export class GeocodingService {
       if (!response.ok) {
         if (response.status === 429) {
           console.warn('⚠️ Nominatim rate limit atingido, aguardando...');
-          // Aguardar mais tempo e tentar novamente
           await new Promise(resolve => setTimeout(resolve, 2000));
           return this.searchAddress(query); // Retry
         }
@@ -117,23 +121,21 @@ export class GeocodingService {
 
       const data = await response.json();
       
-      // Salvar no cache
-      this.saveToCache(cacheKey, data);
+      // Salvar no Redis
+      await this.saveToRedisCache(cacheKey, data);
       
       return data;
     } catch (error: any) {
       console.error('Erro ao buscar endereço:', error.message);
-      
-      // Retornar array vazio em vez de erro para não quebrar o frontend
       return [];
     }
   }
 
   async reverseGeocode(lat: number, lon: number) {
-    const cacheKey = `reverse:${lat.toFixed(4)},${lon.toFixed(4)}`;
+    const cacheKey = `cuidarbem:geocoding:reverse:${lat.toFixed(4)},${lon.toFixed(4)}`;
     
-    // Verificar cache primeiro
-    const cached = this.getFromCache(cacheKey);
+    // Verificar cache distribuído primeiro
+    const cached = await this.getFromRedisCache(cacheKey);
     if (cached) {
       return cached;
     }
@@ -164,7 +166,7 @@ export class GeocodingService {
       }
 
       const data = await response.json();
-      this.saveToCache(cacheKey, data);
+      await this.saveToRedisCache(cacheKey, data);
       
       return data;
     } catch (error: any) {
@@ -180,16 +182,15 @@ export class GeocodingService {
       throw new HttpException('CEP inválido', HttpStatus.BAD_REQUEST);
     }
 
-    const cacheKey = `cep:${cleanCEP}`;
+    const cacheKey = `cuidarbem:geocoding:cep:${cleanCEP}`;
     
-    // Verificar cache primeiro
-    const cached = this.getFromCache(cacheKey);
+    // Verificar cache distribuído primeiro
+    const cached = await this.getFromRedisCache(cacheKey);
     if (cached) {
       return cached;
     }
 
     try {
-      // ViaCEP não tem rate limiting rigoroso
       const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
 
       if (!response.ok) {
@@ -222,10 +223,9 @@ export class GeocodingService {
           state: data.uf,
           postcode: cleanCEP,
           country: 'Brasil',
-        },
+         },
         lat: geocoded?.lat || '',
         lon: geocoded?.lon || '',
-        // Dados originais do ViaCEP para compatibilidade
         cep: cleanCEP,
         logradouro: data.logradouro || '',
         bairro: data.bairro || '',
@@ -233,7 +233,7 @@ export class GeocodingService {
         uf: data.uf,
       };
 
-      this.saveToCache(cacheKey, result);
+      await this.saveToRedisCache(cacheKey, result);
       
       return result;
     } catch (error: any) {

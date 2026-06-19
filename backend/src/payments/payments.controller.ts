@@ -1,25 +1,46 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Body,
-  UseGuards,
-  Request,
-  HttpCode,
-} from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Logger, UseGuards, Get, Param, Req } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { PAYMENTS_QUEUE } from '../queue/queue.constants';
 import { PaymentsService } from './payments.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('payments')
 export class PaymentsController {
-  constructor(private readonly paymentsService: PaymentsService) { }
+  private readonly logger = new Logger(PaymentsController.name);
 
-  // Webhook do Mercado Pago (sem auth)
+  constructor(
+    private readonly paymentsService: PaymentsService,
+    // 📦 Injeta a fila de pagamentos do BullMQ de forma correta
+    @InjectQueue(PAYMENTS_QUEUE) private readonly paymentsQueue: Queue,
+  ) {}
+
   @Post('webhook')
-  @HttpCode(200)
-  async webhook(@Body() body: any) {
-    await this.paymentsService.handleWebhook(body);
+  @HttpCode(HttpStatus.OK) // Sempre retorna 200 rápido para o MercadoPago (0.1.5)
+  async handleWebhook(@Body() body: any) {
+    this.logger.log(`🔔 Webhook HTTP recebido: ${JSON.stringify(body)}`);
+
+    // Verifica se a notificação é de fato sobre um pagamento válido
+    if (body.type === 'payment' && body.data?.id) {
+      const paymentId = String(body.data.id);
+
+      try {
+        // ENFILEIRAMENTO COM IDEMPOTÊNCIA: Define o 'jobId' igual ao ID do pagamento.
+        // O Redis descarta na hora qualquer tentativa duplicada enviada em paralelo (0.1.4, 0.1.6)
+        await this.paymentsQueue.add(
+          'process-payment-update',
+          { paymentId },
+          { jobId: `mp:${paymentId}` } 
+        );
+
+        this.logger.log(`🚀 Webhook do pagamento ${paymentId} enviado para a fila.`);
+        return { enqueued: true };
+      } catch (error: any) {
+        this.logger.error(`❌ Erro ao enfileirar webhook do pagamento ${paymentId}: ${error.message}`);
+      }
+    }
+
+    // Retorna sucesso padrão mesmo para tipos ignorados (ex: merchant_order) para não gerar retries do MP
     return { received: true };
   }
 
@@ -33,7 +54,7 @@ export class PaymentsController {
   // Listar meus pagamentos
   @UseGuards(JwtAuthGuard)
   @Get('my')
-  findMy(@Request() req) {
+  findMy(@Req() req) {
     return this.paymentsService.findByUser(req.user.userId, req.user.role);
   }
 

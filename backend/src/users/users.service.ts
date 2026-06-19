@@ -1,16 +1,24 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, Inject, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
+import Redis from 'ioredis'; // 👈 Importação do ioredis
 import { User, UserDocument } from './schemas/user.schema';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { REDIS_CLIENT } from '../redis/redis.constants'; // 👈 Importação do Token
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
-
+  private readonly logger = new Logger(UsersService.name);
   private readonly safeProjection = '-password';
+  private readonly PRESENCE_PREFIX = 'cuidarbem:presence:';
+
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    // 📦 CORREÇÃO 1: Injeção do cliente Redis unificado no construtor
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+  ) {}
 
   async create(createUserDto: CreateUserDto): Promise<UserDocument> {
     const existing = await this.userModel.findOne({ email: createUserDto.email });
@@ -92,17 +100,52 @@ export class UsersService {
     });
   }
 
-  async touchPresence(id: string) {
-    await this.userModel.findByIdAndUpdate(id, {
-      isOnline: true,
-      lastSeenAt: new Date(),
-    });
+  async touchPresence(userId: string): Promise<void> {
+    const redisKey = `${this.PRESENCE_PREFIX}${userId}`;
+    const timestamp = Date.now().toString();
+
+    // Salva no Redis e define 5 minutos de TTL (300 segundos)
+    await this.redis.set(redisKey, timestamp, 'EX', 300);
   }
 
-  async setOffline(id: string) {
-    await this.userModel.findByIdAndUpdate(id, {
-      isOnline: false,
-    });
+  async setOffline(userId: string): Promise<void> {
+    const redisKey = `${this.PRESENCE_PREFIX}${userId}`;
+    
+    // Apaga a chave de presença atômica do Redis
+    await this.redis.del(redisKey);
+    
+    // Atualiza o MongoDB na mesma hora apenas para saídas manuais (Logout)
+    await this.userModel.updateOne({ _id: userId }, { $set: { isOnline: false } });
+  }
+
+  // 🔄 CORREÇÃO 2: Método adicionador do Sincronizador em lote (Bulk Sinker)
+  async syncPresenceToMongo(): Promise<void> {
+    try {
+      const keys = await this.redis.keys(`${this.PRESENCE_PREFIX}*`);
+      const now = new Date();
+      const userIdsOnline: string[] = [];
+
+      for (const key of keys) {
+        const userId = key.replace(this.PRESENCE_PREFIX, '');
+        userIdsOnline.push(userId);
+      }
+
+      if (userIdsOnline.length > 0) {
+        // Atualiza todos os usuários ativamente pingados de uma vez só
+        await this.userModel.updateMany(
+          { _id: { $in: userIdsOnline } },
+          { $set: { isOnline: true, lastSeenAt: now } }
+        );
+      }
+
+      // Coloca offline quem não disparou pings no Redis nos últimos 5 minutos
+      await this.userModel.updateMany(
+        { _id: { $not: { $in: userIdsOnline } }, isOnline: true },
+        { $set: { isOnline: false } }
+      );
+    } catch (error: any) {
+      this.logger.error(`Erro ao rodar lote de presenças no Mongo: ${error.message}`);
+    }
   }
 
   async registerSuccessfulLogin(id: string) {
@@ -141,7 +184,6 @@ export class UsersService {
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('Usuário não encontrado');
 
-    // Limpeza preventiva de valores nulos
     user.favoriteCaregivers = user.favoriteCaregivers.filter(
       (id): id is Types.ObjectId => id != null && Types.ObjectId.isValid(id.toString())
     );

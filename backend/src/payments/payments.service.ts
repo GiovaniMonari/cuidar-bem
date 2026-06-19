@@ -147,71 +147,86 @@ export class PaymentsService {
     return saved;
   }
 
-  async handleWebhook(data: any) {
-    this.logger.log(`🔔 Webhook recebido: ${JSON.stringify(data)}`);
+  // 2. O PROCESSADOR ASSÍNCRONO: Executado pelo PaymentsWorker em segundo plano (0.1.2)
+  async processPaymentStatusChange(mpPaymentId: string): Promise<void> {
+    this.logger.log(`⚙️ [Worker] Processando mudança de status do pagamento MP: ${mpPaymentId}`);
+    
+    const mpPaymentApi = new MPPayment(this.mpClient);
 
-    if (data.type === 'payment') {
-      const mpPaymentApi = new MPPayment(this.mpClient);
+    try {
+      // 1. Busca os dados em tempo real na API do MercadoPago (0.1.2)
+      const mpPayment = await mpPaymentApi.get({ id: Number(mpPaymentId) });
 
-      try {
-        const mpPayment = await mpPaymentApi.get({ id: data.data.id });
+      // 2. Localiza o registro do pagamento usando a referência externa gerada no checkout
+      const payment = await this.paymentModel.findOne({
+        transactionId: mpPayment.external_reference,
+      });
 
-        const payment = await this.paymentModel.findOne({
-          transactionId: mpPayment.external_reference,
+      if (!payment) {
+        this.logger.warn(`[Worker] Pagamento não encontrado no banco: ${mpPayment.external_reference}`);
+        return;
+      }
+
+      // 3. IDEMPOTÊNCIA EM NÍVEL DE BANCO: Se o pagamento já foi aprovado e processado, ignora (0.1.4)
+      if (payment.status === 'held' && mpPayment.status === 'approved') {
+        this.logger.log(`✨ [Worker] O pagamento ${payment.transactionId} já estava marcado como aprovado/retido. Abortando.`);
+        return;
+      }
+
+      payment.mpPaymentId = String(mpPayment.id);
+      payment.mpStatus = mpPayment.status;
+
+      // 4. Se foi aprovado, executa as alterações e notificações em cascata (0.1.6)
+      if (mpPayment.status === 'approved') {
+        const booking = await this.bookingsService.findOne(
+          payment.bookingId.toString(),
+        );
+
+        payment.status = 'held';
+        payment.paidAt = new Date();
+        payment.history.push({
+          status: payment.status,
+          date: new Date(),
+          description: 'Pagamento aprovado - valor retido na plataforma (Processado via Fila)',
         });
 
-        if (!payment) {
-          this.logger.warn(`Pagamento não encontrado: ${mpPayment.external_reference}`);
-          return;
-        }
+        const clientUser = booking?.clientId as any;
+        const caregiver = booking?.caregiverId as any;
 
-        payment.mpPaymentId = String(mpPayment.id);
-        payment.mpStatus = mpPayment.status;
+        // Dispara o e-mail de confirmação usando o produtor da fila que consertamos (0.1.2, 0.1.5)
+        await this.emailProducer.sendPaymentConfirmed({
+          to: clientUser?.email,
+          clientName: clientUser?.name || 'Cliente',
+          caregiverName: caregiver?.userId?.name || 'Cuidador',
+          amount: payment.amount,
+          bookingDate: new Date(booking?.startDate).toLocaleDateString('pt-BR'),
+        });
 
-        if (mpPayment.status === 'approved') {
-          const booking = await this.bookingsService.findOne(
-            payment.bookingId.toString(),
-          );
-
-          payment.status = 'held';
-          payment.paidAt = new Date();
-          payment.history.push({
-            status: payment.status,
-            date: new Date(),
-            description: 'Pagamento aprovado - valor retido na plataforma',
-          });
-
-          const clientUser = booking?.clientId as any;
-          const caregiver = booking?.caregiverId as any;
-
-          await this.emailProducer.sendPaymentConfirmed({
-            to: clientUser?.email,
-            clientName: clientUser?.name || 'Cliente',
-            caregiverName: caregiver?.userId?.name || 'Cuidador',
-            amount: payment.amount,
-            bookingDate: new Date(booking?.startDate).toLocaleDateString('pt-BR'),
-          });
-
-          this.logger.log(`✅ Pagamento ${payment.transactionId} aprovado e retido`);
-        } else if (mpPayment.status === 'rejected') {
-          payment.status = 'failed';
-          payment.history.push({
-            status: 'failed',
-            date: new Date(),
-            description: 'Pagamento rejeitado',
-          });
-        } else if (mpPayment.status === 'pending') {
-          payment.history.push({
-            status: 'pending',
-            date: new Date(),
-            description: 'Pagamento pendente de confirmação',
-          });
-        }
-
-        await payment.save();
-      } catch (error) {
-        this.logger.error(`Erro no webhook`);
+        this.logger.log(`✅ [Worker] Pagamento ${payment.transactionId} aprovado, retido e e-mail enfileirado.`);
+      } 
+      else if (mpPayment.status === 'rejected') {
+        payment.status = 'failed';
+        payment.history.push({
+          status: 'failed',
+          date: new Date(),
+          description: 'Pagamento rejeitado pelo MercadoPago',
+        });
+      } 
+      else if (mpPayment.status === 'pending') {
+        payment.history.push({
+          status: 'pending',
+          date: new Date(),
+          description: 'Pagamento pendente de confirmação',
+        });
       }
+
+      // Salva as alterações no banco com segurança
+      await payment.save();
+
+    } catch (error: any) {
+      this.logger.error(`❌ [Worker Error] Falha crítica ao processar pagamento MP ${mpPaymentId}: ${error.message}`);
+      // Disparamos o throw aqui para o BullMQ saber que falhou e tentar novamente via backoff exponencial (0.1.5)
+      throw error; 
     }
   }
   

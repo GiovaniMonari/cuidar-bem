@@ -10,6 +10,9 @@ import {
   UploadedFile,
   BadRequestException,
   Param,
+  Req,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -110,14 +113,16 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Post('me/presence')
-  async touchPresence(@Request() req) {
+  @HttpCode(HttpStatus.OK)
+  async touchPresence(@Req() req: any) { // 👈 Corrigido para @Req()
     await this.usersService.touchPresence(req.user.userId);
     return { success: true };
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('me/presence/offline')
-  async setOffline(@Request() req) {
+  @HttpCode(HttpStatus.OK)
+  async setOffline(@Req() req: any) { // 👈 Corrigido para @Req()
     await this.usersService.setOffline(req.user.userId);
     return { success: true };
   }

@@ -8,10 +8,8 @@ async function bootstrap() {
     logger: ['error', 'warn', 'debug', 'log', 'verbose'],
   });
 
-  const redisIoAdapter = new RedisIoAdapter(app);
-  await redisIoAdapter.connectToRedis();
-
-  app.useWebSocketAdapter(redisIoAdapter);
+  // 1. CONFIGURAÇÕES HTTP GLOBAIS (Devem vir primeiro)
+  app.setGlobalPrefix('api');
 
   app.enableCors({
     origin: [
@@ -19,7 +17,9 @@ async function bootstrap() {
       'https://cuidar-bem-giovanimonaris-projects.vercel.app',
       'https://cuidar-bem-pink.vercel.app',
     ],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS', // Força os métodos aceitos
     credentials: true,
+    allowedHeaders: 'Content-Type, Accept, Authorization', // Força os headers permitidos
   });
 
   app.useGlobalPipes(
@@ -30,8 +30,12 @@ async function bootstrap() {
     }),
   );
 
-  app.setGlobalPrefix('api');
+  // 2. CONFIGURAÇÃO DE WEBSOCKETS COM REDIS
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
+  // 3. INICIALIZAÇÃO DO SERVIDOR
   const port = process.env.PORT || 3001;
   await app.listen(port);
   console.log(`🚀 API rodando em http://localhost:${port}/api`);

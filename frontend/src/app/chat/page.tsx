@@ -51,7 +51,7 @@ function ChatContent() {
   useEffect(() => {
     const socket = getSocket();
 
-    socket.on('newMessage', (msg) => {
+    socket?.on('newMessage', (msg) => {
       setMessages((prev) => {
         const alreadyExists = prev.some((m) => m._id === msg._id);
         if (alreadyExists) return prev;
@@ -74,7 +74,7 @@ function ChatContent() {
     });
 
     return () => {
-      socket.off('newMessage');
+      socket?.off('newMessage');
     };
   }, []);
 
@@ -124,7 +124,7 @@ function ChatContent() {
       setMessages(data || []);
 
       const socket = getSocket();
-      socket.emit('joinConversation', { conversationId: conversation._id });
+      socket?.emit('joinConversation', { conversationId: conversation._id });
 
       setConversations((prev) =>
         prev.map((conv) =>
@@ -155,7 +155,7 @@ function ChatContent() {
 
     const socket = getSocket();
 
-    socket.emit('sendMessage', {
+    socket?.emit('sendMessage', {
       conversationId: selectedConversation._id,
       content: message.trim(),
     });

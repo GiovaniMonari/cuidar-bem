@@ -18,7 +18,7 @@ async function bootstrap() {
     origin: [
       'http://localhost:3000',
       'https://vercel.app',
-      'https://vercel.app',
+      'https://cuidar-bem-pink.vercel.app',
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,

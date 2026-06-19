@@ -13,7 +13,6 @@ import { EMAIL_QUEUE } from './queue.constants';
         // CORREÇÃO: Passa a URL completa injetada pela Railway.
         // Se estiver em ambiente local e não encontrar a variável, usa o localhost.
         url: process.env.REDIS_URL || 'redis://localhost:6379',
-        keyPrefix: 'cuidarbem',
       },
     }),
     BullModule.registerQueue({

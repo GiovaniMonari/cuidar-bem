@@ -234,7 +234,7 @@ export class BookingsService {
       },
     ]);
 
-    const caregiverPopulated = saved.caregiverId as any;
+        const caregiverPopulated = saved.caregiverId as any;
     const caregiverUser = caregiverPopulated?.userId;
     const client = saved.clientId as any;
 
@@ -242,12 +242,12 @@ export class BookingsService {
     this.logger.log(`   Cliente: ${client?.email || 'sem email'}`);
     this.logger.log(`   Cuidador: ${caregiverUser?.email || 'sem email'}`);
 
-    // ✅ Enviar emails em paralelo para não bloquear resposta
-    const emailPromises: Promise<boolean>[] = [];
+    // ✅ Enviar emails em paralelo de forma correta e resiliente
+    const emailPromises: Promise<any>[] = [];
 
-    // Email para o cuidador
+    // 1. Email para o Cuidador (Avisa que há uma nova solicitação)
     if (caregiverUser?.email) {
-      await this.emailProducer.sendNewBookingRequest({
+      const promise = this.emailProducer.sendNewBookingRequest({
         to: caregiverUser.email,
         caregiverName: caregiverUser.name,
         clientName: dto.clientName || client?.name || 'Cliente',
@@ -258,42 +258,41 @@ export class BookingsService {
         address: dto.address || '',
         totalAmount: dto.totalAmount,
         notes: dto.notes,
-      });
+      }).catch(err => this.logger.error(`Erro ao enfileirar email do cuidador: ${err.message}`));
+      
+      emailPromises.push(promise);
     } else {
       this.logger.warn('⚠️ Cuidador sem email cadastrado');
     }
 
-    // Email para o cliente
+    // 2. Email para o Cliente (Você - Confirmação de que o pedido foi enviado)
     if (client?.email) {
-      await this.emailProducer.sendNewBookingRequest({
-        to: caregiverUser.email,
-        caregiverName: caregiverUser.name,
+      // CORREÇÃO 1: Alterado para enviar para client.email (Seu gimareeli@gmail.com)
+      // CORREÇÃO 2: Alterado para chamar o método correto do cliente no Producer
+      const promise = this.emailProducer.sendBookingConfirmationClient({
+        to: client.email,
         clientName: dto.clientName || client?.name || 'Cliente',
-        clientPhone: dto.clientPhone || client?.phone || '',
+        caregiverName: caregiverUser?.name || 'Cuidador',
         serviceName: dto.serviceName || dto.serviceType || 'Atendimento',
-        durationLabel: dto.durationLabel || `${dto.durationHours}h`,
         startDate: new Date(dto.startDate).toLocaleString('pt-BR'),
-        address: dto.address || '',
         totalAmount: dto.totalAmount,
-        notes: dto.notes,
-      });
+        durationLabel: dto.durationLabel || `${dto.durationHours}`
+      }).catch(err => this.logger.error(`Erro ao enfileirar email do cliente: ${err.message}`));
+      
+      emailPromises.push(promise);
     } else {
-      this.logger.warn('⚠️ Cuidador sem email cadastrado');
+      this.logger.warn('⚠️ Cliente sem email cadastrado');
     }
 
-    // ✅ Aguardar emails mas não falhar se não enviar
+    // ✅ Aguarda o enfileiramento de ambos no Redis em paralelo
     if (emailPromises.length > 0) {
-      const results = await Promise.allSettled(emailPromises);
-      const successCount = results.filter(
-        (r) => r.status === 'fulfilled' && r.value === true,
-      ).length;
-      this.logger.log(
-        `📧 Emails enviados: ${successCount}/${emailPromises.length}`,
-      );
+      await Promise.allSettled(emailPromises);
+      this.logger.log(`📧 Disparos de e-mail processados em background.`);
     }
 
     return saved;
   }
+
 
   // ═══════════════════════════════════════════
   // CHECK-IN

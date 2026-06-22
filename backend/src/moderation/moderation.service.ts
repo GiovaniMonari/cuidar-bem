@@ -32,7 +32,8 @@ import {
   PlatformReport,
   PlatformReportDocument,
 } from './schemas/platform-report.schema';
-import { JwtBlacklistService } from 'src/redis/jwt-blacklist.service';
+import { RedisCacheService } from '../redis/redis-cache.service';
+import { CACHE_KEYS, CACHE_TTL } from '../redis/cache-keys';
 
 type ModerationAction = 'none' | 'watchlist' | 'ban' | 'dismiss' | 'unban';
 type UserAction = 'ban' | 'unban' | 'watchlist' | 'clear_watch';
@@ -83,8 +84,10 @@ export class ModerationService {
     private readonly platformReportModel: Model<PlatformReportDocument>,
     @InjectModel(AdminActionLog.name)
     private readonly adminActionLogModel: Model<AdminActionLogDocument>,
-    private readonly jwtBlacklistService: JwtBlacklistService
+    private readonly cache: RedisCacheService,
   ) {}
+
+  // ─── Reports ────────────────────────────────────────────────────
 
   async createReport(
     dto: CreatePlatformReportDto,
@@ -148,10 +151,23 @@ export class ModerationService {
     report.moderationSnapshot = moderationResult.snapshot;
     await report.save();
 
+    // Nova reportagem invalida o dashboard
+    await this.invalidateDashboardCache();
+
     return this.getReportSummary(report._id.toString());
   }
 
+  // ─── Dashboard ──────────────────────────────────────────────────
+
   async getDashboard() {
+    return this.cache.wrap(
+      CACHE_KEYS.ADMIN_DASHBOARD,
+      CACHE_TTL.ADMIN_DASHBOARD,
+      () => this.computeDashboard(),
+    );
+  }
+
+  private async computeDashboard() {
     const now = new Date();
     const onlineThreshold = new Date(
       now.getTime() - ONLINE_WINDOW_MINUTES * 60 * 1000,
@@ -272,6 +288,8 @@ export class ModerationService {
       refreshWindowSeconds: 20,
     };
   }
+
+  // ─── Users ──────────────────────────────────────────────────────
 
   async listUsers(search?: string, role?: string, status?: string): Promise<any[]> {
     const query: FilterQuery<UserDocument> = {};
@@ -522,6 +540,8 @@ export class ModerationService {
     };
   }
 
+  // ─── Reports listing ────────────────────────────────────────────
+
   async listReports(status?: string, source?: string) {
     const query: FilterQuery<PlatformReportDocument> = {};
 
@@ -687,6 +707,9 @@ export class ModerationService {
       },
     });
 
+    // Revisão de report invalida o dashboard
+    await this.invalidateDashboardCache();
+
     return this.getReportDetail(reportId);
   }
 
@@ -695,7 +718,7 @@ export class ModerationService {
     adminId: string,
     dto: UpdateUserModerationDto,
   ) {
-    return this.applyUserModerationAction(
+    const result = await this.applyUserModerationAction(
       userId,
       dto.action as UserAction,
       dto.reason ||
@@ -707,6 +730,11 @@ export class ModerationService {
       adminId,
       { userId },
     );
+
+    // Mudança de moderação invalida o dashboard
+    await this.invalidateDashboardCache();
+
+    return result;
   }
 
   async getLogs(limit = 40) {
@@ -716,6 +744,12 @@ export class ModerationService {
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean();
+  }
+
+  // ─── Helpers privados ───────────────────────────────────────────
+
+  private async invalidateDashboardCache(): Promise<void> {
+    await this.cache.del(CACHE_KEYS.ADMIN_DASHBOARD);
   }
 
   private async getReportSummary(reportId: string) {
@@ -936,20 +970,15 @@ export class ModerationService {
     const now = new Date();
 
     if (action === 'ban') {
-    user.moderationStatus = 'banned';
-    user.isActive = false;
-    user.banReason = reason;
-    user.banSource = actorType === 'system' ? 'automatic' : 'manual';
-    user.bannedAt = now;
-    user.lastModerationAt = now;
-    user.moderationReason = reason;
-    user.isOnline = false;
-
-    // TTL de 7 dias (tempo máximo que um JWT costuma viver)
-    // ajuste conforme seu JWT_EXPIRATION
-    const jwtTtlSeconds = 60 * 60 * 24 * 7;
-    await this.jwtBlacklistService.addUser(user._id.toString(), jwtTtlSeconds);
-  } else if (action === 'unban') {
+      user.moderationStatus = 'banned';
+      user.isActive = false;
+      user.banReason = reason;
+      user.banSource = actorType === 'system' ? 'automatic' : 'manual';
+      user.bannedAt = now;
+      user.lastModerationAt = now;
+      user.moderationReason = reason;
+      user.isOnline = false;
+    } else if (action === 'unban') {
       user.moderationStatus = 'active';
       user.isActive = true;
       user.banReason = '';
@@ -960,9 +989,6 @@ export class ModerationService {
       if (user.reviewRequestStatus === 'pending') {
         user.reviewRequestStatus = 'accepted';
       }
-
-      // remove da blacklist para permitir login novamente
-      await this.jwtBlacklistService.removeUser(user._id.toString());
     } else if (action === 'watchlist') {
       user.moderationStatus = 'watchlist';
       user.isActive = true;
@@ -978,6 +1004,9 @@ export class ModerationService {
     }
 
     await user.save();
+
+    // Qualquer ação de moderação invalida o dashboard
+    await this.invalidateDashboardCache();
 
     await this.recordAction({
       actorId,

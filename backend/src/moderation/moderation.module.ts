@@ -18,8 +18,10 @@ import {
   AdminActionLog,
   AdminActionLogSchema,
 } from './schemas/admin-action-log.schema';
-import { JwtBlacklistService } from 'src/redis/jwt-blacklist.service';
-import { RedisModule } from 'src/redis/redis.module';
+// RedisModule é @Global(), portanto não precisa ser importado aqui,
+// mas deixamos explícito para deixar a dependência visível.
+import { RedisModule } from '../redis/redis.module';
+import { RedisCacheService } from 'src/redis/redis-cache.service';
 
 @Module({
   imports: [
@@ -36,7 +38,7 @@ import { RedisModule } from 'src/redis/redis.module';
     RedisModule,
   ],
   controllers: [ReportsController, AdminController],
-  providers: [ModerationService, AdminGuard,],
+  providers: [ModerationService, AdminGuard, RedisCacheService],
   exports: [ModerationService],
 })
 export class ModerationModule {}

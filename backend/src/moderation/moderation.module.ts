@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { BullModule } from '@nestjs/bullmq';
 import { AdminGuard } from '../auth/admin.guard';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Booking, BookingSchema } from '../bookings/schemas/booking.schema';
@@ -10,18 +11,12 @@ import { Feedback, FeedbackSchema } from '../feedback/schemas/feedback.schema';
 import { ModerationService } from './moderation.service';
 import { ReportsController } from './reports.controller';
 import { AdminController } from './admin.controller';
-import {
-  PlatformReport,
-  PlatformReportSchema,
-} from './schemas/platform-report.schema';
-import {
-  AdminActionLog,
-  AdminActionLogSchema,
-} from './schemas/admin-action-log.schema';
-// RedisModule é @Global(), portanto não precisa ser importado aqui,
-// mas deixamos explícito para deixar a dependência visível.
+import { PlatformReport, PlatformReportSchema } from './schemas/platform-report.schema';
+import { AdminActionLog, AdminActionLogSchema } from './schemas/admin-action-log.schema';
 import { RedisModule } from '../redis/redis.module';
-import { RedisCacheService } from 'src/redis/redis-cache.service';
+import { ModerationProducer } from './queues/moderation.producer';
+import { ModerationWorker } from './queues/moderation.worker';
+import { MODERATION_QUEUE } from './queues/moderation.constants';
 
 @Module({
   imports: [
@@ -35,10 +30,11 @@ import { RedisCacheService } from 'src/redis/redis-cache.service';
       { name: PlatformReport.name, schema: PlatformReportSchema },
       { name: AdminActionLog.name, schema: AdminActionLogSchema },
     ]),
+    BullModule.registerQueue({ name: MODERATION_QUEUE }),
     RedisModule,
   ],
   controllers: [ReportsController, AdminController],
-  providers: [ModerationService, AdminGuard, RedisCacheService],
+  providers: [ModerationService, ModerationProducer, ModerationWorker, AdminGuard],
   exports: [ModerationService],
 })
 export class ModerationModule {}

@@ -34,14 +34,11 @@ import {
 } from './schemas/platform-report.schema';
 import { RedisCacheService } from '../redis/redis-cache.service';
 import { CACHE_KEYS, CACHE_TTL } from '../redis/cache-keys';
+import { ModerationProducer } from './queues/moderation.producer';
 
 type ModerationAction = 'none' | 'watchlist' | 'ban' | 'dismiss' | 'unban';
 type UserAction = 'ban' | 'unban' | 'watchlist' | 'clear_watch';
 
-const WATCHLIST_THRESHOLD = 2;
-const BAN_THRESHOLD = 4;
-const LOOKBACK_DAYS = 60;
-const RECENT_ACTIVITY_DAYS = 14;
 const ONLINE_WINDOW_MINUTES = 5;
 
 const REASON_LABELS: Record<string, string> = {
@@ -57,13 +54,6 @@ const SOURCE_LABELS: Record<string, string> = {
   service: 'Fluxo pós-serviço',
 };
 
-const REASON_WEIGHTS: Record<string, number> = {
-  inappropriate_behavior: 1.2,
-  delay_or_no_show: 1,
-  offensive_language: 1.1,
-  fraud_attempt: 1.8,
-  other: 0.9,
-};
 
 @Injectable()
 export class ModerationService {
@@ -85,6 +75,7 @@ export class ModerationService {
     @InjectModel(AdminActionLog.name)
     private readonly adminActionLogModel: Model<AdminActionLogDocument>,
     private readonly cache: RedisCacheService,
+    private readonly moderationProducer: ModerationProducer,
   ) {}
 
   // ─── Reports ────────────────────────────────────────────────────
@@ -145,14 +136,9 @@ export class ModerationService {
       resolvedAction: 'none',
     });
 
-    const moderationResult = await this.evaluateAutomatedModeration(report);
-    report.autoAction = moderationResult.recommendedAction;
-    report.severityScore = moderationResult.score;
-    report.moderationSnapshot = moderationResult.snapshot;
-    await report.save();
-
-    // Nova reportagem invalida o dashboard
-    await this.invalidateDashboardCache();
+    // Avaliação automática desacoplada — não bloqueia a resposta ao usuário.
+    // O worker atualiza autoAction/severityScore/moderationSnapshot em background.
+    await this.moderationProducer.enqueueEvaluateReport(report._id.toString());
 
     return this.getReportSummary(report._id.toString());
   }
@@ -848,109 +834,6 @@ export class ModerationService {
     }
 
     throw new ForbiddenException('Seu perfil não pode enviar reportagens');
-  }
-
-  private async evaluateAutomatedModeration(report: PlatformReportDocument) {
-    const reason = report.reason;
-    const weight = REASON_WEIGHTS[reason] || 1;
-    const lookbackDate = new Date(Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
-    const recentDate = new Date(
-      Date.now() - RECENT_ACTIVITY_DAYS * 24 * 60 * 60 * 1000,
-    );
-
-    const baseQuery: FilterQuery<PlatformReportDocument> = {
-      reportedUserId: report.reportedUserId,
-      status: { $ne: 'dismissed' },
-      createdAt: { $gte: lookbackDate },
-    };
-
-    const [sameReasonCount, recentCount, lifetimeCount, user] = await Promise.all([
-      this.platformReportModel.countDocuments({
-        ...baseQuery,
-        reason,
-      }),
-      this.platformReportModel.countDocuments({
-        reportedUserId: report.reportedUserId,
-        status: { $ne: 'dismissed' },
-        createdAt: { $gte: recentDate },
-      }),
-      this.platformReportModel.countDocuments({
-        reportedUserId: report.reportedUserId,
-        status: { $ne: 'dismissed' },
-      }),
-      this.userModel.findById(report.reportedUserId),
-    ]);
-
-    if (!user) {
-      throw new NotFoundException('Usuário reportado não encontrado');
-    }
-
-    const historicalPenalty =
-      (user.lastModerationAt ? 0.8 : 0) +
-      (user.reviewRequestStatus === 'pending' ? 0.3 : 0);
-    const score = Number(
-      (
-        sameReasonCount * weight +
-        recentCount * 0.45 +
-        Math.min(lifetimeCount, 10) * 0.15 +
-        historicalPenalty
-      ).toFixed(2),
-    );
-
-    let recommendedAction: ModerationAction = 'none';
-
-    if (sameReasonCount >= BAN_THRESHOLD || score >= 6.2) {
-      recommendedAction = 'ban';
-    } else if (sameReasonCount >= WATCHLIST_THRESHOLD || score >= 3.4) {
-      recommendedAction = 'watchlist';
-    }
-
-    if (recommendedAction === 'ban' && user.moderationStatus !== 'banned') {
-      await this.applyUserModerationAction(
-        user._id.toString(),
-        'ban',
-        `Banimento automático após ${sameReasonCount} reportagens recorrentes de ${REASON_LABELS[reason] || reason}`,
-        'system',
-        undefined,
-        {
-          reportId: report._id.toString(),
-          sameReasonCount,
-          recentCount,
-          score,
-          reason,
-        },
-      );
-    } else if (
-      recommendedAction === 'watchlist' &&
-      user.moderationStatus === 'active'
-    ) {
-      await this.applyUserModerationAction(
-        user._id.toString(),
-        'watchlist',
-        `Observação automática após ${sameReasonCount} reportagens recorrentes de ${REASON_LABELS[reason] || reason}`,
-        'system',
-        undefined,
-        {
-          reportId: report._id.toString(),
-          sameReasonCount,
-          recentCount,
-          score,
-          reason,
-        },
-      );
-    }
-
-    return {
-      recommendedAction,
-      score,
-      snapshot: {
-        sameReasonCount,
-        recentCount,
-        lifetimeCount,
-        weight,
-        score,
-      },
-    };
   }
 
   private async applyUserModerationAction(

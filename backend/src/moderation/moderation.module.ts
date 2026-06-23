@@ -17,6 +17,7 @@ import { RedisModule } from '../redis/redis.module';
 import { ModerationProducer } from './queues/moderation.producer';
 import { ModerationWorker } from './queues/moderation.worker';
 import { MODERATION_QUEUE } from './queues/moderation.constants';
+import { RedisCacheService } from 'src/redis/redis-cache.service';
 
 @Module({
   imports: [
@@ -34,7 +35,7 @@ import { MODERATION_QUEUE } from './queues/moderation.constants';
     RedisModule,
   ],
   controllers: [ReportsController, AdminController],
-  providers: [ModerationService, ModerationProducer, ModerationWorker, AdminGuard],
+  providers: [ModerationService, ModerationProducer, ModerationWorker, AdminGuard, RedisCacheService],
   exports: [ModerationService],
 })
 export class ModerationModule {}

@@ -123,6 +123,27 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * SET NX EX — insere a chave apenas se ela ainda não existir.
+   * Retorna `true`  → chave criada (operação permitida).
+   * Retorna `false` → chave já existia (operação bloqueada / duplicata).
+   * Retorna `null`  → Redis indisponível (o chamador deve usar fallback).
+   *
+   * Uso típico: deduplicação de eventos dentro de uma janela de tempo.
+   */
+  async setNX(key: string, ttlSeconds: number): Promise<boolean | null> {
+    if (!this.client || !this.isConnected) return null;
+
+    try {
+      // SET key 1 NX EX ttl — atômico, sem race conditions
+      const result = await this.client.set(key, '1', 'EX', ttlSeconds, 'NX');
+      return result === 'OK'; // 'OK' → criou; null → já existia
+    } catch (err: any) {
+      this.logger.warn(`Redis SETNX falhou (${key}): ${err.message}`);
+      return null;
+    }
+  }
+
+  /**
    * Cache-aside helper: retorna o valor cacheado se existir,
    * caso contrário executa `fn`, armazena o resultado e retorna.
    */

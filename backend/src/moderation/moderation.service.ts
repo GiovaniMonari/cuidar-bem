@@ -93,29 +93,55 @@ export class ModerationService {
     const reporterObjectId = new Types.ObjectId(reporterId);
     const reportedObjectId = new Types.ObjectId(resolvedContext.reportedUserId);
 
-    const duplicateQuery: FilterQuery<PlatformReportDocument> = {
-      reporterId: reporterObjectId,
-      reportedUserId: reportedObjectId,
-      source: dto.source,
-      reason: dto.reason,
-      status: { $ne: 'dismissed' },
-      createdAt: { $gte: new Date(Date.now() - 6 * 60 * 60 * 1000) },
-    };
+    // ─── Deduplicação via Redis (O(1), sem round-trip ao MongoDB) ───────────
+    // O contexto preferencial é conversationId (chat) ou bookingId (serviço).
+    const contextId =
+      resolvedContext.conversationId || resolvedContext.bookingId || undefined;
 
-    if (resolvedContext.bookingId) {
-      duplicateQuery.bookingId = new Types.ObjectId(resolvedContext.bookingId);
-    }
+    const dedupKey = CACHE_KEYS.reportDedup(
+      reporterId,
+      resolvedContext.reportedUserId,
+      dto.source,
+      dto.reason,
+      contextId,
+    );
 
-    if (resolvedContext.conversationId) {
-      duplicateQuery.conversationId = new Types.ObjectId(resolvedContext.conversationId);
-    }
+    const redisResult = await this.cache.setNX(dedupKey, CACHE_TTL.REPORT_DEDUP);
 
-    const duplicate = await this.platformReportModel.findOne(duplicateQuery);
-    if (duplicate) {
+    if (redisResult === false) {
+      // Chave já existia → duplicata confirmada pelo Redis
       throw new BadRequestException(
         'Você já enviou uma reportagem semelhante recentemente para este contexto',
       );
     }
+
+    if (redisResult === null) {
+      // Redis indisponível → fallback: query MongoDB original de 6 horas
+      const duplicateQuery: FilterQuery<PlatformReportDocument> = {
+        reporterId: reporterObjectId,
+        reportedUserId: reportedObjectId,
+        source: dto.source,
+        reason: dto.reason,
+        status: { $ne: 'dismissed' },
+        createdAt: { $gte: new Date(Date.now() - 6 * 60 * 60 * 1000) },
+      };
+
+      if (resolvedContext.bookingId) {
+        duplicateQuery.bookingId = new Types.ObjectId(resolvedContext.bookingId);
+      }
+
+      if (resolvedContext.conversationId) {
+        duplicateQuery.conversationId = new Types.ObjectId(resolvedContext.conversationId);
+      }
+
+      const duplicate = await this.platformReportModel.findOne(duplicateQuery);
+      if (duplicate) {
+        throw new BadRequestException(
+          'Você já enviou uma reportagem semelhante recentemente para este contexto',
+        );
+      }
+    }
+    // redisResult === true → primeira vez nessa janela, pode prosseguir
 
     const report = await this.platformReportModel.create({
       bookingId: resolvedContext.bookingId

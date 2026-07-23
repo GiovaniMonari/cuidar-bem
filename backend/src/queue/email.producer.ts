@@ -69,8 +69,33 @@ export class EmailProducer {
   }
 
   async sendPaymentPending(data: PaymentPendingEmailJob) {
-    await this.emailQueue.add('payment-pending', data);
-    this.logger.log(`Job payment-pending enfileirado para ${data.to}`);
+    return this.enqueuePaymentEmail('payment-pending', data, `payment-pending:${data.bookingId}`);
+  }
+
+  async sendPaymentReminder(data: PaymentPendingEmailJob) {
+    return this.enqueuePaymentEmail(
+      'payment-reminder',
+      { ...data, isReminder: true },
+      `payment-reminder:${data.bookingId}`,
+    );
+  }
+
+  private async enqueuePaymentEmail(
+    jobName: 'payment-pending' | 'payment-reminder',
+    data: PaymentPendingEmailJob,
+    jobId: string,
+  ) {
+    await this.emailQueue.add(jobName, data, {
+      jobId,
+      attempts: 2,
+      backoff: {
+        type: 'fixed',
+        delay: 10 * 60 * 1000,
+      },
+      removeOnComplete: false,
+      removeOnFail: 100,
+    });
+    this.logger.log(`Job ${jobName} enfileirado para ${data.to}`);
   }
 
   async sendPaymentConfirmed(data: PaymentConfirmedEmailJob) {

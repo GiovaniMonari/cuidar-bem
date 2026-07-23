@@ -69,6 +69,12 @@ export class Payment {
   releasedAt: Date;
 
   @Prop()
+  paymentReminderSentAt: Date;
+
+  @Prop()
+  overdueAccountBannedAt: Date;
+
+  @Prop()
   refundedAt: Date;
 
   @Prop({ type: Object })

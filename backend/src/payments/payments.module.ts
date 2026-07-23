@@ -4,6 +4,7 @@ import { BullModule } from '@nestjs/bullmq'; // 👈 Importação necessária
 import { PaymentsService } from './payments.service';
 import { PaymentsController } from './payments.controller';
 import { Payment, PaymentSchema } from './schemas/payment.schema';
+import { User, UserSchema } from '../users/schemas/user.schema';
 import { BookingsModule } from '../bookings/bookings.module';
 import { CaregiversModule } from '../caregivers/caregivers.module';
 import { UsersModule } from '../users/users.module';
@@ -13,7 +14,10 @@ import { QueueModule } from '../queue/queue.module'; // 👈 Importe o módulo d
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Payment.name, schema: PaymentSchema }]),
+    MongooseModule.forFeature([
+      { name: Payment.name, schema: PaymentSchema },
+      { name: User.name, schema: UserSchema },
+    ]),
     // 📦 Registra a fila de pagamentos especificamente para este módulo injetar no Controller
     BullModule.registerQueue({
       name: PAYMENTS_QUEUE,

@@ -8,6 +8,7 @@ export type EmailJobName =
   | 'service-completed-client'
   | 'service-completed-caregiver'
   | 'payment-pending'
+  | 'payment-reminder'
   | 'payment-confirmed'
   | 'new-feedback';
 
@@ -87,6 +88,8 @@ export type ServiceCompletedCaregiverEmailJob = {
 };
 
 export type PaymentPendingEmailJob = {
+  bookingId: string;
+  isReminder?: boolean;
   to: string;
   clientName: string;
   caregiverName: string;
@@ -125,5 +128,6 @@ export type EmailJobData =
   | { name: 'service-completed-client'; data: ServiceCompletedClientEmailJob }
   | { name: 'service-completed-caregiver'; data: ServiceCompletedCaregiverEmailJob }
   | { name: 'payment-pending'; data: PaymentPendingEmailJob }
+  | { name: 'payment-reminder'; data: PaymentPendingEmailJob }
   | { name: 'payment-confirmed'; data: PaymentConfirmedEmailJob }
   | { name: 'new-feedback'; data: NewFeedbackEmailJob };

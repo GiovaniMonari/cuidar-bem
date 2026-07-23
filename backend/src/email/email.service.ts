@@ -381,6 +381,7 @@ export class EmailService implements OnModuleInit {
     pixKey?: string;
     bookingDate: string;
     serviceType: string;
+    isReminder?: boolean;
   }) {
     const content = `
       <div class="header" style="background: linear-gradient(135deg, #2563eb, #1d4ed8);">
@@ -437,6 +438,15 @@ export class EmailService implements OnModuleInit {
           </p>
         </div>
 
+        ${data.isReminder ? `
+          <div style="background: #fee2e2; border: 1px solid #fca5a5; border-radius: 12px; padding: 16px; margin: 16px 0;">
+            <p style="color: #991b1b; margin: 0; font-size: 14px; line-height: 1.5;">
+              🚨 <strong>Aviso sobre o prazo:</strong> este pagamento deve ser concluído em até 24 horas após o término do atendimento.
+              O não pagamento dentro desse prazo poderá resultar no banimento da sua conta da plataforma.
+            </p>
+          </div>
+        ` : ''}
+
         <div style="text-align: center;">
           <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/agenda" class="btn">
             Acompanhar no Dashboard
@@ -447,7 +457,7 @@ export class EmailService implements OnModuleInit {
 
     return this.sendMail(
       data.to,
-      `💳 Pagamento Pendente - R$ ${data.amount.toFixed(2)}`,
+      `${data.isReminder ? '🚨 Lembrete de pagamento' : '💳 Pagamento Pendente'} - R$ ${data.amount.toFixed(2)}`,
       this.baseTemplate(content),
     );
   }

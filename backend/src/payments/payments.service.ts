@@ -1,14 +1,17 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { MercadoPagoConfig, Preference, Payment as MPPayment } from 'mercadopago';
 import { v4 as uuidv4 } from 'uuid';
 import { Payment, PaymentDocument } from './schemas/payment.schema';
+import { User, UserDocument } from '../users/schemas/user.schema';
 import { BookingsService } from '../bookings/bookings.service';
 import { CaregiversService } from '../caregivers/caregivers.service';
 import { UsersService } from '../users/users.service';
 import { EmailService } from '../email/email.service';
 import { EmailProducer } from 'src/queue/email.producer';
+import { JwtBlacklistService } from '../redis/jwt-blacklist.service';
 
 const PLATFORM_FEE_PERCENT = 10;
 
@@ -19,14 +22,97 @@ export class PaymentsService {
 
   constructor(
     @InjectModel(Payment.name) private paymentModel: Model<PaymentDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     private bookingsService: BookingsService,
     private caregiversService: CaregiversService,
     private usersService: UsersService,
     private emailProducer: EmailProducer,
+    private jwtBlacklistService: JwtBlacklistService,
   ) {
     this.mpClient = new MercadoPagoConfig({
       accessToken: process.env.MP_ACCESS_TOKEN || '',
     });
+  }
+
+  @Cron('*/5 * * * *')
+  async processOverduePayments(): Promise<void> {
+    const now = Date.now();
+    await this.sendPaymentReminder(new Date(now - 30 * 60 * 1000));
+    await this.banOverdueClient(new Date(now - 24 * 60 * 60 * 1000));
+  }
+
+  private async sendPaymentReminder(createdBefore: Date): Promise<void> {
+    const payment: any = await this.paymentModel
+      .findOneAndUpdate(
+        {
+          status: 'pending',
+          createdAt: { $lte: createdBefore },
+          paymentReminderSentAt: { $exists: false },
+        },
+        { $set: { paymentReminderSentAt: new Date() } },
+        { new: true },
+      )
+      .populate('clientId', 'name email')
+      .populate({ path: 'caregiverId', populate: { path: 'userId', select: 'name' } })
+      .populate('bookingId');
+
+    if (!payment) return;
+
+    const client = payment.clientId;
+    const caregiver = payment.caregiverId;
+    const booking = payment.bookingId;
+    if (!client?.email) return;
+
+    try {
+      await this.emailProducer.sendPaymentReminder({
+        bookingId: booking?._id?.toString() || payment.bookingId.toString(),
+        to: client.email,
+        clientName: client.name || 'Cliente',
+        caregiverName: caregiver?.userId?.name || 'Cuidador',
+        amount: payment.amount,
+        paymentUrl: payment.paymentUrl,
+        bookingDate: booking?.startDate
+          ? new Date(booking.startDate).toLocaleDateString('pt-BR')
+          : 'seu atendimento',
+        serviceType: booking?.serviceName || booking?.serviceType || 'Atendimento domiciliar',
+      });
+    } catch (error: any) {
+      this.logger.warn(`Lembrete de pagamento não enfileirado: ${error.message}`);
+    }
+  }
+
+  private async banOverdueClient(createdBefore: Date): Promise<void> {
+    const payment: any = await this.paymentModel.findOneAndUpdate(
+      {
+        status: 'pending',
+        createdAt: { $lte: createdBefore },
+        overdueAccountBannedAt: { $exists: false },
+      },
+      { $set: { overdueAccountBannedAt: new Date() } },
+      { new: true },
+    );
+
+    if (!payment) return;
+
+    const user = await this.userModel.findOneAndUpdate(
+      { _id: payment.clientId, moderationStatus: { $ne: 'banned' } },
+      {
+        $set: {
+          isActive: false,
+          moderationStatus: 'banned',
+          banSource: 'automatic',
+          banReason: 'Pagamento do atendimento não efetuado em até 24 horas.',
+          bannedAt: new Date(),
+          lastModerationAt: new Date(),
+        },
+      },
+      { new: true },
+    );
+
+    if (user) {
+      await this.jwtBlacklistService.addUser(user._id.toString(), 7 * 24 * 60 * 60);
+      this.logger.warn(`Conta ${user.email} banida por pagamento pendente há mais de 24 horas.`);
+    }
   }
 
   private calculateAmounts(totalAmount: number) {
@@ -140,6 +226,7 @@ export class PaymentsService {
     
     try {
       await this.emailProducer.sendPaymentPending({
+        bookingId: bookingId,
         to: clientUser?.email,
         clientName: clientUser?.name || booking.clientName || 'Cliente',
         caregiverName,

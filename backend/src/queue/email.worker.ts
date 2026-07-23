@@ -43,6 +43,9 @@ export class EmailWorker extends WorkerHost {
       case 'payment-pending':
         await this.emailService.sendPaymentEmail(job.data);
         break;
+      case 'payment-reminder':
+        await this.emailService.sendPaymentEmail(job.data);
+        break;
       case 'payment-confirmed':
         await this.emailService.sendPaymentConfirmedEmail(job.data);
         break;

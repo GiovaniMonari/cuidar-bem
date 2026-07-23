@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -17,7 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-export default function LoginPage() {
+function LoginFormContent() {
   const [serverError, setServerError] = useState('');
   const [banReason, setBanReason] = useState('');
   const [reviewMessage, setReviewMessage] = useState('');
@@ -26,6 +26,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect');
 
   const {
     register,
@@ -47,7 +49,11 @@ export default function LoginPage() {
     try {
       const loggedUser = await login(data.email, data.password);
       toast.success(`Bem-vindo de volta, ${loggedUser.name}!`);
-      router.push(loggedUser.role === 'admin' ? '/admin' : '/agenda');
+      if (redirectUrl) {
+        router.push(redirectUrl);
+      } else {
+        router.push(loggedUser.role === 'admin' ? '/admin' : '/agenda');
+      }
     } catch (err: any) {
       const msg = err.message || 'Erro ao fazer login';
       setServerError(msg);
@@ -208,5 +214,13 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
+      <LoginFormContent />
+    </Suspense>
   );
 }

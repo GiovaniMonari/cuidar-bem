@@ -52,9 +52,10 @@ function PaymentCheckoutContent() {
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.push('/login');
+      const redirectTarget = bookingId ? `/pagamento/checkout?booking=${bookingId}` : '/agenda';
+      router.push(`/login?redirect=${encodeURIComponent(redirectTarget)}`);
     }
-  }, [authLoading, isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, router, bookingId]);
 
   useEffect(() => {
     if (!bookingId || authLoading || !isAuthenticated) return;

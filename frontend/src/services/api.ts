@@ -30,13 +30,29 @@ class ApiService {
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const res = await fetch(`${API_URL}${endpoint}`, options);
+    const text = await res.text();
+    let data: any = null;
+
+    if (text && text.trim().length > 0) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { message: text };
+      }
+    }
+
     if (!res.ok) {
-      const error = await res.json().catch(() => ({ message: 'Erro na requisição' }));
-      const requestError = new Error(error.message || 'Erro na requisição') as Error & Record<string, any>;
-      Object.assign(requestError, error);
+      const error = data || { message: 'Erro na requisição' };
+      const requestError = new Error(
+        (typeof error === 'object' && error?.message) ? error.message : 'Erro na requisição'
+      ) as Error & Record<string, any>;
+      if (typeof error === 'object' && error !== null) {
+        Object.assign(requestError, error);
+      }
       throw requestError;
     }
-    return res.json();
+
+    return data as T;
   }
 
   // Auth
@@ -282,12 +298,23 @@ class ApiService {
       body: formData,
     });
 
-    if (!res.ok) {
-      const error = await res.json().catch(() => ({ message: 'Erro ao enviar imagem' }));
-      throw new Error(error.message || 'Erro ao enviar imagem');
+    const text = await res.text();
+    let data: any = null;
+
+    if (text && text.trim().length > 0) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { message: text };
+      }
     }
 
-    return res.json();
+    if (!res.ok) {
+      const error = data || { message: 'Erro ao enviar imagem' };
+      throw new Error((typeof error === 'object' && error?.message) ? error.message : 'Erro ao enviar imagem');
+    }
+
+    return data;
   }
   async removeAvatar() {
     return this.request<any>('/users/me/avatar/remove', {

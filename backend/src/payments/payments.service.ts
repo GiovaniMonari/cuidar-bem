@@ -231,7 +231,15 @@ export class PaymentsService {
   }
   
   async findByBooking(bookingId: string): Promise<PaymentDocument | null> {
-    return this.paymentModel.findOne({ bookingId });
+    let payment: any = await this.paymentModel.findOne({ bookingId });
+    if (!payment) {
+      try {
+        payment = await this.createPayment(bookingId);
+      } catch (err: any) {
+        this.logger.warn(`Auto-criação de pagamento falhou para booking ${bookingId}: ${err.message}`);
+      }
+    }
+    return payment;
   }
 
   async findByUser(userId: string, role: string) {

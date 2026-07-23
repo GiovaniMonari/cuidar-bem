@@ -10,12 +10,54 @@ import { cn } from "@/lib/utils";
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.cuidarbem.com.br';
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   applicationName: 'CuidarBem',
-  title: 'CuidarBem - Encontre Cuidadores de Confiança',
+  title: {
+    default: 'CuidarBem | Encontre cuidadores de confiança',
+    template: '%s | CuidarBem',
+  },
   description:
-    'Plataforma para encontrar cuidadores qualificados para idosos e pessoas com deficiência.',
+    'Plataforma para encontrar cuidadores qualificados, profissionais de enfermagem e apoio para idosos e pessoas com deficiência.',
+  keywords: [
+    'cuidador para idosos',
+    'cuidadores de confiança',
+    'enfermagem domiciliar',
+    'cuidador para pessoa com deficiência',
+    'plataforma de cuidado familiar',
+  ],
   manifest: '/manifest.webmanifest',
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'pt_BR',
+    url: siteUrl,
+    title: 'CuidarBem | Encontre cuidadores de confiança',
+    description:
+      'Conectamos famílias a cuidadores qualificados para oferecer segurança, acolhimento e qualidade de vida.',
+    siteName: 'CuidarBem',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'CuidarBem | Encontre cuidadores de confiança',
+    description:
+      'Plataforma confiável para encontrar cuidadores qualificados para idosos e pessoas com deficiência.',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

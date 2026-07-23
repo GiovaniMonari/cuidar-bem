@@ -187,7 +187,27 @@ export default function AgendaPage() {
         }
         navigator.geolocation.getCurrentPosition(resolve, reject, options);
       });
-    return await getPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+
+    try {
+      return await getPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+    } catch (error: any) {
+      if (error?.code === 1) {
+        throw new Error(
+          'A localização foi bloqueada para este site. Permita a localização nas configurações do navegador e tente novamente.',
+        );
+      }
+
+      try {
+        return await getPosition({ enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 });
+      } catch (fallbackError: any) {
+        if (fallbackError?.code === 1) {
+          throw new Error(
+            'A localização foi bloqueada para este site. Permita a localização nas configurações do navegador e tente novamente.',
+          );
+        }
+        throw new Error('Não foi possível obter sua localização. Verifique o GPS e tente novamente.');
+      }
+    }
   };
 
   const openReports = (bookingId: string) => {

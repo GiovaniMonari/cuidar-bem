@@ -35,6 +35,14 @@ export class PaymentsService {
     return { platformFee, caregiverAmount };
   }
 
+  private getNotificationUrl(): string | undefined {
+    const backendUrl = process.env.BACKEND_URL;
+    if (backendUrl && (backendUrl.startsWith('http://') || backendUrl.startsWith('https://'))) {
+      return `${backendUrl}/api/payments/webhook`;
+    }
+    return undefined;
+  }
+
   async createPayment(bookingId: string): Promise<PaymentDocument> {
     const booking = await this.bookingsService.findOne(bookingId);
     if (!booking) throw new NotFoundException('Agendamento não encontrado');
@@ -63,6 +71,7 @@ export class PaymentsService {
     let mpPaymentUrl = '';
 
     try {
+      const notificationUrl = this.getNotificationUrl();
       const preference = new Preference(this.mpClient);
       const mpPreference = await preference.create({
         body: {
@@ -86,9 +95,9 @@ export class PaymentsService {
             pending: `${process.env.FRONTEND_URL}/pagamento/pendente?booking=${bookingId}`,
           },
           auto_return: 'approved',
-          notification_url: `${process.env.BACKEND_URL}/api/payments/webhook`,
           external_reference: transactionId,
           statement_descriptor: 'CUIDARBEM',
+          ...(notificationUrl ? { notification_url: notificationUrl } : {}),
         },
       });
 
@@ -260,6 +269,7 @@ export class PaymentsService {
     const email = clientUser?.email || 'financeiro@cuidarbem.com';
 
     try {
+      const notificationUrl = this.getNotificationUrl();
       const mpPaymentApi = new MPPayment(this.mpClient);
       const mpResponse = await mpPaymentApi.create({
         body: {
@@ -272,7 +282,7 @@ export class PaymentsService {
             last_name: lastName,
           },
           external_reference: payment.transactionId,
-          notification_url: `${process.env.BACKEND_URL}/api/payments/webhook`,
+          ...(notificationUrl ? { notification_url: notificationUrl } : {}),
         },
       });
 

@@ -251,7 +251,7 @@ export class PaymentsService {
   }
 
   async simulatePayment(bookingId: string): Promise<PaymentDocument> {
-    const payment = await this.paymentModel.findOne({ bookingId });
+    let payment: any = await this.findByBooking(bookingId);
     if (!payment) throw new NotFoundException('Pagamento não encontrado');
 
     const booking = await this.bookingsService.findOne(bookingId);
@@ -272,15 +272,53 @@ export class PaymentsService {
     const caregiver = booking?.caregiverId as any;
 
     if (clientUser?.email) {
-      await this.emailProducer.sendPaymentConfirmed({
-        to: clientUser.email,
-        clientName: clientUser.name || 'Cliente',
-        caregiverName: caregiver?.userId?.name || 'Cuidador',
-        amount: payment.amount,
-        bookingDate: new Date(booking?.startDate).toLocaleDateString('pt-BR'),
-      });
+      try {
+        await this.emailProducer.sendPaymentConfirmed({
+          to: clientUser.email,
+          clientName: clientUser.name || 'Cliente',
+          caregiverName: caregiver?.userId?.name || 'Cuidador',
+          amount: payment.amount,
+          bookingDate: new Date(booking?.startDate).toLocaleDateString('pt-BR'),
+        });
+      } catch (err: any) {
+        this.logger.warn(`Email de confirmação de pagamento não enviado: ${err.message}`);
+      }
     }
 
+    return payment;
+  }
+
+  async releasePayment(bookingId: string): Promise<PaymentDocument | null> {
+    const payment = await this.paymentModel.findOne({ bookingId });
+    if (!payment) return null;
+
+    if (payment.status === 'held' || payment.status === 'paid') {
+      payment.status = 'released';
+      payment.releasedAt = new Date();
+      payment.history.push({
+        status: 'released',
+        date: new Date(),
+        description: 'Pagamento liberado para o cuidador',
+      });
+      return await payment.save();
+    }
+    return payment;
+  }
+
+  async refundPayment(bookingId: string): Promise<PaymentDocument | null> {
+    const payment = await this.paymentModel.findOne({ bookingId });
+    if (!payment) return null;
+
+    if (['pending', 'paid', 'held'].includes(payment.status)) {
+      payment.status = 'refunded';
+      payment.refundedAt = new Date();
+      payment.history.push({
+        status: 'refunded',
+        date: new Date(),
+        description: 'Pagamento reembolsado ao cliente',
+      });
+      return await payment.save();
+    }
     return payment;
   }
 }

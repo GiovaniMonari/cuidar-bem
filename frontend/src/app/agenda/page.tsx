@@ -377,10 +377,10 @@ export default function AgendaPage() {
                         payment={payments[booking._id]}
                         feedbackCount={feedbackCounts[booking._id] || 0}
                         isCaregiver={isCaregiver}
-                        actionLoading={updateStatusMutation.isPending || checkInMutation.isPending || simulatePaymentMutation.isPending}
+                        actionLoading={updateStatusMutation.isPending || checkInMutation.isPending}
                         onStatusUpdate={(id, status) => updateStatusMutation.mutate({ id, status })}
                         onCheckIn={(id) => checkInMutation.mutate(id)}
-                        onSimulatePayment={(id) => simulatePaymentMutation.mutate(id)}
+                        onOpenPayment={(id) => router.push(`/pagamento/checkout?booking=${id}`)}
                         onOpenChat={(id) => openChatMutation.mutate(id)}
                         onOpenReports={openReports}
                       />
@@ -455,7 +455,7 @@ function BookingCard({
   actionLoading,
   onStatusUpdate,
   onCheckIn,
-  onSimulatePayment,
+  onOpenPayment,
   onOpenChat,
   onOpenReports,
 }: {
@@ -466,7 +466,7 @@ function BookingCard({
   actionLoading: boolean;
   onStatusUpdate: (id: string, status: string) => void;
   onCheckIn: (id: string) => void;
-  onSimulatePayment: (id: string) => void;
+  onOpenPayment: (id: string) => void;
   onOpenChat: (id: string) => void;
   onOpenReports: (id: string) => void;
 }) {
@@ -614,7 +614,7 @@ function BookingCard({
                 </Button>
               )}
               {payment?.status === 'pending' && !isCaregiver && (
-                <Button onClick={() => onSimulatePayment(booking._id)} disabled={actionLoading} className="w-full bg-primary-600">
+                <Button onClick={() => onOpenPayment(booking._id)} disabled={actionLoading} className="w-full bg-primary-600">
                   Pagar Agora
                 </Button>
               )}

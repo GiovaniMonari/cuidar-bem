@@ -130,7 +130,7 @@ export class PaymentsService {
     const start = new Date(booking.startDate);
     
     try {
-      await this.emailProducer.sendPaymentEmail({
+      await this.emailProducer.sendPaymentPending({
         to: clientUser?.email,
         clientName: clientUser?.name || booking.clientName || 'Cliente',
         caregiverName,

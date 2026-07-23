@@ -23,7 +23,7 @@ import { EmailProducer } from 'src/queue/email.producer';
 @Injectable()
 export class BookingsService {
   private readonly logger = new Logger(BookingsService.name);
-  private readonly checkInRadiusMeters = 200;
+  private readonly checkInRadiusMeters = 300;
   private readonly earlyCheckInWindowMs = 2 * 60 * 60 * 1000;
   private readonly commuteBufferMs = 60 * 60 * 1000;
   private paymentsService: any;

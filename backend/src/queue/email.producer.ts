@@ -21,8 +21,8 @@ export class EmailProducer {
   sendNewFeedbackAvailableEmail(data: any) {
       throw new Error('Method not implemented.');
   }
-  sendPaymentEmail(data: any) {
-      throw new Error('Method not implemented.');
+  async sendPaymentEmail(data: PaymentPendingEmailJob) {
+    return this.sendPaymentPending(data);
   }
   private readonly logger = new Logger(EmailProducer.name);
 

@@ -19,7 +19,7 @@ async function bootstrap() {
       'http://localhost:3000',
       'https://vercel.app',
       'https://cuidar-bem-pink.vercel.app',
-      'https://www.cuidarbem.services',
+      'https://cuidarbem.services',
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,

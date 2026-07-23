@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Footer } from '@/components/Footer';
+import { SeoJsonLd } from '@/components/SeoJsonLd';
 import { api } from '@/services/api';
 import { Caregiver } from '@/types';
 import {
@@ -1177,6 +1178,31 @@ export default function HomePage() {
   const [topCaregivers, setTopCaregivers] = useState<Caregiver[]>([]);
   const [loadingCaregivers, setLoadingCaregivers] = useState(true);
 
+  const organizationSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'CuidarBem',
+    url: 'https://www.cuidarbem.services',
+    logo: 'https://www.cuidarbem.services/icons/icon-512x512.png',
+    description:
+      'Plataforma para encontrar cuidadores qualificados, profissionais de enfermagem e apoio para idosos e pessoas com deficiência.',
+    areaServed: 'Brasil',
+    sameAs: [],
+  };
+
+  const serviceSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Service',
+    name: 'CuidarBem',
+    serviceType: 'Cuidado domiciliar para idosos e pessoas com deficiência',
+    provider: {
+      '@type': 'Organization',
+      name: 'CuidarBem',
+    },
+    areaServed: 'Brasil',
+    url: 'https://www.cuidarbem.services',
+  };
+
   useEffect(() => {
     const fetchTopCaregivers = async () => {
       try {
@@ -1204,6 +1230,8 @@ export default function HomePage() {
 
   return (
     <div>
+      <SeoJsonLd data={organizationSchema} />
+      <SeoJsonLd data={serviceSchema} />
       {renderContent()}
       <Footer />
     </div>

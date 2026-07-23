@@ -304,9 +304,17 @@ export class PaymentsService {
       this.logger.log(`✅ PIX Mercado Pago criado para booking ${bookingId}: ID ${mpPaymentId}`);
     } catch (error: any) {
       this.logger.error(`❌ Erro ao gerar PIX no Mercado Pago: ${error.message}`);
-      throw new BadRequestException(
-        error.message || 'Não foi possível gerar a chave PIX no Mercado Pago.'
-      );
+      let userFriendlyMessage = error.message || 'Não foi possível gerar a cobrança PIX no Mercado Pago.';
+
+      if (
+        typeof error.message === 'string' &&
+        (error.message.includes('without key enabled') || error.message.includes('Collector user'))
+      ) {
+        userFriendlyMessage =
+          'A conta do Mercado Pago cadastrada ainda não possui uma Chave PIX cadastrada. Cadastre uma chave PIX (CPF/CNPJ, e-mail ou aleatória) no painel do Mercado Pago para habilitar o PIX direto, ou clique em "Pagar no Mercado Pago (Cartão/Boleto)" acima.';
+      }
+
+      throw new BadRequestException(userFriendlyMessage);
     }
 
     return payment;

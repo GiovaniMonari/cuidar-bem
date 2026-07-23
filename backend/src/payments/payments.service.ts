@@ -242,6 +242,66 @@ export class PaymentsService {
     return payment;
   }
 
+  async generatePixPayment(bookingId: string): Promise<PaymentDocument> {
+    const payment: any = await this.findByBooking(bookingId);
+    if (!payment) throw new NotFoundException('Pagamento não encontrado');
+
+    if (payment.qrCode && payment.qrCodeBase64 && payment.status === 'pending') {
+      return payment;
+    }
+
+    const booking = await this.bookingsService.findOne(bookingId);
+    if (!booking) throw new NotFoundException('Agendamento não encontrado');
+
+    const clientUser = booking.clientId as any;
+    const clientNameParts = (clientUser?.name || booking.clientName || 'Cliente').split(' ');
+    const firstName = clientNameParts[0] || 'Cliente';
+    const lastName = clientNameParts.slice(1).join(' ') || 'CuidarBem';
+    const email = clientUser?.email || 'financeiro@cuidarbem.com';
+
+    try {
+      const mpPaymentApi = new MPPayment(this.mpClient);
+      const mpResponse = await mpPaymentApi.create({
+        body: {
+          transaction_amount: Number(payment.amount),
+          description: `CuidarBem - ${booking.serviceName || booking.serviceType || 'Atendimento'}`,
+          payment_method_id: 'pix',
+          payer: {
+            email,
+            first_name: firstName,
+            last_name: lastName,
+          },
+          external_reference: payment.transactionId,
+          notification_url: `${process.env.BACKEND_URL}/api/payments/webhook`,
+        },
+      });
+
+      const qrCode = mpResponse.point_of_interaction?.transaction_data?.qr_code || '';
+      const qrCodeBase64 = mpResponse.point_of_interaction?.transaction_data?.qr_code_base64 || '';
+      const mpPaymentId = String(mpResponse.id || '');
+
+      payment.mpPaymentId = mpPaymentId;
+      payment.mpStatus = mpResponse.status || 'pending';
+      payment.qrCode = qrCode;
+      payment.qrCodeBase64 = qrCodeBase64;
+      payment.history.push({
+        status: 'pending',
+        date: new Date(),
+        description: 'Cobrança PIX gerada com sucesso via Mercado Pago',
+      });
+
+      await payment.save();
+      this.logger.log(`✅ PIX Mercado Pago criado para booking ${bookingId}: ID ${mpPaymentId}`);
+    } catch (error: any) {
+      this.logger.error(`❌ Erro ao gerar PIX no Mercado Pago: ${error.message}`);
+      throw new BadRequestException(
+        error.message || 'Não foi possível gerar a chave PIX no Mercado Pago.'
+      );
+    }
+
+    return payment;
+  }
+
   async findByUser(userId: string, role: string) {
     const query = role === 'client' ? { clientId: userId } : { caregiverId: userId };
     return this.paymentModel

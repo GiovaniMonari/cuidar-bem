@@ -58,6 +58,13 @@ export class PaymentsController {
     return this.paymentsService.findByUser(req.user.userId, req.user.role);
   }
 
+  // Gerar pagamento PIX direto via Mercado Pago
+  @UseGuards(JwtAuthGuard)
+  @Post('pix/:bookingId')
+  generatePix(@Param('bookingId') bookingId: string) {
+    return this.paymentsService.generatePixPayment(bookingId);
+  }
+
   // Simular pagamento (para testes)
   @UseGuards(JwtAuthGuard)
   @Post('simulate/:bookingId')

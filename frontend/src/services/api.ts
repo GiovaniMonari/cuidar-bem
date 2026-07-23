@@ -219,6 +219,13 @@ class ApiService {
     });
   }
 
+  async generatePixPayment(bookingId: string) {
+    return this.request<any>(`/payments/pix/${bookingId}`, {
+      method: 'POST',
+      headers: this.headers(true),
+    });
+  }
+
   async simulatePayment(bookingId: string) {
     return this.request<any>(`/payments/simulate/${bookingId}`, {
       method: 'POST',

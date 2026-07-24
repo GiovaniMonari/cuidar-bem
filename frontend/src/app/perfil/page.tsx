@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -25,7 +25,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-export default function ProfilePage() {
+function ProfilePageContent() {
   const { user, isAuthenticated, loading: authLoading, updateUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -570,5 +570,28 @@ export default function ProfilePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50/50">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+            <Skeleton className="h-10 w-48 rounded-xl" />
+            <Card className="border-none shadow-sm rounded-3xl">
+              <CardContent className="p-8 space-y-8">
+                <Skeleton className="h-24 w-24 rounded-3xl" />
+                <Skeleton className="h-12 w-full rounded-xl" />
+                <Skeleton className="h-12 w-full rounded-xl" />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      }
+    >
+      <ProfilePageContent />
+    </Suspense>
   );
 }

@@ -11,6 +11,7 @@ import { UsersModule } from '../users/users.module';
 import { EmailModule } from 'src/email/email.module';
 import { PAYMENTS_QUEUE } from '../queue/queue.constants'; // 👈 Importe a constante da fila
 import { QueueModule } from '../queue/queue.module'; // 👈 Importe o módulo de filas
+import { RedisModule } from '../redis/redis.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { QueueModule } from '../queue/queue.module'; // 👈 Importe o módulo d
     CaregiversModule,
     UsersModule,
     EmailModule,
+    RedisModule,
     // forwardRef evita problemas de dependência circular entre o QueueModule e o PaymentsModule
     forwardRef(() => QueueModule), 
   ],

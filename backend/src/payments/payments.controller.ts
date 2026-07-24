@@ -1,9 +1,12 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Logger, UseGuards, Get, Param, Req } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Logger, UseGuards, Get, Param, Req, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PAYMENTS_QUEUE } from '../queue/queue.constants';
 import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { CreateWithdrawalDto } from './dto/create-withdrawal.dto';
+import { MercadoPagoOAuthService } from './mercado-pago-oauth.service';
 
 @Controller('payments')
 export class PaymentsController {
@@ -11,6 +14,7 @@ export class PaymentsController {
 
   constructor(
     private readonly paymentsService: PaymentsService,
+    private readonly mercadoPagoOAuthService: MercadoPagoOAuthService,
     // 📦 Injeta a fila de pagamentos do BullMQ de forma correta
     @InjectQueue(PAYMENTS_QUEUE) private readonly paymentsQueue: Queue,
   ) {}
@@ -70,5 +74,37 @@ export class PaymentsController {
   @Post('simulate/:bookingId')
   simulatePayment(@Param('bookingId') bookingId: string) {
     return this.paymentsService.simulatePayment(bookingId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('withdraw')
+  requestWithdrawal(@Req() req, @Body() dto: CreateWithdrawalDto) {
+    return this.paymentsService.requestWithdrawal(req.user.userId, dto.amount);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('withdraw/balance')
+  getWithdrawalBalance(@Req() req) {
+    return this.paymentsService.getWithdrawalBalance(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('oauth/connect')
+  getMercadoPagoConnectUrl(@Req() req) {
+    return { url: this.mercadoPagoOAuthService.getAuthorizationUrl(req.user.userId) };
+  }
+
+  @Get('oauth/callback')
+  async mercadoPagoCallback(@Req() req, @Res() response: Response) {
+    try {
+      const redirectUrl = await this.mercadoPagoOAuthService.handleCallback(
+        req.query.code,
+        req.query.state,
+      );
+      return response.redirect(redirectUrl);
+    } catch (error: any) {
+      this.logger.error(`Falha no callback OAuth Mercado Pago: ${error.message}`);
+      return response.redirect(`${this.mercadoPagoOAuthService.getFrontendUrl()}/perfil?mercadopago=error`);
+    }
   }
 }

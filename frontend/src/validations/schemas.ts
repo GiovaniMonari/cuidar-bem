@@ -102,6 +102,14 @@ export const editProfileSchema = yup.object({
 
 export type EditProfileFormData = yup.InferType<typeof editProfileSchema>;
 
+export const caregiverPayoutSchema = yup.object({
+  payoutMethod: yup.string().oneOf(['pix', 'mercado_pago']).required(),
+  pixKeyType: yup.string().oneOf(['cpf', 'cnpj', 'email', 'phone', 'random']).optional(),
+  pixKey: yup.string().optional(),
+});
+
+export type CaregiverPayoutFormData = yup.InferType<typeof caregiverPayoutSchema>;
+
 // ==================== PERFIL CUIDADOR ====================
 export const caregiverProfileSchema = yup.object({
   bio: yup

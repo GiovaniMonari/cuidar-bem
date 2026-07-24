@@ -40,6 +40,34 @@ class AvailabilityDate {
   isAvailable: boolean;
 }
 
+class PayoutAccount {
+  @Prop({ required: true, enum: ['pix', 'mercado_pago'] })
+  method: 'pix' | 'mercado_pago';
+
+  @Prop({ enum: ['cpf', 'cnpj', 'email', 'phone', 'random'] })
+  pixKeyType?: 'cpf' | 'cnpj' | 'email' | 'phone' | 'random';
+
+  @Prop()
+  pixKey?: string;
+}
+
+class MercadoPagoConnection {
+  @Prop({ required: true })
+  userId: string;
+
+  @Prop({ required: true, select: false })
+  accessTokenEncrypted: string;
+
+  @Prop({ required: true, select: false })
+  refreshTokenEncrypted: string;
+
+  @Prop()
+  expiresAt?: Date;
+
+  @Prop()
+  connectedAt?: Date;
+}
+
 @Schema({ timestamps: true })
 export class Caregiver {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true, unique: true })
@@ -96,6 +124,12 @@ export class Caregiver {
 
   @Prop()
   profileImage: string;
+
+  @Prop({ type: PayoutAccount, default: null })
+  payoutAccount?: PayoutAccount;
+
+  @Prop({ type: MercadoPagoConnection, default: null })
+  mercadoPago?: MercadoPagoConnection;
 }
 
 export const CaregiverSchema = SchemaFactory.createForClass(Caregiver);

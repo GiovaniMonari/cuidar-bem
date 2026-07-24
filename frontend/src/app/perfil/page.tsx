@@ -1,15 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/services/api';
-import { editProfileSchema, type EditProfileFormData } from '@/validations/schemas';
+import {
+  editProfileSchema,
+  caregiverPayoutSchema,
+  type EditProfileFormData,
+  type CaregiverPayoutFormData,
+} from '@/validations/schemas';
 import { UserAvatar } from '@/components/UserAvatar';
-import { Camera, Star, Trash2, ShieldCheck, Mail, Phone, Edit3, Save, Stethoscope, Loader2, CheckCircle, AlertCircle, User as UserIcon, Badge } from 'lucide-react';
+import { Camera, Star, Trash2, ShieldCheck, Mail, Phone, Edit3, Save, Stethoscope, Loader2, CheckCircle, AlertCircle, User as UserIcon, Badge, CreditCard, LockKeyhole } from 'lucide-react';
 import { maskPhone } from '@/utils/masks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,11 +28,15 @@ import { cn } from '@/lib/utils';
 export default function ProfilePage() {
   const { user, isAuthenticated, loading: authLoading, updateUser } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [profile, setProfile] = useState<any>(null);
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [caregiverProfile, setCaregiverProfile] = useState<any>(null);
+  const [payoutSaving, setPayoutSaving] = useState(false);
+  const [mercadoPagoConnecting, setMercadoPagoConnecting] = useState(false);
 
   const {
     register,
@@ -39,6 +48,23 @@ export default function ProfilePage() {
     resolver: yupResolver(editProfileSchema) as any,
     mode: 'onBlur',
   });
+
+  const {
+    register: registerPayout,
+    handleSubmit: handlePayoutSubmit,
+    reset: resetPayout,
+    watch: watchPayout,
+    formState: { errors: payoutErrors },
+  } = useForm<CaregiverPayoutFormData>({
+    resolver: yupResolver(caregiverPayoutSchema) as any,
+    mode: 'onBlur',
+    defaultValues: {
+      payoutMethod: 'pix',
+      pixKeyType: 'cpf',
+      pixKey: '',
+    },
+  });
+  const payoutMethod = watchPayout('payoutMethod');
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -52,10 +78,34 @@ export default function ProfilePage() {
     }
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    const mercadoPagoStatus = searchParams.get('mercadopago');
+    if (mercadoPagoStatus === 'connected') {
+      toast.success('Mercado Pago conectado com sucesso!');
+      router.replace('/perfil');
+    } else if (mercadoPagoStatus === 'error') {
+      toast.error('Não foi possível conectar o Mercado Pago.');
+      router.replace('/perfil');
+    }
+  }, [router, searchParams]);
+
   const fetchProfile = async () => {
     try {
       const data = await api.getProfile();
       setProfile(data);
+      if (data.role === 'caregiver') {
+        try {
+          const caregiver = await api.getMyCaregiverProfile();
+          setCaregiverProfile(caregiver);
+          resetPayout({
+            payoutMethod: caregiver.payoutAccount?.method || 'pix',
+            pixKeyType: caregiver.payoutAccount?.pixKeyType || 'cpf',
+            pixKey: caregiver.payoutAccount?.pixKey || '',
+          });
+        } catch {
+          setCaregiverProfile(null);
+        }
+      }
       reset({ name: data.name, phone: data.phone || '' });
     } catch (error) {
       console.error(error);
@@ -106,6 +156,55 @@ export default function ProfilePage() {
     } catch (error: any) {
       toast.error('Erro ao salvar alterações', {
         description: error.message || 'Ocorreu um problema inesperado.',
+      });
+    }
+  };
+
+  const onSavePayout = async (data: CaregiverPayoutFormData) => {
+    if (!caregiverProfile?._id) {
+      toast.error('Crie seu perfil de cuidador antes de configurar o saque.');
+      return;
+    }
+
+    if (data.payoutMethod === 'pix' && (!data.pixKeyType || !data.pixKey?.trim())) {
+      toast.error('Informe o tipo e a chave Pix para salvar o saque.');
+      return;
+    }
+
+    setPayoutSaving(true);
+    try {
+      const updated = await api.updateCaregiverProfile(caregiverProfile._id, {
+        payoutAccount: {
+          method: data.payoutMethod,
+          pixKeyType: data.payoutMethod === 'pix' ? data.pixKeyType : undefined,
+          pixKey: data.payoutMethod === 'pix' ? data.pixKey?.trim() : undefined,
+        },
+      });
+      setCaregiverProfile(updated);
+      resetPayout({
+        payoutMethod: updated.payoutAccount?.method || 'pix',
+        pixKeyType: updated.payoutAccount?.pixKeyType || 'cpf',
+        pixKey: updated.payoutAccount?.pixKey || '',
+      });
+      toast.success('Configuração de saque salva com sucesso!');
+    } catch (error: any) {
+      toast.error('Erro ao salvar configuração de saque', {
+        description: error.message || 'Ocorreu um problema inesperado.',
+      });
+    } finally {
+      setPayoutSaving(false);
+    }
+  };
+
+  const connectMercadoPago = async () => {
+    setMercadoPagoConnecting(true);
+    try {
+      const { url } = await api.getMercadoPagoConnectUrl();
+      window.location.assign(url);
+    } catch (error: any) {
+      setMercadoPagoConnecting(false);
+      toast.error('Não foi possível iniciar a conexão com o Mercado Pago', {
+        description: error.message || 'Verifique a configuração OAuth do backend.',
       });
     }
   };
@@ -364,6 +463,108 @@ export default function ProfilePage() {
                   </Button>
                 </Link>
               </div>
+            </Card>
+
+            <Card className="border-none shadow-lg rounded-3xl overflow-hidden bg-white">
+              <CardHeader className="bg-gray-50/50 border-b border-gray-100/50 p-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-primary-50 rounded-2xl flex items-center justify-center text-primary-600 shadow-inner">
+                    <CreditCard className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl font-black text-gray-900 tracking-tight">Configuração de Saque</CardTitle>
+                    <CardDescription className="text-gray-500 font-medium mt-1">Escolha como receber os valores dos seus serviços.</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8">
+                <form onSubmit={handlePayoutSubmit(onSavePayout)} className="space-y-6">
+                  <div className="flex items-start gap-4 rounded-2xl border border-primary-100 bg-primary-50/50 p-5">
+                    <CreditCard className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary-600" />
+                    <div>
+                      <p className="font-black text-gray-900">Pix ou conta Mercado Pago</p>
+                      <p className="mt-1 text-sm font-medium leading-relaxed text-gray-500">
+                        Escolha uma conta para receber os valores liberados dos seus atendimentos.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    <Label className="ml-1 text-xs font-black uppercase tracking-widest text-gray-400">Método de saque</Label>
+                    <select
+                      {...registerPayout('payoutMethod')}
+                      className="h-14 w-full rounded-2xl border-transparent bg-gray-50 px-4 font-bold text-gray-700 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-primary-200"
+                    >
+                      <option value="pix">Pix</option>
+                      <option value="mercado_pago">Conta Mercado Pago</option>
+                    </select>
+                  </div>
+
+                  {payoutErrors.payoutMethod && (
+                    <p className="ml-1 text-xs font-bold text-red-500">Selecione um método de saque.</p>
+                  )}
+
+                  {payoutMethod === 'pix' && (
+                    <div className="grid gap-6 sm:grid-cols-2">
+                      <div className="space-y-2.5">
+                      <Label className="ml-1 text-xs font-black uppercase tracking-widest text-gray-400">Tipo de chave Pix</Label>
+                      <select
+                        {...registerPayout('pixKeyType')}
+                        className="h-14 w-full rounded-2xl border-transparent bg-gray-50 px-4 font-bold text-gray-700 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-primary-200"
+                      >
+                        <option value="cpf">CPF</option>
+                        <option value="cnpj">CNPJ</option>
+                        <option value="email">E-mail</option>
+                        <option value="phone">Telefone</option>
+                        <option value="random">Chave aleatória</option>
+                      </select>
+                      </div>
+                      <div className="space-y-2.5">
+                      <Label className="ml-1 text-xs font-black uppercase tracking-widest text-gray-400">Chave Pix</Label>
+                      <Input
+                        type="text"
+                        {...registerPayout('pixKey')}
+                        className="h-14 rounded-2xl border-transparent bg-gray-50 font-medium transition-all focus:bg-white"
+                        placeholder="Informe sua chave Pix"
+                      />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 border-t border-gray-100 pt-5 text-xs font-bold text-gray-400">
+                    <LockKeyhole className="h-4 w-4 text-emerald-500" />
+                    Os dados são usados somente para encaminhar o saque ao destino escolhido.
+                  </div>
+
+                  <Button type="submit" disabled={payoutSaving} className="h-12 w-full rounded-2xl font-black gap-2">
+                    {payoutSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                    {payoutSaving ? 'Salvando...' : 'Salvar configuração de saque'}
+                  </Button>
+
+                  <div className="border-t border-gray-100 pt-6">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="font-black text-gray-900">Conta Mercado Pago</p>
+                        <p className="mt-1 text-sm font-medium text-gray-500">
+                          {caregiverProfile?.mercadoPago?.userId
+                            ? 'Conta conectada e pronta para receber repasses.'
+                            : 'Conecte sua conta para usar esse método de saque.'}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant={caregiverProfile?.mercadoPago?.userId ? 'outline' : 'default'}
+                        disabled={mercadoPagoConnecting}
+                        onClick={connectMercadoPago}
+                        className="rounded-2xl font-black gap-2"
+                      >
+                        {mercadoPagoConnecting && <Loader2 className="h-4 w-4 animate-spin" />}
+                        {caregiverProfile?.mercadoPago?.userId ? 'Reconectar Mercado Pago' : 'Conectar Mercado Pago'}
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+              </CardContent>
             </Card>
           </div>
         )}

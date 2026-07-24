@@ -53,6 +53,21 @@ class AvailabilityTimeRangeDto {
   endTime: string;
 }
 
+class PayoutAccountDto {
+  @IsString()
+  @Matches(/^(pix|mercado_pago)$/)
+  method: 'pix' | 'mercado_pago';
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(cpf|cnpj|email|phone|random)$/)
+  pixKeyType?: 'cpf' | 'cnpj' | 'email' | 'phone' | 'random';
+
+  @IsOptional()
+  @IsString()
+  pixKey?: string;
+}
+
 export class CreateCaregiverDto {
   @IsString()
   bio: string;
@@ -99,4 +114,9 @@ export class CreateCaregiverDto {
   @IsOptional()
   @IsString()
   profileImage?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PayoutAccountDto)
+  payoutAccount?: PayoutAccountDto;
 }

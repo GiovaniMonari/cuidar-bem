@@ -5,6 +5,7 @@ import { Model } from 'mongoose';
 import { MercadoPagoConfig, Preference, Payment as MPPayment } from 'mercadopago';
 import { v4 as uuidv4 } from 'uuid';
 import { Payment, PaymentDocument } from './schemas/payment.schema';
+import { Withdrawal, WithdrawalDocument } from './schemas/withdrawal.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { BookingsService } from '../bookings/bookings.service';
 import { CaregiversService } from '../caregivers/caregivers.service';
@@ -22,6 +23,7 @@ export class PaymentsService {
 
   constructor(
     @InjectModel(Payment.name) private paymentModel: Model<PaymentDocument>,
+    @InjectModel(Withdrawal.name) private withdrawalModel: Model<WithdrawalDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private bookingsService: BookingsService,
     private caregiversService: CaregiversService,
@@ -413,6 +415,72 @@ export class PaymentsService {
       .find(query)
       .populate('bookingId')
       .sort({ createdAt: -1 });
+  }
+
+  async requestWithdrawal(caregiverId: string, requestedAmount: number) {
+    const balance = await this.getWithdrawalBalance(caregiverId);
+    const caregiver = balance.caregiver;
+    const payoutAccount = caregiver.payoutAccount;
+    if (!payoutAccount) {
+      throw new BadRequestException('Configure um método de saque antes de solicitar um saque.');
+    }
+    if (payoutAccount.method === 'mercado_pago' && !caregiver.mercadoPago?.userId) {
+      throw new BadRequestException('Conecte sua conta Mercado Pago antes de solicitar um saque.');
+    }
+    if (payoutAccount.method === 'pix' && (!payoutAccount.pixKeyType || !payoutAccount.pixKey)) {
+      throw new BadRequestException('Informe sua chave Pix antes de solicitar um saque.');
+    }
+
+    const available = balance.available;
+    const amount = Math.round(Number(requestedAmount) * 100) / 100;
+    if (amount > available) {
+      throw new BadRequestException(`Saldo disponível para saque: R$ ${available.toFixed(2)}.`);
+    }
+
+    const withdrawal = new this.withdrawalModel({
+      caregiverId: caregiver.userId,
+      amount,
+      method: payoutAccount.method,
+      payoutAccount: {
+        method: payoutAccount.method,
+        pixKeyType: payoutAccount.pixKeyType,
+        pixKey: payoutAccount.pixKey,
+      },
+      status: 'pending',
+    });
+    return withdrawal.save();
+  }
+
+  async getWithdrawalBalance(caregiverId: string) {
+    const caregiver = await this.caregiversService.findByUserId(caregiverId);
+    const caregiverUserId = (caregiver.userId as any)?._id || caregiver.userId;
+    const released = await this.paymentModel.aggregate([
+      { $match: { caregiverId: caregiver._id, status: 'released' } },
+      { $group: { _id: null, total: { $sum: '$caregiverAmount' } } },
+    ]);
+    const requested = await this.withdrawalModel.aggregate([
+      {
+        $match: {
+          caregiverId: caregiverUserId,
+          status: { $in: ['pending', 'processing', 'completed'] },
+        },
+      },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]);
+    const available = Math.round(
+      ((released[0]?.total || 0) - (requested[0]?.total || 0)) * 100,
+    ) / 100;
+
+    return {
+      available: Math.max(0, available),
+      payoutConfigured: Boolean(
+        caregiver.payoutAccount &&
+        (caregiver.payoutAccount.method === 'pix'
+          ? caregiver.payoutAccount.pixKeyType && caregiver.payoutAccount.pixKey
+          : caregiver.mercadoPago?.userId),
+      ),
+      caregiver,
+    };
   }
 
   async simulatePayment(bookingId: string): Promise<PaymentDocument> {

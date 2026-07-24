@@ -233,6 +233,26 @@ class ApiService {
     });
   }
 
+  async getWithdrawalBalance() {
+    return this.request<any>('/payments/withdraw/balance', {
+      headers: this.headers(true),
+    });
+  }
+
+  async requestWithdrawal(amount: number) {
+    return this.request<any>('/payments/withdraw', {
+      method: 'POST',
+      headers: this.headers(true),
+      body: JSON.stringify({ amount }),
+    });
+  }
+
+  async getMercadoPagoConnectUrl() {
+    return this.request<{ url: string }>('/payments/oauth/connect', {
+      headers: this.headers(true),
+    });
+  }
+
   async getServiceTypes(category?: string) {
     const query = category ? `?category=${category}` : '';
     return this.request<any>(`/services${query}`, {

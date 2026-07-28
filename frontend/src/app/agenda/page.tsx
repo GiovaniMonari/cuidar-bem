@@ -91,6 +91,7 @@ export default function AgendaPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<string>('all');
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push('/login');
@@ -242,6 +243,9 @@ export default function AgendaPage() {
   }
 
   const filtered = activeTab === 'all' ? bookings : bookings.filter((b) => b.status === activeTab);
+  const INITIAL_LIMIT = 4;
+  const visibleBookings = showAll ? filtered : filtered.slice(0, INITIAL_LIMIT);
+  const hasMore = filtered.length > INITIAL_LIMIT;
   const isCaregiver = user?.role === 'caregiver';
 
   const totalEarnings = Object.values(payments)
@@ -400,7 +404,7 @@ export default function AgendaPage() {
       {/* ── Booking List ── */}
       <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pb-24">
         <div className="w-full space-y-8">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-col">
+          <Tabs value={activeTab} onValueChange={(tab) => { setActiveTab(tab); setShowAll(false); }} className="w-full flex-col">
             <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <h2 className="flex items-center gap-3 text-2xl font-black text-gray-900">
                 <LayoutDashboard className="w-6 h-6 text-primary-600" />
@@ -444,7 +448,7 @@ export default function AgendaPage() {
                 </div>
               ) : (
                 <div className="flex w-full min-w-0 flex-col gap-8">
-                  {filtered.map((booking) => (
+                  {visibleBookings.map((booking) => (
                     <div key={booking._id} className="w-full min-w-0">
                       <BookingCard
                         booking={booking}
@@ -460,6 +464,29 @@ export default function AgendaPage() {
                       />
                     </div>
                   ))}
+                  {hasMore && !showAll && (
+                    <div className="flex justify-center pt-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowAll(true)}
+                        className="gap-2 rounded-xl border-gray-200 font-bold text-gray-600 hover:border-primary-300 hover:text-primary-700"
+                      >
+                        <Calendar className="w-4 h-4" />
+                        Mostrar todos ({filtered.length - INITIAL_LIMIT} restantes)
+                      </Button>
+                    </div>
+                  )}
+                  {showAll && filtered.length > INITIAL_LIMIT && (
+                    <div className="flex justify-center pt-2">
+                      <Button
+                        variant="ghost"
+                        onClick={() => setShowAll(false)}
+                        className="gap-2 rounded-xl font-bold text-gray-400 hover:text-gray-600"
+                      >
+                        Mostrar menos
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </TabsContent>

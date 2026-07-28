@@ -314,21 +314,32 @@ export default function AgendaPage() {
         {/* ── Financial Summary ── */}
         {isCaregiver && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Total Recebido */}
             <Card className="bg-primary-600 text-white border-none shadow-lg">
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-4 opacity-80">
                   <Banknote className="w-5 h-5" />
                   <span className="text-sm font-bold uppercase tracking-wider">Total Recebido</span>
                 </div>
-                <div className="text-4xl font-black tracking-tight">
-                  R$ {totalEarnings.toFixed(2)}
-                </div>
-                <CardDescription className="text-primary-100 mt-2 font-medium">
-                  Pagamentos liberados na sua conta
-                </CardDescription>
+                {loadingExtras ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-10 w-40 bg-primary-500/60 rounded-lg" />
+                    <Skeleton className="h-4 w-56 bg-primary-500/40 rounded" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-4xl font-black tracking-tight">
+                      R$ {totalEarnings.toFixed(2)}
+                    </div>
+                    <CardDescription className="text-primary-100 mt-2 font-medium">
+                      Pagamentos liberados na sua conta
+                    </CardDescription>
+                  </>
+                )}
               </CardContent>
             </Card>
 
+            {/* A Receber */}
             <Card className="bg-white border-gray-200 shadow-sm">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between gap-3 mb-4 text-amber-600">
@@ -338,27 +349,39 @@ export default function AgendaPage() {
                   </div>
                   <WalletCards className="w-5 h-5" />
                 </div>
-                <div className="text-4xl font-black text-gray-900 tracking-tight">
-                  R$ {pendingAmount.toFixed(2)}
-                </div>
-                <CardDescription className="text-gray-500 mt-2 font-medium">
-                  Valores em processamento ou retidos
-                </CardDescription>
+                {loadingExtras ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-10 w-40 rounded-lg" />
+                    <Skeleton className="h-4 w-52 rounded" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-4xl font-black text-gray-900 tracking-tight">
+                      R$ {pendingAmount.toFixed(2)}
+                    </div>
+                    <CardDescription className="text-gray-500 mt-2 font-medium">
+                      Valores em processamento ou retidos
+                    </CardDescription>
+                  </>
+                )}
                 <div className="mt-5 border-t border-gray-100 pt-4">
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Disponível para saque</p>
-                      <p className="mt-1 text-xl font-black text-emerald-600">
-                        {loadingWithdrawalBalance
-                          ? '...'
-                          : `R$ ${Number(withdrawalBalance?.available || 0).toFixed(2)}`}
-                      </p>
+                      {loadingWithdrawalBalance ? (
+                        <Skeleton className="mt-1 h-7 w-28 rounded-lg" />
+                      ) : (
+                        <p className="mt-1 text-xl font-black text-emerald-600">
+                          R$ {Number(withdrawalBalance?.available || 0).toFixed(2)}
+                        </p>
+                      )}
                     </div>
                     <Button
                       type="button"
                       size="sm"
                       disabled={
                         loadingWithdrawalBalance ||
+                        loadingExtras ||
                         withdrawalMutation.isPending ||
                         !withdrawalBalance?.payoutConfigured ||
                         Number(withdrawalBalance?.available || 0) <= 0

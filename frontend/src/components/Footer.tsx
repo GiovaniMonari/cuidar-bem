@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Heart,
   Mail,
@@ -12,6 +15,9 @@ import {
 } from 'lucide-react';
 
 export function Footer() {
+  const { user } = useAuth();
+  const isCaregiver = user?.role === 'caregiver';
+
   return (
     <footer className="bg-gray-900 text-gray-300">
       {/* Footer Principal */}
@@ -49,28 +55,30 @@ export function Footer() {
           </div>
 
           {/* Para Clientes */}
-          <div>
-            <h4 className="text-white font-semibold mb-4">Para Clientes</h4>
-            <ul className="space-y-2.5">
-              {[
-                { label: 'Buscar Cuidadores', href: '/cuidadores' },
-                { label: 'Como Funciona', href: '/#como-funciona' },
-                { label: 'Cuidado de Idosos', href: '/cuidadores?specialty=cuidado_idosos' },
-                { label: 'Cuidado PcD', href: '/cuidadores?specialty=cuidado_deficiencia' },
-                { label: 'Enfermagem', href: '/cuidadores?specialty=enfermagem' },
-              ].map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="text-gray-400 hover:text-white text-sm transition-colors flex items-center gap-1 group"
-                  >
-                    <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {!isCaregiver && (
+            <div>
+              <h4 className="text-white font-semibold mb-4">Para Clientes</h4>
+              <ul className="space-y-2.5">
+                {[
+                  { label: 'Buscar Cuidadores', href: '/cuidadores' },
+                  { label: 'Como Funciona', href: '/#como-funciona' },
+                  { label: 'Cuidado de Idosos', href: '/cuidadores?specialty=cuidado_idosos' },
+                  { label: 'Cuidado PcD', href: '/cuidadores?specialty=cuidado_deficiencia' },
+                  { label: 'Enfermagem', href: '/cuidadores?specialty=enfermagem' },
+                ].map((link) => (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="text-gray-400 hover:text-white text-sm transition-colors flex items-center gap-1 group"
+                    >
+                      <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Para Cuidadores */}
           <div>
@@ -80,7 +88,7 @@ export function Footer() {
                 { label: 'Cadastrar-se', href: '/registro?role=caregiver' },
                 { label: 'Meu Perfil', href: '/perfil/cuidador' },
                 { label: 'Agenda', href: '/agenda' },
-                { label: 'Configurar Pagamento', href: '/perfil' },
+                { label: 'Configurar Saque', href: '/perfil' },
               ].map((link) => (
                 <li key={link.href}>
                   <Link

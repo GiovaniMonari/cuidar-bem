@@ -1,5 +1,6 @@
 import { IsOptional, IsString, IsNumber } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class FilterCaregiverDto {
   @IsOptional()

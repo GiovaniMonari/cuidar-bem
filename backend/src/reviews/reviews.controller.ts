@@ -11,6 +11,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -18,6 +19,8 @@ import { Types } from 'mongoose';
 import { ReviewWithBookingDto } from './dto/review-with-booking.dto';
 import { CaregiversService } from '../caregivers/caregivers.service'; // Add this import
 
+@ApiTags('Reviews')
+@ApiBearerAuth()
 @Controller('reviews')
 export class ReviewsController {
   constructor(
@@ -27,11 +30,15 @@ export class ReviewsController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Criar avaliação para um cuidador' })
+  @ApiBody({ type: CreateReviewDto })
   create(@Request() req, @Body() dto: CreateReviewDto) {
     return this.reviewsService.create(req.user.userId, dto);
   }
 
   @Get('caregiver/:caregiverId')
+  @ApiOperation({ summary: 'Listar avaliações de um cuidador' })
+  @ApiParam({ name: 'caregiverId', description: 'ID do cuidador' })
   findByCaregiver(@Param('caregiverId') caregiverId: string) {
     if (!Types.ObjectId.isValid(caregiverId)) {
       throw new BadRequestException('ID do cuidador inválido.');

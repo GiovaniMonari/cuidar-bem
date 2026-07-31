@@ -1,4 +1,5 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, Logger, UseGuards, Get, Param, Req, Res } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -8,6 +9,8 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { CreateWithdrawalDto } from './dto/create-withdrawal.dto';
 import { MercadoPagoOAuthService } from './mercado-pago-oauth.service';
 
+@ApiTags('Payments')
+@ApiBearerAuth()
 @Controller('payments')
 export class PaymentsController {
   private readonly logger = new Logger(PaymentsController.name);
@@ -20,6 +23,7 @@ export class PaymentsController {
   ) {}
 
   @Post('webhook')
+  @ApiOperation({ summary: 'Webhook de pagamento do Mercado Pago' })
   @HttpCode(HttpStatus.OK) // Sempre retorna 200 rápido para o MercadoPago (0.1.5)
   async handleWebhook(@Body() body: any) {
     this.logger.log(`🔔 Webhook HTTP recebido: ${JSON.stringify(body)}`);
@@ -51,6 +55,8 @@ export class PaymentsController {
   // Buscar pagamento de um booking
   @UseGuards(JwtAuthGuard)
   @Get('booking/:bookingId')
+  @ApiOperation({ summary: 'Buscar pagamentos de um agendamento' })
+  @ApiParam({ name: 'bookingId', description: 'ID do agendamento' })
   findByBooking(@Param('bookingId') bookingId: string) {
     return this.paymentsService.findByBooking(bookingId);
   }
@@ -58,6 +64,7 @@ export class PaymentsController {
   // Listar meus pagamentos
   @UseGuards(JwtAuthGuard)
   @Get('my')
+  @ApiOperation({ summary: 'Listar pagamentos do usuário autenticado' })
   findMy(@Req() req) {
     return this.paymentsService.findByUser(req.user.userId, req.user.role);
   }

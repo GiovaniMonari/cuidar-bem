@@ -9,8 +9,10 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 class ServicePriceDto {
+  @ApiProperty({ example: 'bath', description: 'Chave do serviço oferecido' })
   @IsString()
   serviceKey: string;
 
@@ -69,9 +71,11 @@ class PayoutAccountDto {
 }
 
 export class CreateCaregiverDto {
+  @ApiProperty({ example: 'Cuido de idosos com atenção especial', description: 'Descrição do perfil do cuidador' })
   @IsString()
   bio: string;
 
+  @ApiProperty({ example: ['idoso', 'companheirismo'], description: 'Especialidades do cuidador' })
   @IsArray()
   @IsString({ each: true })
   specialties: string[];

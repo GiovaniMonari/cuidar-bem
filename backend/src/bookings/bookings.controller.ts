@@ -9,22 +9,28 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CheckInBookingDto } from './dto/check-in-booking.dto';
 
+@ApiTags('Bookings')
+@ApiBearerAuth()
 @Controller('bookings')
 @UseGuards(JwtAuthGuard)
 export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) {}
 
   @Post()
+  @ApiOperation({ summary: 'Criar novo agendamento' })
+  @ApiBody({ type: CreateBookingDto })
   create(@Request() req, @Body() dto: CreateBookingDto) {
     return this.bookingsService.create(req.user.userId, dto, req.user);
   }
 
   @Get('my')
+  @ApiOperation({ summary: 'Listar agendamentos do usuário autenticado' })
   findMy(@Request() req) {
     if (req.user.role === 'caregiver') {
       return this.bookingsService.findByCaregiver(req.user.userId);

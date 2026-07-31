@@ -6,20 +6,26 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { ChatService } from './chat.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
+@ApiTags('Chat')
+@ApiBearerAuth()
 @Controller('chat')
 @UseGuards(JwtAuthGuard)
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
   @Post('booking/:bookingId')
+  @ApiOperation({ summary: 'Abrir ou recuperar conversa de um agendamento' })
+  @ApiParam({ name: 'bookingId', description: 'ID do agendamento da conversa' })
   getOrCreateConversation(@Param('bookingId') bookingId: string, @Request() req) {
     return this.chatService.getOrCreateConversation(bookingId, req.user.userId);
   }
 
   @Get('conversations')
+  @ApiOperation({ summary: 'Listar conversas do usuário autenticado' })
   getConversations(@Request() req) {
     return this.chatService.getUserConversations(req.user.userId);
   }

@@ -8,12 +8,15 @@ import {
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateBookingDto {
+  @ApiProperty({ example: '64f3b8d2c2e8e8f1a4b2c3d4', description: 'ID do cuidador selecionado' })
   @IsString()
   @IsNotEmpty()
   caregiverId: string;
 
+  @ApiProperty({ example: 'companionship', description: 'Tipo do serviço' })
   @IsString()
   @IsNotEmpty()
   serviceType: string;

@@ -14,6 +14,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { UsersService } from './users.service';
@@ -32,6 +33,8 @@ function imageFileFilter(req: any, file: Express.Multer.File, callback: Function
   callback(null, true);
 }
 
+@ApiTags('Users')
+@ApiBearerAuth()
 @Controller('users')
 export class UsersController {
   constructor(
@@ -41,12 +44,15 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
+  @ApiOperation({ summary: 'Obter perfil do usuário autenticado' })
   getProfile(@Request() req) {
     return this.usersService.findById(req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Put('me')
+  @ApiOperation({ summary: 'Atualizar perfil do usuário autenticado' })
+  @ApiBody({ type: UpdateUserDto })
   updateProfile(@Request() req, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.update(req.user.userId, updateUserDto);
   }

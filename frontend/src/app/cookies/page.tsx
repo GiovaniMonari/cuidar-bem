@@ -2,7 +2,7 @@
 
 import { Footer } from '@/components/Footer';
 import { Cookie, Settings, BarChart3, Shield, ToggleLeft } from 'lucide-react';
-
+//  teste
 const COOKIE_TYPES = [
   {
     icon: Shield,

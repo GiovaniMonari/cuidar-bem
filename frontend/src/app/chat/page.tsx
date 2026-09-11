@@ -9,6 +9,7 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { ReportUserModal } from '@/components/ReportUserModal';
 import {
   Send,
+  ArrowLeft,
   MessageCircle,
   Loader2,
   Search,
@@ -302,12 +303,12 @@ function ChatContent() {
   }
 
   return (
-    <div className="h-[calc(100vh-64px)] bg-gray-50">
-      <div className="max-w-7xl mx-auto h-full px-4 py-6">
-        <div className="grid lg:grid-cols-[320px_1fr] gap-6 h-full">
+    <div className="h-[calc(100dvh-64px)] min-h-0 bg-gray-50">
+      <div className="max-w-7xl mx-auto h-full px-0 py-0 sm:px-4 sm:py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-0 lg:gap-6 h-full">
           {/* Lista de conversas */}
-          <div className="card overflow-hidden h-full flex flex-col">
-            <div className="p-4 border-b border-gray-100">
+          <div className={`card overflow-hidden h-full flex-col ${selectedConversation ? 'hidden lg:flex' : 'flex'}`}>
+            <div className="p-4 sm:p-5 border-b border-gray-100">
               <h1 className="font-bold text-lg text-gray-900 flex items-center gap-2">
                 <MessageCircle className="w-5 h-5 text-primary-600" />
                 Conversas
@@ -322,7 +323,7 @@ function ChatContent() {
                   <button
                     key={conversation._id}
                     onClick={() => openConversation(conversation)}
-                    className={`w-full text-left p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                    className={`w-full text-left p-3.5 sm:p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
                       selectedConversation?._id === conversation._id
                         ? 'bg-primary-50'
                         : ''
@@ -360,7 +361,7 @@ function ChatContent() {
           </div>
 
           {/* Área do chat */}
-          <div className="card h-full flex flex-col overflow-hidden">
+          <div className={`card h-full flex-col overflow-hidden ${selectedConversation ? 'flex' : 'hidden lg:flex'}`}>
             {!selectedConversation ? (
               <div className="flex-1 flex items-center justify-center text-gray-400 text-center px-6">
                 <div>
@@ -373,19 +374,30 @@ function ChatContent() {
               </div>
             ) : (
               <>
-                <div className="p-4 border-b border-gray-100 bg-white">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
+                <div className="p-3 sm:p-4 border-b border-gray-100 bg-white">
+                  <div className="flex items-center justify-between gap-2 sm:gap-4">
+                    <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedConversation(null);
+                          setMessages([]);
+                        }}
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 lg:hidden"
+                        aria-label="Voltar para conversas"
+                      >
+                        <ArrowLeft className="h-5 w-5" />
+                      </button>
                       <UserAvatar
                         name={getOtherUser(selectedConversation)?.name || 'Usuário'}
                         avatar={getOtherUser(selectedConversation)?.avatar}
                         size={44}
                       />
-                      <div>
-                        <p className="font-semibold text-gray-900">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-gray-900">
                           {getOtherUser(selectedConversation)?.name || 'Usuário'}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="hidden text-xs text-gray-500 sm:block">
                           Conversa com este profissional
                         </p>
                       </div>
@@ -393,15 +405,16 @@ function ChatContent() {
                     <button
                       type="button"
                       onClick={() => setReportModalOpen(true)}
-                      className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100"
+                      className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-2.5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100 sm:h-auto sm:px-3 sm:py-2"
+                      aria-label="Reportar usuário"
                     >
                       <ShieldAlert className="h-4 w-4" />
-                      Reportar
+                      <span className="hidden sm:inline">Reportar</span>
                     </button>
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+                <div className="flex-1 min-h-0 space-y-3 overflow-y-auto bg-gray-50 p-3 sm:p-4">
                   {loadingMessages ? (
                     <div className="flex items-center justify-center h-full">
                       <Loader2 className="w-6 h-6 text-primary-600 animate-spin" />
@@ -423,7 +436,7 @@ function ChatContent() {
                           className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
                         >
                           <div
-                            className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm shadow-sm ${
+                            className={`max-w-[88%] px-3.5 py-2.5 text-sm shadow-sm sm:max-w-[75%] sm:px-4 sm:py-3 ${
                               isMine
                                 ? 'bg-primary-600 text-white rounded-br-md'
                                 : 'bg-white text-gray-800 border border-gray-200 rounded-bl-md'
@@ -454,7 +467,7 @@ function ChatContent() {
                   <div ref={messagesEndRef} />
                 </div>
 
-                <div className="p-4 border-t border-gray-100 flex gap-3 bg-white">
+                <div className="flex gap-2 border-t border-gray-100 bg-white p-3 sm:gap-3 sm:p-4">
                   <input
                     type="text"
                     value={message}
@@ -466,12 +479,13 @@ function ChatContent() {
                       }
                     }}
                     placeholder="Digite sua mensagem..."
-                    className="input-field"
+                    className="input-field min-w-0 px-3 sm:px-4"
                   />
 
                   <button
                     onClick={sendMessage}
-                    className="btn-primary !px-5 flex items-center gap-2"
+                    className="btn-primary h-[50px] w-[50px] shrink-0 !px-0 flex items-center justify-center gap-2 sm:!px-5 sm:w-auto"
+                    aria-label="Enviar mensagem"
                   >
                     <Send className="w-4 h-4" />
                   </button>

@@ -1,7 +1,18 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import {
   Heart,
   Mail,
@@ -16,10 +27,31 @@ import {
 
 export function Footer() {
   const { user } = useAuth();
-  const isCaregiver = user?.role === 'caregiver';
+  const [accessWarning, setAccessWarning] = useState<'client' | 'caregiver' | null>(null);
+
+  const handleRestrictedLink = (
+    event: React.MouseEvent<HTMLAnchorElement>,
+    targetRole: 'client' | 'caregiver',
+  ) => {
+    if (!user || user.role === targetRole || user.role === 'admin') return;
+
+    event.preventDefault();
+    setAccessWarning(targetRole);
+  };
+
+  const warningContent = accessWarning === 'client'
+    ? {
+        title: 'Área exclusiva para clientes',
+        description: 'Esta funcionalidade é destinada a clientes. Seu perfil de cuidador não pode acessá-la.',
+      }
+    : {
+        title: 'Área exclusiva para cuidadores',
+        description: 'Esta funcionalidade é destinada a cuidadores. Seu perfil de cliente não pode acessá-la.',
+      };
 
   return (
-    <footer className="bg-gray-900 text-gray-300">
+    <>
+      <footer className="bg-gray-900 text-gray-300">
       {/* Footer Principal */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -55,8 +87,7 @@ export function Footer() {
           </div>
 
           {/* Para Clientes */}
-          {!isCaregiver && (
-            <div>
+          <div>
               <h4 className="text-white font-semibold mb-4">Para Clientes</h4>
               <ul className="space-y-2.5">
                 {[
@@ -69,6 +100,7 @@ export function Footer() {
                   <li key={link.href}>
                     <Link
                       href={link.href}
+                      onClick={(event) => handleRestrictedLink(event, 'client')}
                       className="text-gray-400 hover:text-white text-sm transition-colors flex items-center gap-1 group"
                     >
                       <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -77,8 +109,7 @@ export function Footer() {
                   </li>
                 ))}
               </ul>
-            </div>
-          )}
+          </div>
 
           {/* Para Cuidadores */}
           <div>
@@ -93,6 +124,7 @@ export function Footer() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
+                      onClick={(event) => handleRestrictedLink(event, 'caregiver')}
                     className="text-gray-400 hover:text-white text-sm transition-colors flex items-center gap-1 group"
                   >
                     <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -140,7 +172,20 @@ export function Footer() {
             </div>
           </div>
         </div>
-      </div>
-    </footer>
+        </div>
+      </footer>
+
+      <Dialog open={accessWarning !== null} onOpenChange={(open) => !open && setAccessWarning(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{warningContent.title}</DialogTitle>
+            <DialogDescription>{warningContent.description}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>Entendi</DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

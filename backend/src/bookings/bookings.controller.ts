@@ -39,16 +39,23 @@ export class BookingsController {
   }
 
   @Get('can-review/:caregiverId')
+  @ApiOperation({ summary: 'Verificar se o usuário pode avaliar um cuidador' })
+  @ApiParam({ name: 'caregiverId', description: 'ID do cuidador' })
   canReview(@Request() req, @Param('caregiverId') caregiverId: string) {
     return this.bookingsService.canReview(req.user.userId, caregiverId);
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Buscar um agendamento por ID' })
+  @ApiParam({ name: 'id', description: 'ID do agendamento' })
   findOne(@Param('id') id: string) {
     return this.bookingsService.findOne(id);
   }
 
   @Post(':id/check-in')
+  @ApiOperation({ summary: 'Registrar check-in do agendamento' })
+  @ApiParam({ name: 'id', description: 'ID do agendamento' })
+  @ApiBody({ type: CheckInBookingDto })
   checkIn(@Param('id') id: string, @Request() req, @Body() dto: CheckInBookingDto) {
     return this.bookingsService.checkIn(
       id,
@@ -60,6 +67,9 @@ export class BookingsController {
   }
 
   @Put(':id/status')
+  @ApiOperation({ summary: 'Atualizar status do agendamento' })
+  @ApiParam({ name: 'id', description: 'ID do agendamento' })
+  @ApiBody({ schema: { type: 'object', required: ['status'], properties: { status: { type: 'string', example: 'confirmed' } } } })
   updateStatus(
     @Param('id') id: string,
     @Request() req,

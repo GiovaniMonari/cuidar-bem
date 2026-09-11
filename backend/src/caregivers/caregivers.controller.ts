@@ -9,7 +9,7 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CaregiversService } from './caregivers.service';
 import { CreateCaregiverDto } from './dto/create-caregiver.dto';
 import { FilterCaregiverDto } from './dto/filter-caregiver.dto';
@@ -31,6 +31,7 @@ export class CaregiversController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Buscar um cuidador por id' })
+  @ApiParam({ name: 'id', description: 'ID do cuidador' })
   findOne(@Param('id') id: string) {
     return this.caregiversService.findOne(id);
   }
@@ -56,6 +57,7 @@ export class CaregiversController {
   @ApiBearerAuth()
   @Put(':id')
   @ApiOperation({ summary: 'Atualizar perfil de cuidador' })
+  @ApiParam({ name: 'id', description: 'ID do cuidador' })
   @ApiBody({ type: CreateCaregiverDto })
   update(
     @Param('id') id: string,
@@ -66,16 +68,22 @@ export class CaregiversController {
   }
 
   @Get(':id/availability')
+  @ApiOperation({ summary: 'Consultar disponibilidade de um cuidador' })
+  @ApiParam({ name: 'id', description: 'ID do cuidador' })
   getAvailability(@Param('id') id: string) {
     return this.caregiversService.getAvailability(id);
   }
 
   @Get(':id/booked-dates')
+  @ApiOperation({ summary: 'Listar datas ocupadas de um cuidador' })
+  @ApiParam({ name: 'id', description: 'ID do cuidador' })
   getBookedDates(@Param('id') id: string) {
     return this.caregiversService.getBookedDates(id);
   }
 
   @Get(':id/bookings')
+  @ApiOperation({ summary: 'Listar agendamentos de um cuidador' })
+  @ApiParam({ name: 'id', description: 'ID do cuidador' })
   getCaregiverBookings(@Param('id') id: string) {
     return this.caregiversService.getCaregiverBookings(id);
   }

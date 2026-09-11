@@ -20,7 +20,6 @@ import { ReviewWithBookingDto } from './dto/review-with-booking.dto';
 import { CaregiversService } from '../caregivers/caregivers.service'; // Add this import
 
 @ApiTags('Reviews')
-@ApiBearerAuth()
 @Controller('reviews')
 export class ReviewsController {
   constructor(
@@ -30,6 +29,7 @@ export class ReviewsController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Criar avaliação para um cuidador' })
   @ApiBody({ type: CreateReviewDto })
   create(@Request() req, @Body() dto: CreateReviewDto) {
@@ -48,6 +48,9 @@ export class ReviewsController {
 
   @Get('can-review/:caregiverId')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Verificar se o usuário pode avaliar um cuidador' })
+  @ApiParam({ name: 'caregiverId', description: 'ID do cuidador' })
   canReview(@Request() req, @Param('caregiverId') caregiverId: string) {
     if (!Types.ObjectId.isValid(caregiverId)) {
       throw new BadRequestException('ID do cuidador inválido.');
@@ -57,6 +60,9 @@ export class ReviewsController {
 
   @Get('reviewable-bookings/:caregiverId')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Listar agendamentos elegíveis para avaliação' })
+  @ApiParam({ name: 'caregiverId', description: 'ID do cuidador' })
   getReviewableBookings(@Request() req, @Param('caregiverId') caregiverId: string) {
     if (!Types.ObjectId.isValid(caregiverId)) {
       throw new BadRequestException('ID do cuidador inválido.');
@@ -66,6 +72,8 @@ export class ReviewsController {
 
   @Get('my-reviews')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Listar avaliações recebidas pelo cuidador autenticado' })
   async getMyReviews(@Request() req): Promise<ReviewWithBookingDto[]> {
     const userId = req.user.userId;
     

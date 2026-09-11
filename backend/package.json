@@ -6,6 +6,9 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
     "seed": "ts-node src/seed.ts",
     "create:admin": "ts-node src/create-admin.ts"
   },
@@ -52,8 +55,11 @@
     "@types/nodemailer": "^7.0.11",
     "@types/passport-jwt": "^4.0.0",
     "@types/uuid": "^10.0.0",
+    "@types/jest": "^29.5.14",
+    "jest": "^29.7.0",
     "madge": "^8.0.0",
     "ts-node": "^10.9.2",
+    "ts-jest": "^29.2.5",
     "typescript": "^5.3.3"
   }
 }

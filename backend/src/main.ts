@@ -18,10 +18,29 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('Cuidar Bem API')
     .setDescription(
-      'Documentação da API para autenticação, usuários, cuidadores, agendamentos e pagamentos.',
+      [
+        'API da plataforma Cuidar Bem para conectar clientes e cuidadores.',
+        '',
+        'A maioria das rotas protegidas exige um token JWT no header Authorization como Bearer token.',
+        'O prefixo global das rotas HTTP é /api. O endpoint de webhook de pagamentos é público.',
+        '',
+        'WebSocket (Socket.IO): conecte-se usando /chat com o token em auth.token ou no header Authorization.',
+        'Eventos disponíveis: joinConversation ({ conversationId }), sendMessage ({ conversationId, content }) e newMessage.',
+      ].join('\n'),
     )
-    .setVersion('1.0')
-    .addBearerAuth()
+    .setVersion('1.0.0')
+    .setContact('Cuidar Bem', 'https://www.cuidarbem.services', 'suporte@cuidarbem.services')
+    .addServer(`http://localhost:${process.env.PORT || 3001}`, 'Desenvolvimento local')
+    .addServer('https://www.cuidarbem.services', 'Produção')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Token JWT retornado pelo endpoint /api/auth/login.',
+      },
+      'bearer',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

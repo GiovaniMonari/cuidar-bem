@@ -31,6 +31,8 @@ export class ChatController {
   }
 
   @Get('messages/:conversationId')
+  @ApiOperation({ summary: 'Listar mensagens de uma conversa e marcá-las como lidas' })
+  @ApiParam({ name: 'conversationId', description: 'ID da conversa' })
   async getMessages(@Param('conversationId') conversationId: string, @Request() req) {
     await this.chatService.markMessagesAsRead(conversationId, req.user.userId);
     return this.chatService.getMessages(conversationId, req.user.userId);

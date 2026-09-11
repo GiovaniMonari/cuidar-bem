@@ -59,6 +59,8 @@ export class FeedbackController {
   // ✅ IMPORTANTE: Esta rota deve vir ANTES de @Get(':id')
   @Get('check/:bookingId/:dayNumber')
   @ApiOperation({ summary: 'Verificar se já existe feedback para um dia específico' })
+  @ApiParam({ name: 'bookingId', description: 'ID do agendamento' })
+  @ApiParam({ name: 'dayNumber', description: 'Número do dia do atendimento', type: Number, example: 1 })
   async checkDayFeedback(
     @Param('bookingId') bookingId: string,
     @Param('dayNumber') dayNumber: string,

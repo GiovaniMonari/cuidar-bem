@@ -119,7 +119,7 @@ export class PaymentsService {
 
   private calculateAmounts(totalAmount: number) {
     const platformFee = Math.round(totalAmount * PLATFORM_FEE_PERCENT) / 100;
-    const caregiverAmount = totalAmount - platformFee;
+    const caregiverAmount = Math.round((totalAmount - platformFee) * 100) / 100;
     return { platformFee, caregiverAmount };
   }
 

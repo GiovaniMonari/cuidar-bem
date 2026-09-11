@@ -31,8 +31,8 @@ export class AdminController {
   @Get('users')
   @ApiOperation({ summary: 'Listar usuários para moderação' })
   @ApiQuery({ name: 'search', required: false, type: String })
-  @ApiQuery({ name: 'role', required: false, type: String })
-  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'role', required: false, type: String, enum: ['client', 'caregiver', 'admin'] })
+  @ApiQuery({ name: 'status', required: false, type: String, enum: ['active', 'banned', 'watchlist'] })
   listUsers(
     @Query('search') search?: string,
     @Query('role') role?: string,
@@ -61,8 +61,8 @@ export class AdminController {
 
   @Get('reports')
   @ApiOperation({ summary: 'Listar denúncias do sistema' })
-  @ApiQuery({ name: 'status', required: false, type: String })
-  @ApiQuery({ name: 'source', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, type: String, enum: ['pending', 'under_review', 'resolved', 'dismissed'] })
+  @ApiQuery({ name: 'source', required: false, type: String, enum: ['chat', 'service'] })
   listReports(@Query('status') status?: string, @Query('source') source?: string) {
     return this.moderationService.listReports(status, source);
   }

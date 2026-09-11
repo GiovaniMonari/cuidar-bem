@@ -14,7 +14,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { UsersService } from './users.service';
@@ -59,6 +59,9 @@ export class UsersController {
 
     @UseGuards(JwtAuthGuard)
   @Post('me/avatar')
+  @ApiOperation({ summary: 'Enviar avatar do usuário autenticado' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ schema: { type: 'object', required: ['file'], properties: { file: { type: 'string', format: 'binary', description: 'Imagem JPG, PNG ou WEBP (máximo 5 MB)' } } } })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -96,6 +99,7 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Post('me/avatar/remove')
+  @ApiOperation({ summary: 'Remover avatar do usuário autenticado' })
   async removeAvatar(@Request() req) {
     const currentUser = await this.usersService.findRawById(req.user.userId);
 
@@ -119,6 +123,7 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Post('me/presence')
+  @ApiOperation({ summary: 'Atualizar presença do usuário para online' })
   @HttpCode(HttpStatus.OK)
   async touchPresence(@Req() req: any) { // 👈 Corrigido para @Req()
     await this.usersService.touchPresence(req.user.userId);
@@ -127,6 +132,7 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Post('me/presence/offline')
+  @ApiOperation({ summary: 'Marcar usuário como offline' })
   @HttpCode(HttpStatus.OK)
   async setOffline(@Req() req: any) { // 👈 Corrigido para @Req()
     await this.usersService.setOffline(req.user.userId);
@@ -135,6 +141,8 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Post('me/password')
+  @ApiOperation({ summary: 'Alterar senha do usuário autenticado' })
+  @ApiBody({ schema: { type: 'object', required: ['currentPassword', 'newPassword'], properties: { currentPassword: { type: 'string', format: 'password' }, newPassword: { type: 'string', format: 'password', minLength: 8 } } } })
   async changePassword(@Request() req, @Body() body: { currentPassword: string; newPassword: string }) {
     const user = await this.usersService.findRawById(req.user.userId);
     if (!user) throw new BadRequestException('Usuário não encontrado');
@@ -145,6 +153,8 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Post('me/favorite/:caregiverId')
+  @ApiOperation({ summary: 'Adicionar ou alternar cuidador favorito' })
+  @ApiParam({ name: 'caregiverId', description: 'ID do cuidador' })
   async toggleFavorite(
     @Request() req,
     @Param('caregiverId') caregiverId: string,
@@ -154,12 +164,15 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Get('favorites/caregivers')
+  @ApiOperation({ summary: 'Listar cuidadores favoritos' })
   async getFavoriteCaregivers(@Request() req) {
     return this.usersService.getFavoriteCaregivers(req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('me/favorite/:caregiverId/remove')
+  @ApiOperation({ summary: 'Remover cuidador dos favoritos' })
+  @ApiParam({ name: 'caregiverId', description: 'ID do cuidador' })
   async removeFavoriteCaregiver(
     @Request() req,
     @Param('caregiverId') caregiverId: string,

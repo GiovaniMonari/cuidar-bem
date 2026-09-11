@@ -155,6 +155,7 @@ export class ReviewsService {
     const reviews = await this.reviewModel
       .find({ caregiverId: new Types.ObjectId(caregiverId) })
       .sort({ createdAt: -1 })
+      .populate('clientId', 'name avatar')
       .populate({
         path: 'bookingId',
         select: 'serviceType serviceName startDate endDate patientName clientId',
@@ -172,31 +173,46 @@ export class ReviewsService {
       return [];
     }
 
-    const formattedReviews: ReviewWithBookingDto[] = reviews
-      .filter(review => review.bookingId) // Filtra reviews com booking válido
-      .map((review: any) => {
-        const bookingDetails = review.bookingId;
-        const contractedBy = bookingDetails?.clientId;
+    const formattedReviews: ReviewWithBookingDto[] = reviews.map((review: any) => {
+      const bookingDetails = review.bookingId && typeof review.bookingId === 'object'
+        ? review.bookingId
+        : null;
+      const contractedBy = review.clientId?.name
+        ? review.clientId
+        : bookingDetails?.clientId;
 
-        return {
-          _id: review._id.toString(),
-          rating: review.rating,
-          comment: review.comment || '',
-          createdAt: review.createdAt.toISOString(),
-          
+      return {
+        _id: review._id.toString(),
+        rating: review.rating,
+        comment: review.comment || '',
+        createdAt: review.createdAt.toISOString(),
+        ...(review.clientId?.name && {
+          reviewer: {
+            _id: review.clientId._id.toString(),
+            name: review.clientId.name,
+            avatar: review.clientId.avatar || undefined,
+          },
+        }),
+        ...(bookingDetails && {
           booking: {
             _id: bookingDetails._id.toString(),
+            serviceType: bookingDetails.serviceType,
+            serviceName: bookingDetails.serviceName,
+            patientName: bookingDetails.patientName,
             startDate: bookingDetails.startDate?.toISOString(),
             endDate: bookingDetails.endDate?.toISOString(),
-            
-            contractedBy: {
+            contractedBy: contractedBy ? {
               _id: contractedBy._id.toString(),
               name: contractedBy.name || 'Cliente não encontrado',
               avatar: contractedBy.avatar || undefined,
+            } : {
+              _id: '',
+              name: 'Cliente não encontrado',
             },
           },
-        };
-      });
+        }),
+      };
+    });
 
       console.log('✅ Reviews formatadas:', formattedReviews.length);
       

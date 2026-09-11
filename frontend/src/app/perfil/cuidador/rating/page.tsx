@@ -27,7 +27,12 @@ interface ReviewWithBooking {
   rating: number;
   comment?: string;
   createdAt: string;
-  booking: {
+  reviewer?: {
+    _id: string;
+    name: string;
+    avatar?: string;
+  };
+  booking?: {
     serviceType: string;
     serviceName: string;
     startDate: string;
@@ -291,13 +296,13 @@ export default function CaregiverRatingsPage() {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <UserAvatar
-                      avatar={review.booking?.contractedBy?.avatar}
-                      name={review.booking?.contractedBy?.name || 'Cliente'}
+                      avatar={review.reviewer?.avatar || review.booking?.contractedBy?.avatar}
+                      name={review.reviewer?.name || review.booking?.contractedBy?.name || 'Cliente'}
                       size={48}
                     />
                     <div>
                       <h3 className="font-semibold text-lg">
-                        {review.booking?.contractedBy?.name || 'Cliente'}
+                        {review.reviewer?.name || review.booking?.contractedBy?.name || 'Cliente'}
                       </h3>
                       <p className="text-sm text-gray-500">
                         {format(new Date(review.createdAt), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}

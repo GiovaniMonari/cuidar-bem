@@ -10,8 +10,14 @@ export class ReviewWithBookingDto {
   comment?: string;
   @ApiProperty({ example: '2026-09-20T18:00:00.000Z', format: 'date-time' })
   createdAt: string;
-  @ApiProperty({ type: 'object', additionalProperties: true })
-  booking: {
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  reviewer?: {
+    _id: string;
+    name: string;
+    avatar?: string;
+  };
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  booking?: {
     _id: string;
     startDate: string;
     endDate: string;

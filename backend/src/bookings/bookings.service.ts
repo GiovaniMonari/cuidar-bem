@@ -23,6 +23,18 @@ import { EmailProducer } from 'src/queue/email.producer';
 @Injectable()
 export class BookingsService {
   private readonly logger = new Logger(BookingsService.name);
+  private readonly elderlyServiceTypes = new Set([
+    'cuidado_basico_idoso',
+    'cuidado_acamado',
+    'cuidado_alzheimer',
+    'pernoite_idoso',
+  ]);
+  private readonly serviceConditionRequirements: Record<string, string[]> = {
+    cuidado_alzheimer: ['alzheimer', 'demência'],
+    cuidado_acamado: ['acamado'],
+    cuidado_pcd_fisico: ['deficiência física'],
+    cuidado_pcd_intelectual: ['tea', 'deficiência intelectual'],
+  };
   private readonly checkInRadiusMeters = 300;
   private readonly earlyCheckInWindowMs = 2 * 60 * 60 * 1000;
   private readonly commuteBufferMs = 60 * 60 * 1000;
@@ -92,6 +104,25 @@ export class BookingsService {
     dto: CreateBookingDto,
     clientUser: any,
   ): Promise<BookingDocument> {
+    if (
+      this.elderlyServiceTypes.has(dto.serviceType) &&
+      (!Number.isFinite(Number(dto.patientAge)) || Number(dto.patientAge) < 60)
+    ) {
+      throw new BadRequestException(
+        'Serviços para idosos estão disponíveis somente para pacientes com 60 anos ou mais.',
+      );
+    }
+
+    const requiredConditions = this.serviceConditionRequirements[dto.serviceType];
+    if (requiredConditions?.length) {
+      const patientCondition = (dto.patientCondition || '').toLowerCase();
+      if (!requiredConditions.some((condition) => patientCondition.includes(condition))) {
+        throw new BadRequestException(
+          'A condição do paciente não corresponde ao serviço selecionado. Atualize o perfil do paciente antes de continuar.',
+        );
+      }
+    }
+
     const start = new Date(dto.startDate);
     const end = new Date(dto.endDate);
     const startOfDay = new Date(start);

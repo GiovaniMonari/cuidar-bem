@@ -121,6 +121,17 @@ export interface Booking {
   updatedAt: string;
 }
 
+export interface Dependent {
+  _id: string;
+  name: string;
+  age: number;
+  disorder?: string;
+  conditions?: string[];
+  notes?: string;
+}
+
+export type PatientProfile = Omit<Dependent, '_id'> & { _id?: string };
+
 // types/index.ts ou types.ts
 
 // services/api.ts - adicione/atualize a interface

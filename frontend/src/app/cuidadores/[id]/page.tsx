@@ -8,8 +8,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { AvailabilityDate, Caregiver, Review, SPECIALTIES } from '@/types';
-import { AddressAutocomplete } from '@/components/AddressAutocomplete';
+import { AvailabilityDate, Caregiver, Dependent, PatientProfile, Review, SPECIALTIES } from '@/types';
 import { StarRating } from '@/components/StarRating';
 import { UserAvatar } from '@/components/UserAvatar';
 import { ServiceSelector } from '@/components/ServiceSelector';
@@ -34,8 +33,6 @@ import {
   Star,
   MessageCircle,
 } from 'lucide-react';
-import { saveAddress } from '@/utils/savedAddresses';
-import { SavedAddresses } from '@/components/SavedAddress';
 import {
   formatDateKey,
   getSuggestedEndDate,
@@ -43,6 +40,7 @@ import {
   isMultiDayDuration,
 } from '@/utils/booking';
 import { buildFullAddress } from '@/utils/addressFields';
+import { getSavedAddresses, SavedAddress } from '@/utils/savedAddresses';
 import { AvailabilityCalendar } from '@/components/AvailabilityCalendar';
 import { useCaregiverData } from '@/hooks/useCaregiverData';
 import { useBookingForm } from '@/hooks/useBookingForm';
@@ -65,6 +63,20 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
+const elderlyServiceTypes = new Set([
+  'cuidado_basico_idoso',
+  'cuidado_acamado',
+  'cuidado_alzheimer',
+  'pernoite_idoso',
+]);
+
+const serviceConditionRequirements: Record<string, string[]> = {
+  cuidado_alzheimer: ['alzheimer', 'demência'],
+  cuidado_acamado: ['acamado'],
+  cuidado_pcd_fisico: ['deficiência física'],
+  cuidado_pcd_intelectual: ['tea', 'deficiência intelectual'],
+};
+
 function CaregiverDetailContent() {
   const { id } = useParams();
   const router = useRouter();
@@ -73,6 +85,13 @@ function CaregiverDetailContent() {
   const caregiverId = id as string;
   const [showBooking, setShowBooking] = useState(false);
   const [shouldLoadAvailability, setShouldLoadAvailability] = useState(false);
+  const [dependents, setDependents] = useState<Dependent[]>([]);
+  const [patientProfile, setPatientProfile] = useState<PatientProfile | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState('');
+  const [selfAge, setSelfAge] = useState('');
+  const [patientCompatibilityError, setPatientCompatibilityError] = useState('');
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState('');
 
   // Custom Hooks
   const {
@@ -119,6 +138,7 @@ function CaregiverDetailContent() {
     caregiverId,
     availableDates,
     user,
+    selectedPatient,
     onSuccess: () => {
       setShowBooking(false);
       toast.success('Solicitação enviada com sucesso!', {
@@ -185,6 +205,62 @@ function CaregiverDetailContent() {
     }
   }, [showBooking, shouldLoadAvailability]);
 
+  useEffect(() => {
+    if (!showBooking || !isAuthenticated || user?.role !== 'client') return;
+    Promise.all([api.getDependents(), api.getPatientProfile()])
+      .then(([savedDependents, savedProfile]) => {
+        setDependents(savedDependents);
+        setPatientProfile(savedProfile);
+        if (savedProfile) setSelfAge(String(savedProfile.age));
+      })
+      .catch(() => {
+        setDependents([]);
+        setPatientProfile(null);
+      });
+  }, [showBooking, isAuthenticated, user?.role]);
+
+  const applySavedAddress = (saved: SavedAddress) => {
+    const selectedFullAddress = buildFullAddress(
+      saved.baseAddress || saved.address,
+      saved.number || '',
+      saved.complement || '',
+    ) || saved.address;
+    setValue('cep', saved.cep || '');
+    setValue('address', saved.baseAddress || saved.address);
+    setValue('number', saved.number || '');
+    setValue('complement', saved.complement || '');
+    setValue('fullAddress', selectedFullAddress);
+    setValue('lat', saved.lat || '');
+    setValue('lon', saved.lon || '');
+    setIsAddressValidated(Boolean(saved.cep && saved.lat && saved.lon && saved.number));
+    setSelectedAddressId((saved as SavedAddress & { _id?: string })._id || saved.address);
+  };
+
+  useEffect(() => {
+    if (!showBooking || !isAuthenticated || user?.role !== 'client') return;
+    api.getSavedAddresses().then(async (addresses) => {
+      let availableAddresses = addresses;
+      if (availableAddresses.length === 0) {
+        const legacyAddresses = getSavedAddresses();
+        if (legacyAddresses.length > 0) {
+          availableAddresses = await Promise.all(legacyAddresses.map((address) => api.createSavedAddress(address)));
+        }
+      }
+      setSavedAddresses(availableAddresses);
+      const selectedAddress = sessionStorage.getItem('cuidarbem_selected_address');
+      if (selectedAddress) {
+        applySavedAddress(JSON.parse(selectedAddress));
+        sessionStorage.removeItem('cuidarbem_selected_address');
+      } else if (availableAddresses.length > 0 && !bookingForm.fullAddress) {
+        applySavedAddress(availableAddresses[0]);
+      }
+    }).catch(() => setSavedAddresses([]));
+  }, [showBooking, isAuthenticated, user?.role]);
+
+  useEffect(() => {
+    if (searchParams.get('openBooking') === '1') setShowBooking(true);
+  }, [searchParams]);
+
   // URL Param logic for review
   useEffect(() => {
     const avaliarBookingId = searchParams.get('avaliar');
@@ -207,6 +283,48 @@ function CaregiverDetailContent() {
   const openBookingDialog = () => {
     setShouldLoadAvailability(true);
     setShowBooking(true);
+  };
+
+  const selectPatient = (value: string) => {
+    setSelectedPatient(value);
+    let patientName = '';
+    let patientAge = '';
+    let patientCondition = '';
+
+    if (value === 'self') {
+      patientName = patientProfile?.name || user?.name || '';
+      patientAge = patientProfile ? String(patientProfile.age) : selfAge;
+      patientCondition = patientProfile?.conditions?.join(', ') || patientProfile?.disorder || '';
+    } else {
+      const dependent = dependents.find((item) => item._id === value);
+      if (dependent) {
+        patientName = dependent.name;
+        patientAge = String(dependent.age);
+        patientCondition = dependent.conditions?.join(', ') || dependent.disorder || '';
+      }
+    }
+
+    setValue('patientName', patientName);
+    setValue('patientAge', patientAge);
+    setValue('patientCondition', patientCondition);
+
+    if (!value || !bookingData.serviceType) {
+      setPatientCompatibilityError('');
+      return;
+    }
+
+    if (elderlyServiceTypes.has(bookingData.serviceType) && Number(patientAge) < 60) {
+      setPatientCompatibilityError('Este paciente não pode receber um serviço para idosos. É necessário ter 60 anos ou mais.');
+      return;
+    }
+
+    const requiredConditions = serviceConditionRequirements[bookingData.serviceType];
+    if (requiredConditions?.length && !requiredConditions.some((condition) => patientCondition.toLowerCase().includes(condition))) {
+      setPatientCompatibilityError('A condição deste paciente não é compatível com o serviço selecionado. Escolha outro serviço ou atualize o perfil.');
+      return;
+    }
+
+    setPatientCompatibilityError('');
   };
 
   const handleStartChat = async () => {
@@ -623,108 +741,93 @@ function CaregiverDetailContent() {
                           </div>
                         )}
 
-                        {/* Endereços salvos */}
-                        <SavedAddresses
-                          onSelect={(saved) => {
-                            const selectedFullAddress =
-                              buildFullAddress(
-                                saved.baseAddress || saved.address,
-                                saved.number || '',
-                                saved.complement || '',
-                              ) || saved.address;
-                            const hasStructuredAddress =
-                              Boolean(saved.baseAddress?.trim()) && Boolean(saved.number?.trim());
-
-                            setValue('cep', saved.cep || '');
-                            setValue('address', saved.baseAddress || saved.address);
-                            setValue('number', saved.number || '');
-                            setValue('complement', saved.complement || '');
-                            setValue('fullAddress', selectedFullAddress);
-                            setValue('lat', saved.lat || '');
-                            setValue('lon', saved.lon || '');
-                            setIsAddressValidated(
-                              Boolean(saved.cep && saved.lat && saved.lon && hasStructuredAddress),
-                            );
-                          }}
-                        />
-
-                        {/* Endereço */}
-                        <AddressAutocomplete
-                          value={bookingForm.address ?? ''}
-                          cep={bookingForm.cep ?? ''}
-                          number={bookingForm.number ?? ''}
-                          complement={bookingForm.complement ?? ''}
-                          lat={bookingForm.lat ?? ''}
-                          lon={bookingForm.lon ?? ''}
-                          isValidated={isAddressValidated}
-                          onChange={(data) => {
-                            if (data.cep !== undefined) setValue('cep', data.cep);
-                            if (data.address !== undefined) setValue('address', data.address);
-                            if (data.number !== undefined) setValue('number', data.number);
-                            if (data.complement !== undefined) setValue('complement', data.complement);
-                            if (data.fullAddress !== undefined) setValue('fullAddress', data.fullAddress);
-                            if (data.lat !== undefined) setValue('lat', data.lat);
-                            if (data.lon !== undefined) setValue('lon', data.lon);
-                          }}
-                          onValidationChange={setIsAddressValidated}
-                        />
-
-                        {/* Dados do paciente */}
-                        <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-                          <h4 className="text-sm font-medium text-gray-700">Dados do Paciente</h4>
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <Input
-                                type="text"
-                                {...register('patientName')}
-                                className={bookingErrors.patientName ? 'border-red-400 focus-visible:ring-red-100' : ''}
-                                placeholder="Nome do paciente"
-                              />
-                              {bookingErrors.patientName && (
-                                <p className="mt-1 text-xs text-red-500">
-                                  {bookingErrors.patientName.message}
-                                </p>
+                        {/* Endereço selecionado */}
+                        {savedAddresses.length > 0 ? (
+                          <div className={`rounded-xl border p-4 space-y-3 transition-colors ${
+                            selectedAddressId === ((savedAddresses[0] as SavedAddress & { _id?: string })._id || savedAddresses[0].address)
+                              ? 'border-emerald-200 bg-emerald-50/60'
+                              : 'border-gray-200 bg-gray-50/70'
+                          }`}>
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                              <h4 className="text-sm font-semibold text-gray-800">Endereço principal</h4>
+                              <p className="text-xs text-gray-600 mt-1">{savedAddresses[0].label}: {savedAddresses[0].address}</p>
+                              </div>
+                              {selectedAddressId === ((savedAddresses[0] as SavedAddress & { _id?: string })._id || savedAddresses[0].address) && (
+                                <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-emerald-700">
+                                  <CheckCircle2 className="h-4 w-4" />
+                                  Selecionado
+                                </span>
                               )}
                             </div>
-
-                            <div>
-                              <Input
-                                type="number"
-                                {...register('patientAge')}
-                                className={bookingErrors.patientAge ? 'border-red-400 focus-visible:ring-red-100' : ''}
-                                placeholder="Idade"
-                              />
-                              {bookingErrors.patientAge && (
-                                <p className="mt-1 text-xs text-red-500">
-                                  {bookingErrors.patientAge.message}
-                                </p>
-                              )}
-                            </div>
+                            {selectedAddressId !== ((savedAddresses[0] as SavedAddress & { _id?: string })._id || savedAddresses[0].address) && (
+                              <button
+                                type="button"
+                                onClick={() => applySavedAddress(savedAddresses[0])}
+                                className="text-sm font-semibold text-primary-700 hover:underline"
+                              >
+                                Usar este endereço
+                              </button>
+                            )}
+                            <Link href={`/enderecos?returnTo=${encodeURIComponent(`/cuidadores/${caregiverId}?openBooking=1`)}`} className="block text-sm font-semibold text-primary-700 hover:underline">Outro endereço</Link>
                           </div>
+                        ) : (
+                          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3" role="alert">
+                            <div>
+                              <h4 className="text-sm font-semibold text-amber-900">Cadastre um endereço para continuar</h4>
+                              <p className="text-xs text-amber-800 mt-1">O atendimento só pode ser solicitado usando um endereço salvo e validado.</p>
+                            </div>
+                            <Link href={`/enderecos?returnTo=${encodeURIComponent(`/cuidadores/${caregiverId}?openBooking=1`)}`} className="inline-flex items-center justify-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700">Cadastrar endereço</Link>
+                          </div>
+                        )}
 
-                          {bookingData.serviceType !== 'cuidado_basico_idoso' && (
+                        {/* Paciente */}
+                        <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700">Quem receberá o atendimento?</h4>
+                            <p className="text-xs text-gray-500 mt-1">Escolha você mesmo ou um dependente cadastrado.</p>
+                          </div>
+                          <select
+                            value={selectedPatient}
+                            onChange={(event) => selectPatient(event.target.value)}
+                            className="input-field bg-white"
+                          >
+                            <option value="">Selecione uma pessoa</option>
+                            <option value="self">Marcar para mim mesmo</option>
+                            {dependents.map((dependent) => (
+                              <option key={dependent._id} value={dependent._id}>{dependent.name}</option>
+                            ))}
+                          </select>
+                          {patientCompatibilityError && (
+                            <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800" role="alert">
+                              <p className="font-semibold">Paciente incompatível com este serviço</p>
+                              <p className="mt-1">{patientCompatibilityError}</p>
+                            </div>
+                          )}
+                          {selectedPatient === 'self' && (patientProfile?.age === undefined || patientProfile?.age === null) && (
                             <Input
-                              type="text"
-                              {...register('patientCondition')}
-                              className={
-                                [
-                                  'cuidado_pcd_intelectual',
-                                  'cuidado_pcd_fisico',
-                                  'cuidado_alzheimer',
-                                  'cuidado_acamado',
-                                ].includes(bookingData.serviceType)
-                                  ? 'bg-gray-100 cursor-not-allowed opacity-70'
-                                  : ''
-                              }
-                              placeholder="Condição do paciente"
-                              readOnly={[
-                                'cuidado_pcd_intelectual',
-                                'cuidado_pcd_fisico',
-                                'cuidado_alzheimer',
-                                'cuidado_acamado',
-                               ].includes(bookingData.serviceType)}
+                              type="number"
+                              min="0"
+                              max="130"
+                              value={selfAge}
+                              onChange={(event) => {
+                                setSelfAge(event.target.value);
+                                setValue('patientAge', event.target.value);
+                              }}
+                              placeholder="Sua idade"
                             />
+                          )}
+                          {selectedPatient && bookingForm.patientName && (
+                            <div className="rounded-lg border border-primary-100 bg-white px-3 py-2 text-sm">
+                              <span className="font-medium text-gray-800">{bookingForm.patientName}</span>
+                              <span className="text-gray-500"> • {bookingForm.patientAge} anos</span>
+                              {bookingForm.patientCondition && <span className="text-gray-500"> • {bookingForm.patientCondition}</span>}
+                            </div>
+                          )}
+                          {dependents.length === 0 && (
+                            <Link href="/dependentes" target="_blank" className="text-xs text-primary-700 hover:underline">
+                              Cadastre um dependente na sua área de Dependentes
+                            </Link>
                           )}
                         </div>
 

@@ -14,7 +14,7 @@ import {
   type CaregiverPayoutFormData,
 } from '@/validations/schemas';
 import { UserAvatar } from '@/components/UserAvatar';
-import { Camera, Star, Trash2, ShieldCheck, Mail, Phone, Edit3, Save, Stethoscope, CalendarDays, Loader2, CheckCircle, AlertCircle, User as UserIcon, Badge, CreditCard, LockKeyhole } from 'lucide-react';
+import { Camera, Star, Trash2, ShieldCheck, Mail, Phone, Edit3, Save, Stethoscope, CalendarDays, Loader2, CheckCircle, AlertCircle, User as UserIcon, Badge, CreditCard, LockKeyhole, MapPin } from 'lucide-react';
 import { maskPhone } from '@/utils/masks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +37,7 @@ function ProfilePageContent() {
   const [caregiverProfile, setCaregiverProfile] = useState<any>(null);
   const [payoutSaving, setPayoutSaving] = useState(false);
   const [mercadoPagoConnecting, setMercadoPagoConnecting] = useState(false);
+  const [savedAddressesCount, setSavedAddressesCount] = useState(0);
 
   const {
     register,
@@ -110,6 +111,14 @@ function ProfilePageContent() {
     try {
       const data = await api.getProfile();
       setProfile(data);
+      if (data.role === 'client') {
+        try {
+          const addresses = await api.getSavedAddresses();
+          setSavedAddressesCount(addresses.length);
+        } catch {
+          setSavedAddressesCount(0);
+        }
+      }
       if (data.role === 'caregiver') {
         try {
           const caregiver = await api.getMyCaregiverProfile();
@@ -441,6 +450,31 @@ function ProfilePageContent() {
             </form>
           </CardContent>
         </Card>
+
+        {user?.role === 'client' && (
+          <Card className="mt-8 border-none shadow-lg rounded-3xl overflow-hidden hover:shadow-xl transition-shadow bg-white">
+            <div className="flex flex-col sm:flex-row items-center justify-between p-8 gap-6">
+              <div className="flex items-center gap-5 text-center sm:text-left">
+                <div className="w-14 h-14 bg-primary-50 rounded-2xl flex items-center justify-center text-primary-600 shadow-inner">
+                  <MapPin className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-gray-900 tracking-tight">Meus endereços</h3>
+                  <p className="text-gray-500 font-medium">
+                    {savedAddressesCount > 0
+                      ? `${savedAddressesCount} endereço${savedAddressesCount > 1 ? 's' : ''} salvo${savedAddressesCount > 1 ? 's' : ''} para seus pedidos.`
+                      : 'Você ainda não possui endereços salvos.'}
+                  </p>
+                </div>
+              </div>
+              <Link href="/enderecos" className="w-full sm:w-auto">
+                <Button className="w-full bg-white border-2 border-gray-100 text-gray-900 hover:bg-gray-50 font-bold h-12 px-8 rounded-2xl">
+                  {savedAddressesCount > 0 ? 'Gerenciar' : 'Adicionar primeiro endereço'}
+                </Button>
+              </Link>
+            </div>
+          </Card>
+        )}
 
         {user?.role === 'caregiver' && (
           <div className="mt-10 space-y-6">

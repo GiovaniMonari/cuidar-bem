@@ -10,21 +10,30 @@ import {
 
 interface Props {
   onSelect: (address: SavedAddress) => void;
+  addresses?: SavedAddress[];
+  onRemove?: (address: SavedAddress) => void;
 }
 
-export function SavedAddresses({ onSelect }: Props) {
+export function SavedAddresses({ onSelect, addresses: providedAddresses, onRemove }: Props) {
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
 
   useEffect(() => {
-    setAddresses(getSavedAddresses());
-  }, []);
+    if (!providedAddresses) setAddresses(getSavedAddresses());
+  }, [providedAddresses]);
 
   const handleRemove = (address: string) => {
+    const item = visibleAddresses.find((savedAddress) => savedAddress.address === address);
+    if (item && onRemove) {
+      onRemove(item);
+      return;
+    }
     removeSavedAddress(address);
     setAddresses(getSavedAddresses());
   };
 
-  if (addresses.length === 0) return null;
+  const visibleAddresses = providedAddresses || addresses;
+
+  if (visibleAddresses.length === 0) return null;
 
   return (
     <div className="bg-gray-50 rounded-xl p-4">
@@ -33,7 +42,7 @@ export function SavedAddresses({ onSelect }: Props) {
       </h4>
 
       <div className="space-y-2">
-        {addresses.map((item) => (
+        {visibleAddresses.map((item) => (
           <div
             key={item.address}
             className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-3 py-3"

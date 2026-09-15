@@ -110,6 +110,78 @@ class ApiService {
     });
   }
 
+  async getSavedAddresses() {
+    return this.request<any[]>('/users/me/addresses', {
+      headers: this.headers(true),
+    });
+  }
+
+  async createSavedAddress(data: any) {
+    return this.request<any>('/users/me/addresses', {
+      method: 'POST',
+      headers: this.headers(true),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateSavedAddress(id: string, data: any) {
+    return this.request<any>(`/users/me/addresses/${id}`, {
+      method: 'PUT',
+      headers: this.headers(true),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async removeSavedAddress(id: string) {
+    return this.request<{ success: boolean }>(`/users/me/addresses/${id}/remove`, {
+      method: 'POST',
+      headers: this.headers(true),
+    });
+  }
+
+  async getDependents() {
+    return this.request<any[]>('/users/me/dependents', {
+      headers: this.headers(true),
+    });
+  }
+
+  async getPatientProfile() {
+    return this.request<any | null>('/users/me/patient-profile', {
+      headers: this.headers(true),
+    });
+  }
+
+  async updatePatientProfile(data: { name: string; age: number; disorder?: string; conditions?: string[]; notes?: string }) {
+    return this.request<any>('/users/me/patient-profile', {
+      method: 'PUT',
+      headers: this.headers(true),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async createDependent(data: { name: string; age: number; disorder?: string; conditions?: string[]; notes?: string }) {
+    return this.request<any>('/users/me/dependents', {
+      method: 'POST',
+      headers: this.headers(true),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateDependent(id: string, data: { name: string; age: number; disorder?: string; conditions?: string[]; notes?: string }) {
+    return this.request<any>(`/users/me/dependents/${id}`, {
+      method: 'PUT',
+      headers: this.headers(true),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async removeDependent(id: string) {
+    return this.request<{ success: boolean }>(`/users/me/dependents/${id}/remove`, {
+      method: 'POST',
+      headers: this.headers(true),
+    });
+  }
+
   async requestBanReview(email: string, message?: string) {
     return this.request<{ success: boolean; message: string }>('/auth/request-ban-review', {
       method: 'POST',

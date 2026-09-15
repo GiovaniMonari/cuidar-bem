@@ -19,9 +19,24 @@ interface UseBookingFormProps {
   availableDates: any[];
   user: any;
   onSuccess?: () => void;
+  selectedPatient?: string;
 }
 
-export function useBookingForm({ caregiverId, availableDates, user, onSuccess }: UseBookingFormProps) {
+const ELDERLY_SERVICE_TYPES = new Set([
+  'cuidado_basico_idoso',
+  'cuidado_acamado',
+  'cuidado_alzheimer',
+  'pernoite_idoso',
+]);
+
+const SERVICE_CONDITION_REQUIREMENTS: Record<string, string[]> = {
+  cuidado_alzheimer: ['alzheimer', 'demência'],
+  cuidado_acamado: ['acamado'],
+  cuidado_pcd_fisico: ['deficiência física'],
+  cuidado_pcd_intelectual: ['tea', 'deficiência intelectual'],
+};
+
+export function useBookingForm({ caregiverId, availableDates, user, onSuccess, selectedPatient }: UseBookingFormProps) {
   const queryClient = useQueryClient();
   const [bookingError, setBookingError] = useState('');
   const [dateRangeError, setDateRangeError] = useState('');
@@ -270,6 +285,25 @@ export function useBookingForm({ caregiverId, availableDates, user, onSuccess }:
     if (!isAddressValidated) {
       setBookingError('Clique em "Validar endereço" antes de solicitar o atendimento.');
       return;
+    }
+
+    if (!selectedPatient || !data.patientName || !data.patientAge) {
+      setBookingError('Selecione quem receberá o atendimento e informe a idade.');
+      return;
+    }
+
+    if (ELDERLY_SERVICE_TYPES.has(data.serviceType) && Number(data.patientAge) < 60) {
+      setBookingError('Serviços para idosos estão disponíveis somente para pacientes com 60 anos ou mais.');
+      return;
+    }
+
+    const requiredConditions = SERVICE_CONDITION_REQUIREMENTS[data.serviceType];
+    if (requiredConditions?.length) {
+      const patientCondition = (data.patientCondition || '').toLowerCase();
+      if (!requiredConditions.some((condition) => patientCondition.includes(condition))) {
+        setBookingError('A condição do paciente não corresponde ao serviço selecionado. Atualize o perfil do paciente antes de continuar.');
+        return;
+      }
     }
 
     let finalStartDate = '';

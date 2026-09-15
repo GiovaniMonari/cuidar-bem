@@ -3,12 +3,14 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { Client, ClientDocument, SavedAddress } from './schemas/client.schema';
+import { Caregiver, CaregiverDocument } from '../caregivers/schemas/caregiver.schema';
 
 @Injectable()
 export class ClientsService {
   constructor(
     @InjectModel(Client.name) private readonly clientModel: Model<ClientDocument>,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @InjectModel(Caregiver.name) private readonly caregiverModel: Model<CaregiverDocument>,
   ) {}
 
   async createForUser(userId: string, favoriteCaregivers: Types.ObjectId[] = []) {
@@ -28,10 +30,26 @@ export class ClientsService {
     if (!user) throw new NotFoundException('Usuário não encontrado');
 
     if (client) {
+      const currentFavorites = client.favoriteCaregivers || [];
+      const legacyFavorites = user.favoriteCaregivers || [];
+      const mergedFavorites = [
+        ...currentFavorites,
+        ...legacyFavorites.filter(
+          (legacyId) => !currentFavorites.some((currentId) => currentId.toString() === legacyId.toString()),
+        ),
+      ];
+      if (mergedFavorites.length !== currentFavorites.length) {
+        client.favoriteCaregivers = mergedFavorites;
+        await client.save();
+      }
+
       if (user.dependents?.length && !client.savedPatients?.length) {
         client.savedPatients = user.dependents as any;
         await client.save();
         await this.userModel.updateOne({ _id: userId }, { $unset: { dependents: 1 } });
+      }
+      if (legacyFavorites.length > 0) {
+        await this.userModel.updateOne({ _id: userId }, { $unset: { favoriteCaregivers: 1 } });
       }
       return client;
     }
@@ -189,6 +207,12 @@ export class ClientsService {
 
   async favoriteCaregiver(userId: string, caregiverId: string) {
     const client = await this.getOrMigrate(userId);
+    client.favoriteCaregivers = client.favoriteCaregivers || [];
+    if (!Types.ObjectId.isValid(caregiverId)) {
+      throw new BadRequestException('Cuidador inválido');
+    }
+    const caregiverExists = await this.caregiverModel.exists({ _id: caregiverId });
+    if (!caregiverExists) throw new NotFoundException('Cuidador não encontrado');
     const caregiverObjectId = new Types.ObjectId(caregiverId);
     const isAlreadyFavorited = client.favoriteCaregivers.some(
       (id) => id.toString() === caregiverId,
@@ -208,16 +232,19 @@ export class ClientsService {
 
   async getFavoriteCaregivers(userId: string) {
     const client = await this.getOrMigrate(userId);
-    await client.populate({
-      path: 'favoriteCaregivers',
-      populate: { path: 'userId', select: 'name avatar email phone' },
-    });
-    return client.favoriteCaregivers || [];
+    const favoriteIds = client.favoriteCaregivers || [];
+    const caregivers = await this.caregiverModel
+      .find({ _id: { $in: favoriteIds } })
+      .populate('userId', 'name avatar email phone');
+    const byId = new Map(caregivers.map((caregiver) => [caregiver._id.toString(), caregiver]));
+    return favoriteIds
+      .map((favoriteId) => byId.get(favoriteId.toString()))
+      .filter(Boolean);
   }
 
   async deleteFavoriteCaregiver(userId: string, caregiverId: string) {
     const client = await this.getOrMigrate(userId);
-    client.favoriteCaregivers = client.favoriteCaregivers.filter(
+    client.favoriteCaregivers = (client.favoriteCaregivers || []).filter(
       (id) => id.toString() !== caregiverId,
     );
     await client.save();
@@ -234,12 +261,22 @@ export class ClientsService {
     let migrated = 0;
 
     for (const user of users) {
+      const client = await this.clientModel.findOne({ userId: user._id });
+      const currentFavorites = client?.favoriteCaregivers || [];
+      const legacyFavorites = user.favoriteCaregivers || [];
+      const mergedFavorites = [
+        ...currentFavorites,
+        ...legacyFavorites.filter(
+          (legacyId) => !currentFavorites.some((currentId) => currentId.toString() === legacyId.toString()),
+        ),
+      ];
+
       await this.clientModel.findOneAndUpdate(
         { userId: user._id },
         {
-          $setOnInsert: {
+          $set: {
             userId: user._id,
-            favoriteCaregivers: user.favoriteCaregivers || [],
+            favoriteCaregivers: mergedFavorites,
           },
         },
         { upsert: true, setDefaultsOnInsert: true },

@@ -21,6 +21,7 @@ import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { ClientsService } from '../clients/clients.service';
 import * as bcrypt from 'bcryptjs';
 
 function imageFileFilter(req: any, file: Express.Multer.File, callback: Function) {
@@ -40,6 +41,7 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly clientsService: ClientsService,
   ) {}
 
   @UseGuards(JwtAuthGuard)
@@ -159,14 +161,14 @@ export class UsersController {
     @Request() req,
     @Param('caregiverId') caregiverId: string,
   ) {
-    return this.usersService.favoriteCaregiver(req.user.userId, caregiverId);
+    return this.clientsService.favoriteCaregiver(req.user.userId, caregiverId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('favorites/caregivers')
   @ApiOperation({ summary: 'Listar cuidadores favoritos' })
   async getFavoriteCaregivers(@Request() req) {
-    return this.usersService.getFavoriteCaregivers(req.user.userId);
+    return this.clientsService.getFavoriteCaregivers(req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -177,6 +179,6 @@ export class UsersController {
     @Request() req,
     @Param('caregiverId') caregiverId: string,
   ) {
-    return this.usersService.deleteFavoriteCaregiver(req.user.userId, caregiverId);
+    return this.clientsService.deleteFavoriteCaregiver(req.user.userId, caregiverId);
   }
 }

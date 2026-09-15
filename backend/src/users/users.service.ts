@@ -1,12 +1,13 @@
 import { Injectable, ConflictException, NotFoundException, Inject, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import Redis from 'ioredis'; // 👈 Importação do ioredis
 import { User, UserDocument } from './schemas/user.schema';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { REDIS_CLIENT } from '../redis/redis.constants'; // 👈 Importação do Token
+import { ClientsService } from '../clients/clients.service';
 
 @Injectable()
 export class UsersService {
@@ -16,6 +17,7 @@ export class UsersService {
 
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private readonly clientsService: ClientsService,
     // 📦 CORREÇÃO 1: Injeção do cliente Redis unificado no construtor
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
@@ -34,7 +36,11 @@ export class UsersService {
       lastSeenAt: new Date(),
       isOnline: true,
     });
-    return user.save();
+    const savedUser = await user.save();
+    if (savedUser.role === 'client') {
+      await this.clientsService.createForUser(savedUser._id.toString());
+    }
+    return savedUser;
   }
 
   async findByEmail(email: string): Promise<UserDocument | null> {
@@ -180,58 +186,4 @@ export class UsersService {
     };
   }
 
-  async favoriteCaregiver(userId: string, caregiverId: string) {
-    const user = await this.userModel.findById(userId);
-    if (!user) throw new NotFoundException('Usuário não encontrado');
-
-    user.favoriteCaregivers = user.favoriteCaregivers.filter(
-      (id): id is Types.ObjectId => id != null && Types.ObjectId.isValid(id.toString())
-    );
-
-    const isAlreadyFavorited = user.favoriteCaregivers.some(
-      (id) => id.toString() === caregiverId
-    );
-
-    if (isAlreadyFavorited) {
-      user.favoriteCaregivers = user.favoriteCaregivers.filter(
-        (id) => id.toString() !== caregiverId
-      );
-    } else {
-      user.favoriteCaregivers.push(new Types.ObjectId(caregiverId));
-    }
-
-    await user.save();
-    return { 
-      success: true, 
-      isFavorited: !isAlreadyFavorited 
-    };
-  }
-
-  async getFavoriteCaregivers(userId: string) {
-    const user = await this.userModel
-      .findById(userId)
-      .populate({
-        path: 'favoriteCaregivers',
-        populate: {
-          path: 'userId',
-          select: 'name avatar email phone',
-        },
-      })
-      .exec();
-
-    if (!user) throw new NotFoundException('Usuário não encontrado');
-    return user.favoriteCaregivers || [];
-  }
-
-  async deleteFavoriteCaregiver(userId: string, caregiverId: string) {
-    const user = await this.userModel.findById(userId);
-    if (!user) throw new NotFoundException('Usuário não encontrado');
-
-    user.favoriteCaregivers = user.favoriteCaregivers
-      .filter((id): id is Types.ObjectId => id != null && Types.ObjectId.isValid(id.toString()))
-      .filter((id) => id.toString() !== caregiverId);
-
-    await user.save();
-    return { message: 'Favorito removido com sucesso' };
-  }
 }

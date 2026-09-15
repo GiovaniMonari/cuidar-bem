@@ -10,7 +10,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "seed": "ts-node src/seed.ts",
-    "create:admin": "ts-node src/create-admin.ts"
+    "create:admin": "ts-node src/create-admin.ts",
+    "migrate:clients": "ts-node -r tsconfig-paths/register src/migrate-clients.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.4",

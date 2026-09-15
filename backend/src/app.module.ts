@@ -19,6 +19,7 @@ import { ModerationModule } from './moderation/moderation.module';
 import { RedisModule } from './redis/redis.module';
 import { QueueModule } from './queue/queue.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ClientsModule } from './clients/clients.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     EmailModule,
     AuthModule,
     UsersModule,
+    ClientsModule,
     CaregiversModule,
     BookingsModule,
     ReviewsModule,

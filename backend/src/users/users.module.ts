@@ -1,5 +1,6 @@
-import { Module, Redirect } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ClientsModule } from '../clients/clients.module';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { User, UserSchema } from './schemas/user.schema';
@@ -7,7 +8,11 @@ import { PresenceSyncService } from './presence-sync.service';
 import { RedisModule } from 'src/redis/redis.module';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]), RedisModule],
+  imports: [
+    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+    ClientsModule,
+    RedisModule,
+  ],
   controllers: [UsersController],
   providers: [UsersService, PresenceSyncService],
   exports: [UsersService],

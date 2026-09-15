@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { MapPin, Pencil, Plus, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -17,7 +17,7 @@ import { SavedAddress } from '@/utils/savedAddresses';
 type AddressRecord = SavedAddress & { _id: string };
 const emptyAddress: SavedAddress = { label: '', address: '', baseAddress: '', number: '', complement: '', cep: '', lat: '', lon: '' };
 
-export default function AddressesPage() {
+function AddressesContent() {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -112,5 +112,13 @@ export default function AddressesPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function AddressesPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-gray-50 px-4 py-12"><div className="max-w-5xl mx-auto h-40 animate-pulse rounded-2xl bg-white" /></main>}>
+      <AddressesContent />
+    </Suspense>
   );
 }

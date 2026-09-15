@@ -68,6 +68,29 @@ class MercadoPagoConnection {
   connectedAt?: Date;
 }
 
+class ProfessionalVerification {
+  @Prop({ required: true, enum: ['none', 'pending', 'approved', 'rejected'], default: 'none' })
+  status: 'none' | 'pending' | 'approved' | 'rejected';
+
+  @Prop()
+  documentUrl?: string;
+
+  @Prop()
+  documentPublicId?: string;
+
+  @Prop()
+  submittedAt?: Date;
+
+  @Prop()
+  reviewedAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  reviewedBy?: Types.ObjectId;
+
+  @Prop()
+  reviewNotes?: string;
+}
+
 @Schema({ timestamps: true })
 export class Caregiver {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true, unique: true })
@@ -130,6 +153,9 @@ export class Caregiver {
 
   @Prop({ type: MercadoPagoConnection, default: null })
   mercadoPago?: MercadoPagoConnection;
+
+  @Prop({ type: ProfessionalVerification, default: () => ({ status: 'none' }) })
+  professionalVerification: ProfessionalVerification;
 }
 
 export const CaregiverSchema = SchemaFactory.createForClass(Caregiver);

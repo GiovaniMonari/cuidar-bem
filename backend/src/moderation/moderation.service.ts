@@ -35,6 +35,7 @@ import {
 import { RedisCacheService } from '../redis/redis-cache.service';
 import { CACHE_KEYS, CACHE_TTL } from '../redis/cache-keys';
 import { ModerationProducer } from './queues/moderation.producer';
+import { EmailProducer } from '../queue/email.producer';
 
 type ModerationAction = 'none' | 'watchlist' | 'ban' | 'dismiss' | 'unban';
 type UserAction = 'ban' | 'unban' | 'watchlist' | 'clear_watch';
@@ -76,6 +77,7 @@ export class ModerationService {
     private readonly adminActionLogModel: Model<AdminActionLogDocument>,
     private readonly cache: RedisCacheService,
     private readonly moderationProducer: ModerationProducer,
+    private readonly emailProducer: EmailProducer,
   ) {}
 
   // ─── Reports ────────────────────────────────────────────────────
@@ -445,15 +447,13 @@ export class ModerationService {
       throw new NotFoundException('Usuário não encontrado');
     }
 
-    const caregiverProfile =
+    const caregiverProfiles =
       user.role === 'caregiver'
-        ? await this.caregiverModel
-            .findOne({ userId: user._id })
-            .select(
-              'bio city state experienceYears specialties rating reviewCount certifications',
-            )
-            .lean()
-        : null;
+        ? await this.caregiverModel.find().lean()
+        : [];
+    const caregiverProfile = caregiverProfiles.find(
+      (profile) => profile.userId?.toString() === user._id.toString(),
+    ) || null;
 
     const reportsReceived = await this.platformReportModel
       .find({ reportedUserId: user._id })
@@ -550,6 +550,59 @@ export class ModerationService {
       bookings,
       activity,
     };
+  }
+
+  async reviewCaregiverVerification(
+    caregiverIdOrUserId: string,
+    adminId: string,
+    status: 'approved' | 'rejected',
+    notes?: string,
+  ) {
+    const caregiver = await this.caregiverModel.findOne({
+      $or: [
+        { _id: caregiverIdOrUserId },
+        { userId: caregiverIdOrUserId },
+      ],
+    });
+    if (!caregiver) throw new NotFoundException('Cuidador não encontrado');
+    if (!caregiver.professionalVerification?.documentUrl) {
+      throw new BadRequestException('Este cuidador ainda não enviou um documento.');
+    }
+    if (caregiver.professionalVerification.status !== 'pending') {
+      throw new BadRequestException('Esta certificação já foi avaliada.');
+    }
+
+    const reviewedAt = new Date();
+    const reviewNotes = notes?.trim() || undefined;
+    const saved = await this.caregiverModel.findOneAndUpdate(
+      {
+        _id: caregiver._id,
+        'professionalVerification.status': 'pending',
+      },
+      {
+        $set: {
+          isAvailable: status === 'approved',
+          'professionalVerification.status': status,
+          'professionalVerification.reviewedAt': reviewedAt,
+          'professionalVerification.reviewedBy': new Types.ObjectId(adminId),
+          'professionalVerification.reviewNotes': reviewNotes,
+        },
+      },
+      { new: true },
+    );
+    if (!saved) {
+      throw new BadRequestException('Esta certificação já foi avaliada.');
+    }
+    const caregiverUser = await this.userModel.findById(caregiver.userId).select('name email').lean();
+    if (caregiverUser?.email) {
+      void this.emailProducer.sendCaregiverVerificationUpdate({
+        to: caregiverUser.email,
+        caregiverName: caregiverUser.name || 'Cuidador',
+        status,
+        notes: reviewNotes,
+      }).catch(() => undefined);
+    }
+    return saved;
   }
 
   // ─── Reports listing ────────────────────────────────────────────

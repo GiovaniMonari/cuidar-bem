@@ -56,6 +56,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -426,9 +427,11 @@ function CaregiverDetailContent() {
             <div className="flex-1 text-center md:text-left">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
                 <h1 className="text-4xl font-black text-white tracking-tight">{caregiverUser?.name}</h1>
-                <Badge className="bg-white/10 hover:bg-white/20 text-white border-white/20 w-fit mx-auto sm:mx-0">
-                  Verificado
-                </Badge>
+                {caregiver.professionalVerification?.status === 'approved' && (
+                  <Badge className="bg-emerald-500/20 hover:bg-emerald-500/30 text-white border-emerald-300/40 w-fit mx-auto sm:mx-0">
+                    Formação verificada
+                  </Badge>
+                )}
               </div>
 
               <div className="flex flex-wrap justify-center md:justify-start items-center gap-6 mt-4 text-white/90">
@@ -859,6 +862,30 @@ function CaregiverDetailContent() {
                           {bookingData.discount > 0 && (
                             <p className="text-xs text-green-600 text-right mt-1">
                               Você economiza R$ {bookingData.discount.toFixed(2)}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                          <div className="flex items-start gap-3">
+                            <Checkbox
+                              id="service-consent"
+                              checked={bookingForm.serviceConsentAccepted === true}
+                              onCheckedChange={(checked) =>
+                                setValue('serviceConsentAccepted', checked === true, {
+                                  shouldDirty: true,
+                                  shouldValidate: true,
+                                })
+                              }
+                              className="mt-0.5 h-5 w-5 shrink-0 data-[state=checked]:border-primary-600 data-[state=checked]:bg-primary-600"
+                            />
+                            <label htmlFor="service-consent" className="cursor-pointer text-sm leading-relaxed text-amber-950">
+                              Li e concordo que a CuidarBem atua apenas como plataforma de conexão entre cliente e cuidador. A plataforma não presta, supervisiona ou garante o atendimento e não se responsabiliza pela conduta das partes, pela execução do serviço ou por eventuais danos decorrentes dele. As condições do atendimento devem ser combinadas diretamente entre cliente e cuidador.
+                            </label>
+                          </div>
+                          {bookingErrors.serviceConsentAccepted && (
+                            <p className="mt-2 text-xs font-medium text-red-600">
+                              {bookingErrors.serviceConsentAccepted.message}
                             </p>
                           )}
                         </div>

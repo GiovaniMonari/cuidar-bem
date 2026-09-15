@@ -14,6 +14,7 @@ import {
   PaymentPendingEmailJob,
   PaymentConfirmedEmailJob,
   NewFeedbackEmailJob,
+  CaregiverVerificationUpdateEmailJob,
 } from './email.jobs';
 
 @Injectable()
@@ -106,5 +107,10 @@ export class EmailProducer {
   async sendNewFeedback(data: NewFeedbackEmailJob) {
     await this.emailQueue.add('new-feedback', data);
     this.logger.log(`Job new-feedback enfileirado para ${data.to}`);
+  }
+
+  async sendCaregiverVerificationUpdate(data: CaregiverVerificationUpdateEmailJob) {
+    await this.emailQueue.add('caregiver-verification-update', data);
+    this.logger.log(`Job caregiver-verification-update enfileirado para ${data.to}`);
   }
 }

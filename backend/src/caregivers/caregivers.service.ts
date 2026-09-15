@@ -4,6 +4,29 @@ import { Model } from 'mongoose';
 import { Caregiver, CaregiverDocument } from './schemas/caregiver.schema';
 import { CreateCaregiverDto } from './dto/create-caregiver.dto';
 import { FilterCaregiverDto } from './dto/filter-caregiver.dto';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { EmailProducer } from '../queue/email.producer';
+
+const SERVICE_QUALIFICATIONS: Record<string, string[]> = {
+  idoso: ['cuidador de idosos', 'gerontologia', 'enfermagem', 'técnico de enfermagem'],
+  pcd: ['atendimento a pcd', 'mobilidade e transferência', 'fisioterapia', 'enfermagem'],
+  enfermagem: ['graduação em enfermagem', 'técnico de enfermagem', 'enfermagem', 'coren'],
+  acompanhamento: ['acompanhante hospitalar', 'acompanhante', 'primeiros socorros', 'enfermagem'],
+};
+
+const SERVICE_CATEGORY_BY_KEY: Record<string, string> = {
+  cuidado_basico_idoso: 'idoso',
+  cuidado_acamado: 'idoso',
+  cuidado_alzheimer: 'idoso',
+  pernoite_idoso: 'idoso',
+  cuidado_pcd_fisico: 'pcd',
+  cuidado_pcd_intelectual: 'pcd',
+  enfermagem_domiciliar: 'enfermagem',
+  pos_operatorio: 'enfermagem',
+  acompanhante_consulta: 'acompanhamento',
+  acompanhante_hospital: 'acompanhamento',
+  acompanhante_passeio: 'acompanhamento',
+};
 import {
   normalizeAvailabilityCalendar,
   getBookingSegmentsByDate,
@@ -18,6 +41,8 @@ export class CaregiversService {
 
   constructor(
     @InjectModel(Caregiver.name) private caregiverModel: Model<CaregiverDocument>,
+    private readonly cloudinaryService: CloudinaryService,
+    private readonly emailProducer: EmailProducer,
   ) {}
 
   async create(userId: string, dto: CreateCaregiverDto): Promise<CaregiverDocument> {
@@ -30,13 +55,18 @@ export class CaregiversService {
       availabilityCalendar: normalizeAvailabilityCalendar(
         dto.availabilityCalendar || [],
       ),
+      isAvailable: false,
       userId,
     });
+    this.validateServiceQualifications(dto.servicePrices || [], dto.certifications || []);
     return (await caregiver.save()).populate('userId', 'name email phone avatar');
   }
 
   async findAll(filters: FilterCaregiverDto) {
-    const query: any = { isAvailable: true };
+    const query: any = {
+      isAvailable: true,
+      'professionalVerification.status': 'approved',
+    };
 
     if (filters.city) {
       query.city = { $regex: filters.city, $options: 'i' };
@@ -68,6 +98,7 @@ export class CaregiversService {
     const [caregivers, total] = await Promise.all([
       this.caregiverModel
         .find(query)
+        .select('-professionalVerification.documentUrl -professionalVerification.documentPublicId')
         .populate('userId', 'name email phone avatar')
         .sort({ rating: -1, reviewCount: -1 })
         .skip(skip)
@@ -85,16 +116,18 @@ export class CaregiversService {
 
   async findOne(id: string): Promise<CaregiverDocument> {
     const caregiver = await this.caregiverModel
-      .findById(id)
+      .findOne({ _id: id, isAvailable: true, 'professionalVerification.status': 'approved' })
+      .select('-professionalVerification.documentUrl -professionalVerification.documentPublicId')
       .populate('userId', 'name email phone avatar');
     if (!caregiver) throw new NotFoundException('Cuidador não encontrado');
     return caregiver;
   }
 
   async findByUserId(userId: string): Promise<CaregiverDocument> {
-    const caregiver = await this.caregiverModel
-      .findOne({ userId })
-      .populate('userId', 'name email phone avatar');
+    const caregivers = await this.caregiverModel.find().populate('userId', 'name email phone avatar');
+    const caregiver = caregivers.find(
+      (profile) => profile.userId?.toString() === userId,
+    );
     if (!caregiver) throw new NotFoundException('Perfil de cuidador não encontrado');
     return caregiver;
   }
@@ -113,9 +146,84 @@ export class CaregiversService {
       );
     }
 
+    if (dto.servicePrices || dto.certifications) {
+      this.validateServiceQualifications(
+        dto.servicePrices || caregiver.servicePrices || [],
+        dto.certifications || caregiver.certifications || [],
+      );
+    }
+
+    if (dto.servicePrices || dto.certifications) {
+      updateData.isAvailable = false;
+      await this.caregiverModel.findByIdAndUpdate(id, {
+        'professionalVerification.status': 'pending',
+        'professionalVerification.reviewedAt': undefined,
+        'professionalVerification.reviewNotes': undefined,
+      });
+    } else if (dto.isAvailable && caregiver.professionalVerification?.status !== 'approved') {
+      updateData.isAvailable = false;
+    }
+
     return this.caregiverModel
       .findByIdAndUpdate(id, updateData, { new: true })
       .populate('userId', 'name email phone avatar');
+  }
+
+  private validateServiceQualifications(
+    servicePrices: Array<{ serviceKey: string; isAvailable?: boolean }>,
+    certifications: string[],
+  ) {
+    const offeredCategories = new Set(
+      servicePrices
+        .filter((service) => service.isAvailable !== false)
+        .map((service) => SERVICE_CATEGORY_BY_KEY[service.serviceKey])
+        .filter(Boolean),
+    );
+    const normalizedCertifications = certifications.map((certification) =>
+      certification.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(),
+    );
+
+    for (const category of offeredCategories) {
+      const matches = (SERVICE_QUALIFICATIONS[category] || []).some((qualification) =>
+        normalizedCertifications.some((certification) => certification.includes(
+          qualification.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(),
+        )),
+      );
+      if (!matches) {
+        throw new ForbiddenException(
+          `Adicione uma formação compatível com os serviços de ${category} selecionados antes de publicar o perfil.`,
+        );
+      }
+    }
+  }
+
+  async submitProfessionalVerification(
+    id: string,
+    userId: string,
+    file: Express.Multer.File,
+  ) {
+    const caregiver = await this.caregiverModel.findById(id);
+    if (!caregiver) throw new NotFoundException('Cuidador não encontrado');
+    if (caregiver.userId.toString() !== userId) {
+      throw new ForbiddenException('Sem permissão para enviar documentos deste perfil');
+    }
+
+    const result: any = await this.cloudinaryService.uploadVerificationDocument(file);
+    if (caregiver.professionalVerification?.documentPublicId) {
+      await this.cloudinaryService.deleteVerificationDocument(
+        caregiver.professionalVerification.documentPublicId,
+      );
+    }
+
+    caregiver.professionalVerification = {
+      status: 'pending',
+      documentUrl: result.secure_url,
+      documentPublicId: result.public_id,
+      submittedAt: new Date(),
+      reviewNotes: undefined,
+    } as any;
+    caregiver.isAvailable = false;
+    return (await caregiver.save()).populate('userId', 'name email phone avatar');
   }
 
   async updateRating(caregiverId: string, avgRating: number, reviewCount?: number) {

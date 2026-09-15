@@ -226,10 +226,32 @@ class ApiService {
     });
   }
 
+  async uploadCaregiverVerification(id: string, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = this.getToken();
+    const res = await fetch(`${API_URL}/caregivers/${id}/professional-verification`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.message || 'Não foi possível enviar o documento.');
+    return data;
+  }
+
   // Bookings
   async createBooking(data: any) {
     return this.request<any>('/bookings', {
       method: 'POST',
+      headers: this.headers(true),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async reviewAdminCaregiverVerification(id: string, data: { status: 'approved' | 'rejected'; notes?: string }) {
+    return this.request<any>(`/admin/caregivers/${id}/verification`, {
+      method: 'PATCH',
       headers: this.headers(true),
       body: JSON.stringify(data),
     });
@@ -539,7 +561,7 @@ class ApiService {
   }
 
   async getAdminDashboard() {
-    return this.request<AdminDashboardResponse>('/admin/agenda', {
+    return this.request<AdminDashboardResponse>('/admin/dashboard', {
       headers: this.headers(true),
     });
   }

@@ -92,6 +92,18 @@ export class Booking {
 
   @Prop({ type: [String], default: [] })
   specialRequirements: string[];
+
+  @Prop({ required: true })
+  serviceConsentAccepted: boolean;
+
+  @Prop({ required: true })
+  serviceConsentVersion: string;
+
+  @Prop({ required: true })
+  serviceConsentText: string;
+
+  @Prop({ required: true })
+  serviceConsentAcceptedAt: Date;
 }
 
 export const BookingSchema = SchemaFactory.createForClass(Booking);

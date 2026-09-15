@@ -45,6 +45,12 @@ export interface Caregiver {
   reviewCount: number;
   isAvailable: boolean;
   profileImage?: string;
+  professionalVerification?: {
+    status: 'none' | 'pending' | 'approved' | 'rejected';
+    submittedAt?: string;
+    reviewedAt?: string;
+    reviewNotes?: string;
+  };
 }
 
 export interface CaregiverServicePrice {
@@ -296,6 +302,7 @@ export interface AdminUserListItem extends User {
 export interface AdminUserDetailResponse {
   user: User;
   caregiverProfile?: {
+    _id?: string;
     bio?: string;
     city?: string;
     state?: string;
@@ -304,6 +311,18 @@ export interface AdminUserDetailResponse {
     rating?: number;
     reviewCount?: number;
     certifications?: string[];
+    servicePrices?: Array<{
+      serviceKey: string;
+      pricePerHour: number;
+      isAvailable: boolean;
+    }>;
+    professionalVerification?: {
+      status: 'none' | 'pending' | 'approved' | 'rejected';
+      documentUrl?: string;
+      submittedAt?: string;
+      reviewedAt?: string;
+      reviewNotes?: string;
+    };
   } | null;
   reportsReceived: PlatformReport[];
   reportsFiled: PlatformReport[];

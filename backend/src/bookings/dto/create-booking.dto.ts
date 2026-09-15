@@ -5,6 +5,8 @@ import {
   IsOptional,
   IsString,
   IsArray,
+  IsBoolean,
+  Equals,
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -117,4 +119,12 @@ export class CreateBookingDto {
   @IsArray()
   @IsString({ each: true })
   specialRequirements?: string[];
+
+  @ApiProperty({
+    description: 'Confirmação de ciência sobre a responsabilidade pelo atendimento',
+    example: true,
+  })
+  @IsBoolean()
+  @Equals(true, { message: 'É necessário aceitar o contrato de consentimento.' })
+  serviceConsentAccepted: boolean;
 }

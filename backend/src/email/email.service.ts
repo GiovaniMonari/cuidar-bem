@@ -167,6 +167,59 @@ export class EmailService implements OnModuleInit {
     );
   }
 
+  async sendCaregiverVerificationUpdateEmail(data: {
+    to: string;
+    caregiverName: string;
+    status: 'submitted' | 'approved' | 'rejected';
+    notes?: string;
+  }) {
+    const statusContent = {
+      submitted: {
+        title: 'Documento enviado',
+        subtitle: 'Sua formação está pendente de análise',
+        message: 'Recebemos seu documento profissional. Nossa equipe fará a conferência e enviará uma nova atualização quando houver uma decisão.',
+      },
+      approved: {
+        title: 'Formação aprovada',
+        subtitle: 'Seu perfil recebeu o selo de formação verificada',
+        message: 'Seu documento foi analisado e aprovado pela equipe CuidarBem. O selo de formação verificada já pode aparecer no seu perfil público.',
+      },
+      rejected: {
+        title: 'Documento precisa de ajustes',
+        subtitle: 'Sua formação não foi aprovada nesta análise',
+        message: 'O documento enviado não pôde ser aprovado. Revise a observação abaixo e envie um novo comprovante pelo seu perfil profissional.',
+      },
+    }[data.status];
+
+    const content = `
+      <div class="header">
+        <h1>📄 ${statusContent.title}</h1>
+        <p>${statusContent.subtitle}</p>
+      </div>
+      <div class="content">
+        <p style="font-size: 18px; color: #1e293b;">Olá, <strong>${data.caregiverName}</strong>!</p>
+        <p style="color: #475569; line-height: 1.6;">${statusContent.message}</p>
+        ${data.notes ? `
+          <div class="info-box">
+            <strong style="color: #1e293b;">Observação da equipe:</strong>
+            <p style="color: #475569; line-height: 1.6; margin-bottom: 0;">${data.notes}</p>
+          </div>
+        ` : ''}
+        <div style="text-align: center;">
+          <a href="${process.env.FRONTEND_URL || 'https://cuidarbem.com.br'}/perfil/cuidador" class="btn">
+            Acessar meu perfil
+          </a>
+        </div>
+      </div>
+    `;
+
+    return this.sendMail(
+      data.to,
+      `CuidarBem: ${statusContent.title}`,
+      this.baseTemplate(content),
+    );
+  }
+
   async sendPasswordResetEmail(data: {
     to: string;
     name: string;

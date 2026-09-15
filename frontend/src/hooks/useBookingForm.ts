@@ -73,6 +73,7 @@ export function useBookingForm({ caregiverId, availableDates, user, onSuccess, s
       patientName: '',
       patientAge: '',
       patientCondition: '',
+      serviceConsentAccepted: false,
       serviceType: '',
       durationKey: '',
     },
@@ -357,6 +358,7 @@ export function useBookingForm({ caregiverId, availableDates, user, onSuccess, s
       patientName: data.patientName,
       patientAge: data.patientAge ? Number(data.patientAge) : undefined,
       patientCondition: data.patientCondition,
+      serviceConsentAccepted: data.serviceConsentAccepted,
     });
   };
 

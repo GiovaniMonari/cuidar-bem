@@ -10,7 +10,8 @@ export type EmailJobName =
   | 'payment-pending'
   | 'payment-reminder'
   | 'payment-confirmed'
-  | 'new-feedback';
+  | 'new-feedback'
+  | 'caregiver-verification-update';
 
 export type WelcomeEmailJob = {
   to: string;
@@ -118,6 +119,13 @@ export type NewFeedbackEmailJob = {
   isFinal: boolean;
 };
 
+export type CaregiverVerificationUpdateEmailJob = {
+  to: string;
+  caregiverName: string;
+  status: 'submitted' | 'approved' | 'rejected';
+  notes?: string;
+};
+
 export type EmailJobData =
   | { name: 'welcome'; data: WelcomeEmailJob }
   | { name: 'password-reset'; data: PasswordResetEmailJob }
@@ -130,4 +138,5 @@ export type EmailJobData =
   | { name: 'payment-pending'; data: PaymentPendingEmailJob }
   | { name: 'payment-reminder'; data: PaymentPendingEmailJob }
   | { name: 'payment-confirmed'; data: PaymentConfirmedEmailJob }
-  | { name: 'new-feedback'; data: NewFeedbackEmailJob };
+  | { name: 'new-feedback'; data: NewFeedbackEmailJob }
+  | { name: 'caregiver-verification-update'; data: CaregiverVerificationUpdateEmailJob };

@@ -35,10 +35,32 @@ export class CloudinaryService {
     });
   }
 
+  async uploadVerificationDocument(file: Express.Multer.File) {
+    return new Promise((resolve, reject) => {
+      const upload = cloudinary.uploader.upload_stream(
+        { folder: 'cuidarbem/professional-verifications', resource_type: 'auto' },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
+        },
+      );
+
+      const stream = Readable.from(file.buffer);
+      stream.pipe(upload);
+    });
+  }
+
   async deleteImage(publicId: string) {
     if (!publicId) return null;
     return cloudinary.uploader.destroy(publicId, {
       resource_type: 'image',
+    });
+  }
+
+  async deleteVerificationDocument(publicId: string) {
+    if (!publicId) return null;
+    return cloudinary.uploader.destroy(publicId, {
+      resource_type: 'raw',
     });
   }
 }

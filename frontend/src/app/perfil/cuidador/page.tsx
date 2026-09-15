@@ -24,7 +24,7 @@ import {
   Plus, X, Briefcase, MapPin, DollarSign, 
   Award, Info,
   ChevronRight, Stethoscope as StethoscopeIcon,
-  Heart, Users, ShieldCheck, Edit3, GraduationCap
+  Heart, Users, ShieldCheck, Edit3, GraduationCap, Upload
 } from 'lucide-react';
 import { ServiceType, SPECIALTIES } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -39,6 +39,11 @@ export default function CaregiverProfilePage() {
   const [success, setSuccess] = useState(false);
   const [serverError, setServerError] = useState('');
   const [newCert, setNewCert] = useState('');
+  const [showOtherCertification, setShowOtherCertification] = useState(false);
+  const [verificationFile, setVerificationFile] = useState<File | null>(null);
+  const [verificationStatus, setVerificationStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
+  const [verificationReviewNotes, setVerificationReviewNotes] = useState('');
+  const [uploadingVerification, setUploadingVerification] = useState(false);
 
   // Fields not covered by the Yup schema (complex/array types)
   const [specialties, setSpecialties] = useState<string[]>([]);
@@ -116,6 +121,8 @@ export default function CaregiverProfilePage() {
       try {
         const data = await api.getMyCaregiverProfile();
         setExistingId(data._id);
+  setVerificationStatus(data.professionalVerification?.status || 'none');
+          setVerificationReviewNotes(data.professionalVerification?.reviewNotes || '');
 
         // Reset RHF fields
         reset({
@@ -143,14 +150,37 @@ export default function CaregiverProfilePage() {
   };
 
   const addCertification = () => {
-    if (newCert.trim()) {
+    if (newCert.trim() && !certifications.includes(newCert.trim())) {
       setValue('certifications', [...certifications, newCert.trim()], { shouldValidate: true });
       setNewCert('');
     }
   };
 
+  const toggleCertification = (certification: string) => {
+    const nextCertifications = certifications.includes(certification)
+      ? certifications.filter((item) => item !== certification)
+      : [...certifications, certification];
+    setValue('certifications', nextCertifications, { shouldValidate: true });
+  };
+
   const removeCertification = (index: number) => {
     setValue('certifications', certifications.filter((_, i) => i !== index), { shouldValidate: true });
+  };
+
+  const uploadVerification = async () => {
+    if (!existingId || !verificationFile) return;
+    setUploadingVerification(true);
+    try {
+      const result = await api.uploadCaregiverVerification(existingId, verificationFile);
+      setVerificationStatus(result.professionalVerification?.status || 'pending');
+      setVerificationReviewNotes('');
+      setVerificationFile(null);
+      toast.success('Documento enviado para análise.');
+    } catch (error: any) {
+      toast.error('Não foi possível enviar o documento', { description: error.message });
+    } finally {
+      setUploadingVerification(false);
+    }
   };
 
   const onSubmit = async (data: CaregiverProfileFormData) => {
@@ -227,6 +257,26 @@ export default function CaregiverProfilePage() {
     enfermagem: 'Enfermagem',
     acompanhamento: 'Acompanhamento',
   };
+
+  const selectedCategories = new Set(
+    serviceTypes
+      .filter((service) => servicePrices.some((price) => price.serviceKey === service.key && price.isAvailable))
+      .map((service) => service.category),
+  );
+  const certificationSuggestions = [
+    ...(selectedCategories.has('enfermagem')
+      ? ['Graduação em Enfermagem', 'Técnico de Enfermagem', 'COREN ativo', 'Curso de Primeiros Socorros']
+      : []),
+    ...(selectedCategories.has('idoso')
+      ? ['Curso de Cuidador de Idosos', 'Especialização em Gerontologia', 'Curso de Primeiros Socorros']
+      : []),
+    ...(selectedCategories.has('pcd')
+      ? ['Capacitação em atendimento a PcD', 'Curso de Mobilidade e Transferência', 'Curso de Primeiros Socorros']
+      : []),
+    ...(selectedCategories.has('acompanhamento')
+      ? ['Curso de Acompanhante Hospitalar', 'Curso de Primeiros Socorros']
+      : []),
+  ].filter((certification, index, suggestions) => suggestions.indexOf(certification) === index);
 
   if (authLoading || loading) {
     return (
@@ -575,31 +625,62 @@ export default function CaregiverProfilePage() {
               </div>
             </CardHeader>
             <CardContent className="p-8 sm:p-10 space-y-8">
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-1 relative group">
-                  <GraduationCap className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-primary-600 transition-colors" />
-                  <Input
-                    type="text"
-                    value={newCert}
-                    onChange={(e) => setNewCert(e.target.value)}
-                    className="h-14 pl-12 bg-gray-50 border-transparent focus:bg-white rounded-2xl font-medium transition-all"
-                    placeholder="Ex: COREN Ativo, Pós em Geriatria..."
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addCertification();
-                      }
-                    }}
-                  />
+              <div>
+                <p className="mb-3 text-sm font-semibold text-gray-700">Selecione suas formações e certificações</p>
+                <div className="flex flex-wrap gap-2.5">
+                  {certificationSuggestions.map((certification) => {
+                    const selected = certifications.includes(certification);
+                    return (
+                      <button
+                        key={certification}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => toggleCertification(certification)}
+                        className={cn(
+                          'rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors',
+                          selected
+                            ? 'border-primary-600 bg-primary-600 text-white shadow-sm'
+                            : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 hover:bg-primary-50',
+                        )}
+                      >
+                        {certification}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setShowOtherCertification((current) => !current)}
+                    className={cn(
+                      'rounded-xl border border-dashed px-4 py-2.5 text-sm font-semibold transition-colors',
+                      showOtherCertification
+                        ? 'border-gray-700 bg-gray-900 text-white'
+                        : 'border-gray-300 bg-gray-50 text-gray-700 hover:border-gray-500 hover:bg-white',
+                    )}
+                  >
+                    <Plus className="mr-1.5 inline-block h-4 w-4" />
+                    Outro
+                  </button>
                 </div>
-                <Button
-                  type="button"
-                  onClick={addCertification}
-                  className="h-14 px-8 rounded-2xl font-bold bg-gray-900 hover:bg-black gap-2 shadow-xl"
-                >
-                  <Plus className="w-5 h-5" />
-                  Adicionar
-                </Button>
+                {showOtherCertification && (
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                    <Input
+                      type="text"
+                      value={newCert}
+                      onChange={(event) => setNewCert(event.target.value)}
+                      className="h-12 rounded-xl bg-gray-50 font-medium"
+                      placeholder="Digite outra formação ou certificação"
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          addCertification();
+                        }
+                      }}
+                    />
+                    <Button type="button" onClick={addCertification} className="h-12 rounded-xl px-6">
+                      Adicionar
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {certifications.length > 0 && (
@@ -624,6 +705,72 @@ export default function CaregiverProfilePage() {
                   ))}
                 </div>
               )}
+
+              <div className={cn(
+                'rounded-2xl border p-5',
+                verificationStatus === 'approved'
+                  ? 'border-emerald-200 bg-emerald-50'
+                  : verificationStatus === 'rejected'
+                    ? 'border-red-200 bg-red-50'
+                    : 'border-blue-100 bg-blue-50',
+              )}>
+                <div className="flex items-start gap-3">
+                  <ShieldCheck className={cn(
+                    'mt-0.5 h-5 w-5 shrink-0',
+                    verificationStatus === 'approved' ? 'text-emerald-700' : verificationStatus === 'rejected' ? 'text-red-700' : 'text-blue-700',
+                  )} />
+                  <div>
+                    <p className="font-bold text-gray-950">Verificação da formação</p>
+                    <p className="mt-1 text-sm leading-relaxed text-gray-700">
+                      {verificationStatus === 'approved'
+                        ? 'Sua formação foi aprovada. O selo de formação verificada está liberado no seu perfil público.'
+                        : verificationStatus === 'rejected'
+                          ? 'Sua formação não foi aprovada. Corrija o que foi apontado e envie um novo documento para análise.'
+                          : verificationStatus === 'pending'
+                            ? 'Seu documento foi enviado e está pendente de análise pela equipe.'
+                            : 'Envie um diploma, certificado ou registro profissional para iniciar a análise.'}
+                    </p>
+                    <p className="mt-2 text-xs font-bold uppercase tracking-wider text-gray-700">
+                      Status: {verificationStatus === 'approved' ? 'Aprovado' : verificationStatus === 'pending' ? 'Em análise' : verificationStatus === 'rejected' ? 'Reprovado' : 'Não enviado'}
+                    </p>
+                    {verificationReviewNotes && (
+                      <div className="mt-3 rounded-xl border border-white/80 bg-white/70 px-3 py-2 text-sm text-gray-700">
+                        <span className="font-semibold">Observação da equipe:</span> {verificationReviewNotes}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-blue-100 bg-white px-3 py-2">
+                    <input
+                      id="professional-verification-file"
+                      type="file"
+                      accept="application/pdf,image/jpeg,image/png,image/webp"
+                      onChange={(event) => setVerificationFile(event.target.files?.[0] || null)}
+                      className="sr-only"
+                    />
+                    <label
+                      htmlFor="professional-verification-file"
+                      className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg bg-slate-900 px-3 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Escolher arquivo
+                    </label>
+                    <span className="min-w-0 truncate text-sm text-slate-500">
+                      {verificationFile?.name || 'Nenhum arquivo selecionado'}
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={uploadVerification}
+                    disabled={!existingId || !verificationFile || uploadingVerification}
+                    className="h-12 shrink-0 rounded-xl"
+                  >
+                    {uploadingVerification ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enviar para análise'}
+                  </Button>
+                </div>
+                {!existingId && <p className="mt-2 text-xs text-blue-800">Salve o perfil antes de enviar o documento.</p>}
+              </div>
             </CardContent>
           </Card>
 

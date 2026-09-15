@@ -208,6 +208,9 @@ export const bookingFormSchema = yup.object({
   patientName: yup.string().optional(),
   patientAge: yup.string().optional(),
   patientCondition: yup.string().optional(),
+  serviceConsentAccepted: yup
+    .boolean()
+    .oneOf([true], 'Leia e aceite o contrato de consentimento para continuar.'),
 });
 
 export type BookingFormData = yup.InferType<typeof bookingFormSchema>;

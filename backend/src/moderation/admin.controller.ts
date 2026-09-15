@@ -14,6 +14,7 @@ import { AdminGuard } from '../auth/admin.guard';
 import { ModerationService } from './moderation.service';
 import { ReviewPlatformReportDto } from './dto/review-platform-report.dto';
 import { UpdateUserModerationDto } from './dto/update-user-moderation.dto';
+import { ReviewCaregiverVerificationDto } from './dto/review-caregiver-verification.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
@@ -57,6 +58,22 @@ export class AdminController {
     @Body() dto: UpdateUserModerationDto,
   ) {
     return this.moderationService.updateUserModeration(id, req.user.userId, dto);
+  }
+
+  @Patch('caregivers/:id/verification')
+  @ApiOperation({ summary: 'Aprovar ou reprovar formação profissional' })
+  @ApiBody({ type: ReviewCaregiverVerificationDto })
+  reviewCaregiverVerification(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body() dto: ReviewCaregiverVerificationDto,
+  ) {
+    return this.moderationService.reviewCaregiverVerification(
+      id,
+      req.user.userId,
+      dto.status,
+      dto.notes,
+    );
   }
 
   @Get('reports')

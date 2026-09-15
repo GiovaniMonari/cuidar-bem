@@ -4,6 +4,7 @@ import { type ReactNode, startTransition, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Activity,
+  Award,
   Ban,
   BarChart3,
   BellRing,
@@ -29,11 +30,12 @@ import {
   PlatformReport,
 } from '@/types';
 
-type AdminTab = 'overview' | 'users' | 'reports' | 'logs';
+type AdminTab = 'overview' | 'users' | 'certifications' | 'reports' | 'logs';
 
 const TABS: Array<{ key: AdminTab; label: string; icon: any }> = [
   { key: 'overview', label: 'Visão geral', icon: LayoutDashboard },
   { key: 'users', label: 'Usuários', icon: Users },
+  { key: 'certifications', label: 'Certificações', icon: Award },
   { key: 'reports', label: 'Reports', icon: FileWarning },
   { key: 'logs', label: 'Logs', icon: Shield },
 ];
@@ -52,6 +54,7 @@ export default function AdminPage() {
   const [tab, setTab] = useState<AdminTab>('overview');
   const [dashboard, setDashboard] = useState<AdminDashboardResponse | null>(null);
   const [users, setUsers] = useState<AdminUserListItem[]>([]);
+  const [certificationCaregivers, setCertificationCaregivers] = useState<AdminUserListItem[]>([]);
   const [reports, setReports] = useState<PlatformReport[]>([]);
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -64,6 +67,7 @@ export default function AdminPage() {
   const [reportStatusFilter, setReportStatusFilter] = useState('pending');
   const [reportSourceFilter, setReportSourceFilter] = useState('all');
   const [moderationReason, setModerationReason] = useState('');
+  const [verificationNotes, setVerificationNotes] = useState('');
   const [reviewNotes, setReviewNotes] = useState('');
   const [notice, setNotice] = useState('');
   const [initialLoading, setInitialLoading] = useState(true);
@@ -119,6 +123,11 @@ export default function AdminPage() {
     }
   };
 
+  const loadCertificationCaregivers = async () => {
+    const data = await api.getAdminUsers({ role: 'caregiver' });
+    setCertificationCaregivers(data);
+  };
+
   const loadLogs = async () => {
     const data = await api.getAdminLogs(50);
     setLogs(data);
@@ -129,7 +138,7 @@ export default function AdminPage() {
     const loadInitial = async () => {
       setInitialLoading(true);
       try {
-        await Promise.all([loadDashboard(), loadUsers(), loadReports(), loadLogs()]);
+        await Promise.all([loadDashboard(), loadUsers(), loadCertificationCaregivers(), loadReports(), loadLogs()]);
       } finally {
         setInitialLoading(false);
       }
@@ -149,6 +158,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!selectedUserId || user?.role !== 'admin') return;
+    setSelectedUserDetail(null);
     api.getAdminUserDetail(selectedUserId).then(setSelectedUserDetail).catch(() => undefined);
   }, [selectedUserId, user?.role]);
 
@@ -164,6 +174,7 @@ export default function AdminPage() {
       loadDashboard().catch(() => undefined);
       loadLogs().catch(() => undefined);
       loadUsers().catch(() => undefined);
+      loadCertificationCaregivers().catch(() => undefined);
       loadReports().catch(() => undefined);
     }, refreshMs);
     return () => window.clearInterval(interval);
@@ -184,6 +195,7 @@ export default function AdminPage() {
     await Promise.all([
       loadDashboard(),
       loadUsers(),
+      loadCertificationCaregivers(),
       loadReports(),
       loadLogs(),
       selectedUserId ? api.getAdminUserDetail(selectedUserId).then(setSelectedUserDetail) : Promise.resolve(),
@@ -231,6 +243,58 @@ export default function AdminPage() {
       setNotice(error.message || 'Não foi possível revisar a reportagem.');
     } finally {
       setBusyAction(false);
+    }
+  };
+
+  const handleVerificationAction = async (status: 'approved' | 'rejected') => {
+    const caregiver = selectedUserDetail?.caregiverProfile;
+    const caregiverId = caregiver?._id || selectedUserDetail?.user._id || selectedUserDetail?.user.id;
+    if (!caregiverId) return;
+    setBusyAction(true);
+    setNotice('');
+    try {
+      await api.reviewAdminCaregiverVerification(caregiverId, {
+        status,
+        notes: verificationNotes.trim() || undefined,
+      });
+      setSelectedUserDetail((current) => current ? {
+        ...current,
+        caregiverProfile: current.caregiverProfile ? {
+          ...current.caregiverProfile,
+          professionalVerification: current.caregiverProfile.professionalVerification ? {
+            ...current.caregiverProfile.professionalVerification,
+            status,
+            reviewNotes: verificationNotes.trim() || undefined,
+            reviewedAt: new Date().toISOString(),
+          } : undefined,
+        } : current.caregiverProfile,
+      } : current);
+      setVerificationNotes('');
+      setNotice(status === 'approved' ? 'Formação aprovada.' : 'Formação reprovada.');
+      loadCertificationCaregivers().catch(() => undefined);
+    } catch (error: any) {
+      setNotice(error.message || 'Não foi possível revisar a formação.');
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
+  const verificationStatusLabel: Record<string, string> = {
+    none: 'Não enviada',
+    pending: 'Pendente',
+    approved: 'Aprovada',
+    rejected: 'Reprovada',
+  };
+
+  const selectCertificationCaregiver = async (caregiverUserId: string) => {
+    setSelectedUserId(caregiverUserId);
+    setSelectedUserDetail(null);
+    setNotice('');
+    try {
+      const detail = await api.getAdminUserDetail(caregiverUserId);
+      setSelectedUserDetail(detail);
+    } catch (error: any) {
+      setNotice(error.message || 'Não foi possível carregar o perfil profissional.');
     }
   };
 
@@ -427,6 +491,77 @@ export default function AdminPage() {
                     )}
                   </div>
 
+                  {selectedUserDetail.user.role === 'caregiver' && selectedUserDetail.caregiverProfile && (
+                    <div className="rounded-3xl border border-blue-200 bg-blue-50 p-5">
+                      <div className="mb-5 border-b border-blue-200 pb-5">
+                        <p className="font-semibold text-blue-950">Certificações declaradas</p>
+                        {selectedUserDetail.caregiverProfile.certifications?.length ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {selectedUserDetail.caregiverProfile.certifications.map((certification) => (
+                              <span key={certification} className="rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-900">
+                                {certification}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-2 text-sm font-medium text-amber-700">
+                            Nenhuma certificação foi declarada.
+                          </p>
+                        )}
+                        <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-blue-700">Serviços oferecidos para conferência</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {selectedUserDetail.caregiverProfile.servicePrices?.filter((service) => service.isAvailable).map((service) => (
+                            <span key={service.serviceKey} className="rounded-full bg-blue-100 px-3 py-1.5 text-xs font-medium text-blue-900">
+                              {service.serviceKey.replaceAll('_', ' ')}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-blue-950">Verificação profissional</p>
+                          <p className="mt-1 text-sm text-blue-800">
+                            Status: {verificationStatusLabel[selectedUserDetail.caregiverProfile.professionalVerification?.status || 'none']}
+                          </p>
+                        </div>
+                        {selectedUserDetail.caregiverProfile.professionalVerification?.documentUrl && (
+                          <a
+                            href={selectedUserDetail.caregiverProfile.professionalVerification.documentUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-sm font-semibold text-blue-700 underline"
+                          >
+                            Abrir documento
+                          </a>
+                        )}
+                      </div>
+                      {selectedUserDetail.caregiverProfile.professionalVerification?.documentUrl &&
+                        selectedUserDetail.caregiverProfile.professionalVerification.status === 'pending' && (
+                        <>
+                          <textarea
+                            value={verificationNotes}
+                            onChange={(event) => setVerificationNotes(event.target.value)}
+                            placeholder="Observação da análise (opcional)"
+                            className="mt-4 min-h-[80px] w-full rounded-2xl border border-blue-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                          />
+                          <div className="mt-3 flex flex-wrap gap-3">
+                            <ActionButton onClick={() => handleVerificationAction('approved')} busy={busyAction} label="Aprovar formação" tone="emerald" icon={ShieldCheck} />
+                            <ActionButton onClick={() => handleVerificationAction('rejected')} busy={busyAction} label="Reprovar formação" tone="rose" icon={Ban} />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedUserDetail.user.role === 'caregiver' && !selectedUserDetail.caregiverProfile && (
+                    <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
+                      <p className="font-semibold text-amber-950">Avaliação de certificações</p>
+                      <p className="mt-2 text-sm leading-relaxed text-amber-900">
+                        Este usuário ainda não possui um perfil profissional de cuidador cadastrado. As certificações e o documento aparecerão aqui depois que o perfil for criado.
+                      </p>
+                    </div>
+                  )}
+
                   <textarea value={moderationReason} onChange={(e) => setModerationReason(e.target.value)} placeholder="Motivo da ação administrativa" className="min-h-[100px] w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-100" />
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <ActionButton onClick={() => handleUserAction('watchlist')} busy={busyAction} label="Colocar em observação" tone="amber" icon={Eye} />
@@ -473,6 +608,110 @@ export default function AdminPage() {
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+            </PanelCard>
+          </div>
+        )}
+
+        {tab === 'certifications' && (
+          <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+            <PanelCard title="Fila de certificações" subtitle="Selecione um cuidador para avaliar a formação declarada.">
+              <div className="space-y-3">
+                {certificationCaregivers.length === 0 && (
+                  <EmptyState text="Nenhum cuidador cadastrado para avaliação." />
+                )}
+                {certificationCaregivers.map((entry) => (
+                  <button
+                    key={entry._id || entry.id}
+                    type="button"
+                    onClick={() => selectCertificationCaregiver(entry._id || entry.id)}
+                    className={`w-full rounded-2xl border px-4 py-4 text-left transition-all ${selectedUserId === (entry._id || entry.id) ? 'border-slate-900 bg-slate-950 text-white' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold">{entry.name}</p>
+                        <p className={`mt-1 text-sm ${selectedUserId === (entry._id || entry.id) ? 'text-slate-300' : 'text-slate-500'}`}>{entry.email}</p>
+                      </div>
+                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                        Avaliar
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </PanelCard>
+
+            <PanelCard title="Avaliação da certificação" subtitle="Compare as certificações declaradas com os serviços oferecidos.">
+              {!selectedUserDetail?.caregiverProfile && (
+                <EmptyState text="Selecione um cuidador na fila para visualizar a certificação." />
+              )}
+              {selectedUserDetail?.caregiverProfile && (
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xl font-semibold text-slate-900">{selectedUserDetail.user.name}</p>
+                      <p className="mt-1 text-sm text-slate-500">{selectedUserDetail.user.email}</p>
+                    </div>
+                    <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold uppercase text-slate-600">
+                      {verificationStatusLabel[selectedUserDetail.caregiverProfile.professionalVerification?.status || 'none']}
+                    </span>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm font-semibold text-slate-700">Certificações declaradas</p>
+                    {selectedUserDetail.caregiverProfile.certifications?.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {selectedUserDetail.caregiverProfile.certifications.map((certification) => (
+                          <span key={certification} className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                            {certification}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm text-amber-700">Nenhuma certificação declarada.</p>
+                    )}
+                    <p className="mt-4 text-sm font-semibold text-slate-700">Serviços oferecidos</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {selectedUserDetail.caregiverProfile.servicePrices?.filter((service) => service.isAvailable).map((service) => (
+                        <span key={service.serviceKey} className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-800">
+                          {service.serviceKey.replaceAll('_', ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {selectedUserDetail.caregiverProfile.professionalVerification?.documentUrl ? (
+                    <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-blue-950">Documento profissional</p>
+                          <p className="mt-1 text-sm text-blue-800">Confira o diploma ou registro enviado.</p>
+                        </div>
+                        <a href={selectedUserDetail.caregiverProfile.professionalVerification.documentUrl} target="_blank" rel="noreferrer" className="text-sm font-semibold text-blue-700 underline">
+                          Abrir documento
+                        </a>
+                      </div>
+                      {selectedUserDetail.caregiverProfile.professionalVerification.status === 'pending' && (
+                        <>
+                          <textarea
+                            value={verificationNotes}
+                            onChange={(event) => setVerificationNotes(event.target.value)}
+                            placeholder="Observação da avaliação (opcional)"
+                            className="mt-4 min-h-[80px] w-full rounded-2xl border border-blue-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                          />
+                          <div className="mt-3 flex flex-wrap gap-3">
+                            <ActionButton onClick={() => handleVerificationAction('approved')} busy={busyAction} label="Aprovar certificação" tone="emerald" icon={ShieldCheck} />
+                            <ActionButton onClick={() => handleVerificationAction('rejected')} busy={busyAction} label="Reprovar certificação" tone="rose" icon={Ban} />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                      Nenhum documento foi enviado para avaliação.
+                    </div>
+                  )}
                 </div>
               )}
             </PanelCard>

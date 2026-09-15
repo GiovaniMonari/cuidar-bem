@@ -8,8 +8,12 @@ import {
   Query,
   UseGuards,
   Request,
+  BadRequestException,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { UseInterceptors, UploadedFile } from '@nestjs/common';
 import { CaregiversService } from './caregivers.service';
 import { CreateCaregiverDto } from './dto/create-caregiver.dto';
 import { FilterCaregiverDto } from './dto/filter-caregiver.dto';
@@ -65,6 +69,31 @@ export class CaregiversController {
     @Body() dto: Partial<CreateCaregiverDto>,
   ) {
     return this.caregiversService.update(id, req.user.userId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post(':id/professional-verification')
+  @ApiOperation({ summary: 'Enviar documento para verificação profissional' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ schema: { type: 'object', required: ['file'], properties: { file: { type: 'string', format: 'binary' } } } })
+  @UseInterceptors(FileInterceptor('file', {
+    storage: memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req, file, callback) => {
+      const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+      callback(null, allowed.includes(file.mimetype));
+    },
+  }))
+  submitProfessionalVerification(
+    @Param('id') id: string,
+    @Request() req,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Envie um PDF ou uma imagem do comprovante profissional.');
+    }
+    return this.caregiversService.submitProfessionalVerification(id, req.user.userId, file);
   }
 
   @Get(':id/availability')

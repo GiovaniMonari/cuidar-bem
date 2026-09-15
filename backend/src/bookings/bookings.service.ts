@@ -20,6 +20,10 @@ import {
 } from '../common/utils/availability';
 import { EmailProducer } from 'src/queue/email.producer';
 
+const SERVICE_CONSENT_VERSION = '2026-09-15';
+const SERVICE_CONSENT_TEXT =
+  'A CuidarBem atua apenas como plataforma de conexão entre cliente e cuidador. A plataforma não presta, supervisiona ou garante o atendimento e não se responsabiliza pela conduta das partes, pela execução do serviço ou por eventuais danos decorrentes dele. As condições do atendimento devem ser combinadas diretamente entre cliente e cuidador.';
+
 @Injectable()
 export class BookingsService {
   private readonly logger = new Logger(BookingsService.name);
@@ -190,6 +194,15 @@ export class BookingsService {
       throw new NotFoundException('Cuidador não encontrado');
     }
 
+    if (
+      !caregiver.isAvailable ||
+      caregiver.professionalVerification?.status !== 'approved'
+    ) {
+      throw new ForbiddenException(
+        'Este cuidador ainda não está disponível para novos atendimentos.',
+      );
+    }
+
     const selectedService = caregiver.servicePrices?.find(
       (service: any) =>
         service.serviceKey === dto.serviceType && service.isAvailable,
@@ -252,6 +265,9 @@ export class BookingsService {
     const booking = new this.bookingModel({
       ...dto,
       clientId,
+      serviceConsentVersion: SERVICE_CONSENT_VERSION,
+      serviceConsentText: SERVICE_CONSENT_TEXT,
+      serviceConsentAcceptedAt: new Date(),
       status: 'pending',
     });
 

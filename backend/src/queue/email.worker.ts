@@ -52,6 +52,9 @@ export class EmailWorker extends WorkerHost {
       case 'new-feedback':
         await this.emailService.sendNewFeedbackAvailableEmail(job.data);
         break;
+      case 'caregiver-verification-update':
+        await this.emailService.sendCaregiverVerificationUpdateEmail(job.data);
+        break;
       default:
         this.logger.warn(`Job desconhecido: ${job.name}`);
     }

@@ -903,7 +903,7 @@ function CaregiverAgendaSection() {
       badge: null,
     },
     {
-      href: '/perfil/cuidador',
+      href: '/perfil/cuidador/disponibilidade',
       icon: CalendarCheck,
       title: 'Minha Disponibilidade',
       desc: 'Gerencie seus horários e confirme novos agendamentos.',

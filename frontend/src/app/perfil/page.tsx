@@ -14,7 +14,7 @@ import {
   type CaregiverPayoutFormData,
 } from '@/validations/schemas';
 import { UserAvatar } from '@/components/UserAvatar';
-import { Camera, Star, Trash2, ShieldCheck, Mail, Phone, Edit3, Save, Stethoscope, Loader2, CheckCircle, AlertCircle, User as UserIcon, Badge, CreditCard, LockKeyhole } from 'lucide-react';
+import { Camera, Star, Trash2, ShieldCheck, Mail, Phone, Edit3, Save, Stethoscope, CalendarDays, Loader2, CheckCircle, AlertCircle, User as UserIcon, Badge, CreditCard, LockKeyhole } from 'lucide-react';
 import { maskPhone } from '@/utils/masks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,6 +65,23 @@ function ProfilePageContent() {
     },
   });
   const payoutMethod = watchPayout('payoutMethod');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const caregiverSetupComplete = Boolean(
+    caregiverProfile?._id &&
+    caregiverProfile.bio?.trim().length >= 20 &&
+    caregiverProfile.city?.trim() &&
+    caregiverProfile.state?.trim() &&
+    Number(caregiverProfile.hourlyRate) >= 1 &&
+    Number(caregiverProfile.experienceYears) >= 0 &&
+    caregiverProfile.servicePrices?.some((service: any) => service.isAvailable) &&
+    caregiverProfile.availabilityCalendar?.some(
+      (date: any) =>
+        date.isAvailable !== false &&
+        date.timeRanges?.length > 0 &&
+        new Date(`${date.date}T00:00:00`) >= today,
+    ),
+  );
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -427,6 +444,42 @@ function ProfilePageContent() {
 
         {user?.role === 'caregiver' && (
           <div className="mt-10 space-y-6">
+            {!caregiverSetupComplete && (
+              <Alert className="rounded-3xl border-primary-100 bg-primary-50/60 p-6 text-primary-900 sm:p-7">
+              <ShieldCheck className="mt-1 h-5 w-5 text-primary-600" />
+              <div className="space-y-4">
+                <div>
+                  <AlertTitle className="font-black">Complete seu perfil de cuidador</AlertTitle>
+                  <AlertDescription className="mt-1 font-medium leading-relaxed text-primary-800">
+                    Seu perfil só fica completo depois destas duas etapas:
+                  </AlertDescription>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Link
+                    href="/perfil/cuidador"
+                    className="flex items-center gap-3 rounded-2xl border border-primary-100 bg-white/80 p-4 transition-colors hover:border-primary-300 hover:bg-white"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary-100 text-sm font-black text-primary-700">1</span>
+                    <span>
+                      <span className="block text-sm font-black text-gray-900">Perfil de Cuidador</span>
+                      <span className="block text-xs font-medium text-gray-500">Dados, serviços e valores</span>
+                    </span>
+                  </Link>
+                  <Link
+                    href="/perfil/cuidador/disponibilidade"
+                    className="flex items-center gap-3 rounded-2xl border border-primary-100 bg-white/80 p-4 transition-colors hover:border-primary-300 hover:bg-white"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-sm font-black text-emerald-700">2</span>
+                    <span>
+                      <span className="block text-sm font-black text-gray-900">Minha Disponibilidade</span>
+                      <span className="block text-xs font-medium text-gray-500">Dias e horários de atendimento</span>
+                    </span>
+                  </Link>
+                </div>
+              </div>
+              </Alert>
+            )}
+
             <Card className="border-none shadow-lg rounded-3xl overflow-hidden hover:shadow-xl transition-shadow bg-white">
               <div className="flex flex-col sm:flex-row items-center justify-between p-8 gap-6">
                 <div className="flex items-center gap-5 text-center sm:text-left">
@@ -446,6 +499,25 @@ function ProfilePageContent() {
               </div>
             </Card>
 
+            <Card className="border-none shadow-lg rounded-3xl overflow-hidden hover:shadow-xl transition-shadow bg-white">
+              <div className="flex flex-col sm:flex-row items-center justify-between p-8 gap-6">
+                <div className="flex items-center gap-5 text-center sm:text-left">
+                  <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 shadow-inner">
+                    <CalendarDays className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-gray-900 tracking-tight">Minha Disponibilidade</h3>
+                    <p className="text-gray-500 font-medium">Defina os dias e horários para novos atendimentos.</p>
+                  </div>
+                </div>
+                <Link href="/perfil/cuidador/disponibilidade" className="w-full sm:w-auto">
+                  <Button className="w-full bg-white border-2 border-gray-100 text-gray-900 hover:bg-gray-50 font-bold h-12 px-8 rounded-2xl">
+                    Configurar
+                  </Button>
+                </Link>
+              </div>
+            </Card>
+
             <Card className="border-none shadow-lg rounded-3xl overflow-hidden hover:shadow-xl transition-shadow bg-white border-l-8 border-l-primary-500">
               <div className="flex flex-col sm:flex-row items-center justify-between p-8 gap-6">
                 <div className="flex items-center gap-5 text-center sm:text-left">
@@ -454,7 +526,7 @@ function ProfilePageContent() {
                   </div>
                   <div>
                     <h3 className="text-xl font-black text-gray-900 tracking-tight">Perfil de Cuidador</h3>
-                    <p className="text-gray-500 font-medium">Configure especialidades, valores e horários.</p>
+                    <p className="text-gray-500 font-medium">Configure especialidades, serviços e valores.</p>
                   </div>
                 </div>
                 <Link href="/perfil/cuidador" className="w-full sm:w-auto">

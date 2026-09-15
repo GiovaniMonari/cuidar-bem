@@ -7,7 +7,6 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/services/api';
 import { caregiverProfileSchema, type CaregiverProfileFormData } from '@/validations/schemas';
-import { AvailabilityCalendar } from '@/components/AvailabilityCalendar';
 import { deriveSpecialtiesFromServices } from '@/utils/serviceSpecialities';
 import { CityAutocomplete } from '@/components/CityAutoComplete';
 import { Button } from '@/components/ui/button';
@@ -23,11 +22,11 @@ import { cn } from '@/lib/utils';
 import { 
   Save, Loader2, CheckCircle, AlertCircle, 
   Plus, X, Briefcase, MapPin, DollarSign, 
-  Award, Calendar as CalendarIcon, Info,
+  Award, Info,
   ChevronRight, Stethoscope as StethoscopeIcon,
   Heart, Users, ShieldCheck, Edit3, GraduationCap
 } from 'lucide-react';
-import { AvailabilityDate, ServiceType, SPECIALTIES } from '@/types';
+import { ServiceType, SPECIALTIES } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function CaregiverProfilePage() {
@@ -37,7 +36,6 @@ export default function CaregiverProfilePage() {
   const [saving, setSaving] = useState(false);
   const [existingId, setExistingId] = useState<string | null>(null);
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
-  const [bookedDates, setBookedDates] = useState<string[]>([]);
   const [success, setSuccess] = useState(false);
   const [serverError, setServerError] = useState('');
   const [newCert, setNewCert] = useState('');
@@ -65,7 +63,6 @@ export default function CaregiverProfilePage() {
       certifications: [],
       isAvailable: true,
       servicePrices: [],
-      availabilityCalendar: [],
       specialties: [],
     },
   });
@@ -79,7 +76,6 @@ export default function CaregiverProfilePage() {
   const certifications = watch('certifications') || [];
   const isAvailable = watch('isAvailable');
   const servicePrices = watch('servicePrices') || [];
-  const availabilityCalendar = (watch('availabilityCalendar') as AvailabilityDate[]) || [];
 
    useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -121,9 +117,6 @@ export default function CaregiverProfilePage() {
         const data = await api.getMyCaregiverProfile();
         setExistingId(data._id);
 
-        const booked = await api.getCaregiverBookedDates(data._id);
-        setBookedDates(booked || []);
-
         // Reset RHF fields
         reset({
           bio: data.bio,
@@ -134,7 +127,6 @@ export default function CaregiverProfilePage() {
           certifications: data.certifications || [],
           isAvailable: data.isAvailable,
           servicePrices: data.servicePrices || [],
-          availabilityCalendar: data.availabilityCalendar || [],
           specialties: data.specialties || [],
         });
 
@@ -171,15 +163,6 @@ export default function CaregiverProfilePage() {
     const normalizedSpecialties = deriveSpecialtiesFromServices(
       normalizedServicePrices,
     );
-    const normalizedAvailability = (availabilityCalendar || [])
-      .filter((item) => typeof item?.date === 'string' && item.date.trim().length > 0)
-      .map((item) => ({
-        date: item.date,
-        slots: Array.isArray(item.slots) ? item.slots : [],
-        timeRanges: Array.isArray(item.timeRanges) ? item.timeRanges : [],
-        isAvailable: item.isAvailable !== false,
-      }));
-
     try {
         const payload = {
         bio: data.bio,
@@ -189,7 +172,6 @@ export default function CaregiverProfilePage() {
         experienceYears: data.experienceYears,
         specialties: normalizedSpecialties,
         servicePrices: normalizedServicePrices,
-        availabilityCalendar: normalizedAvailability,
         certifications: data.certifications,
         isAvailable: data.isAvailable,
       };
@@ -576,56 +558,6 @@ export default function CaregiverProfilePage() {
                     </Alert>
                   )}
                </div>
-            </CardContent>
-          </Card>
-
-          {/* Availability Section */}
-          <Card className="border-none shadow-xl shadow-gray-200/40 rounded-[32px] overflow-hidden">
-            <CardHeader className="bg-gray-50/50 border-b border-gray-100/50 p-8 sm:p-10">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-primary-600 shadow-sm">
-                  <CalendarIcon className="w-6 h-6" />
-                </div>
-                <div>
-                  <CardTitle className="text-2xl font-black text-gray-900 tracking-tight">Agenda e Disponibilidade</CardTitle>
-                  <CardDescription className="text-gray-500 font-medium mt-1">Defina quais dias você está livre para receber novos atendimentos.</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-8 sm:p-10 space-y-8">
-              <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100">
-                <AvailabilityCalendar
-                  selectedDates={availabilityCalendar}
-                  bookedDates={bookedDates}
-                  onChange={(dates) =>
-                    setValue('availabilityCalendar', dates, {
-                      shouldValidate: true,
-                      shouldDirty: true,
-                      shouldTouch: true,
-                    })
-                  }
-                />
-              </div>
-
-              <div className="flex items-center space-x-3 p-6 bg-primary-50/30 rounded-2xl border border-primary-100">
-                <Checkbox
-                  id="isAvailable"
-                  checked={isAvailable}
-                  onCheckedChange={(checked) => setValue('isAvailable', !!checked, { shouldValidate: true })}
-                  className="h-6 w-6 rounded-lg data-[state=checked]:bg-primary-600 data-[state=checked]:border-primary-600"
-                />
-                <div className="grid gap-1.5 leading-none">
-                  <Label
-                    htmlFor="isAvailable"
-                    className="text-base font-bold text-gray-900 cursor-pointer"
-                  >
-                    Ativar meu perfil para novos atendimentos
-                  </Label>
-                  <p className="text-xs text-primary-600 font-medium">
-                    Se desativado, você não aparecerá nos resultados de busca, mas poderá finalizar agendamentos em curso.
-                  </p>
-                </div>
-              </div>
             </CardContent>
           </Card>
 

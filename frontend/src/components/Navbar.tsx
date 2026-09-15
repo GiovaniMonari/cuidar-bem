@@ -81,6 +81,7 @@ export function Navbar() {
                   {isAdmin ? 'Painel Admin' : 'Agenda'}
                 </Link>
 
+
                 <div className="flex items-center gap-3 pl-3 border-l border-gray-200">
                   <Link
                     href="/perfil"

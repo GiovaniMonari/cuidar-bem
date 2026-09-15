@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 const CHECK_IN_EARLY_WINDOW_MS = 2 * 60 * 60 * 1000;
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
@@ -278,6 +279,15 @@ export default function AgendaPage() {
                 : 'Acompanhe seus agendamentos e cuide de quem você ama.'}
             </p>
           </div>
+          {isCaregiver && (
+            <Link
+              href="/perfil/cuidador/disponibilidade"
+              className="inline-flex h-10 w-fit items-center justify-center rounded-xl border border-primary-200 bg-white px-4 font-bold text-primary-700 transition-colors hover:bg-primary-50"
+            >
+              <Calendar className="mr-2 h-4 w-4" />
+              Configurar disponibilidade
+            </Link>
+          )}
         </div>
 
         {/* ── Stats Cards ── */}

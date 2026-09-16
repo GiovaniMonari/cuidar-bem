@@ -462,7 +462,7 @@ function ProfilePageContent() {
                   <h3 className="text-xl font-black text-gray-900 tracking-tight">Meus endereços</h3>
                   <p className="text-gray-500 font-medium">
                     {savedAddressesCount > 0
-                      ? `${savedAddressesCount} endereço${savedAddressesCount > 1 ? 's' : ''} salvo${savedAddressesCount > 1 ? 's' : ''} para seus pedidos.`
+                      ? `${savedAddressesCount} endereço${savedAddressesCount > 1 ? 's' : ''} salvo${savedAddressesCount > 1 ? 's' : ''} para seus atendimentos.`
                       : 'Você ainda não possui endereços salvos.'}
                   </p>
                 </div>

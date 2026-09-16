@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -350,7 +351,7 @@ export default function AgendaPage() {
             </Card>
 
             {/* A Receber */}
-            <Card className="bg-white border-gray-200 shadow-sm">
+            <Card className="bg-white shadow-sm">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between gap-3 mb-4 text-amber-600">
                   <div className="flex items-center gap-2">
@@ -420,7 +421,7 @@ export default function AgendaPage() {
 
         {/* ── Calendar (caregiver only) ── */}
         {isCaregiver && bookings.length > 0 && (
-          <Card className="border-gray-200 shadow-sm overflow-hidden">
+          <Card className="shadow-sm overflow-hidden">
             <CardHeader className="bg-gray-50/50 border-b border-gray-100">
               <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-primary-600" />
@@ -555,7 +556,7 @@ function StatCard({
 
   if (loading) {
     return (
-      <Card className="border-gray-200 shadow-sm">
+      <Card className="shadow-sm">
         <CardContent className="p-5 space-y-3">
           <Skeleton className="w-10 h-10 rounded-xl" />
           <Skeleton className="h-8 w-16" />
@@ -566,7 +567,7 @@ function StatCard({
   }
 
   return (
-    <Card className="border-gray-200 shadow-sm transition-all hover:border-gray-300">
+    <Card className="shadow-sm transition-all">
       <CardContent className="p-5">
         <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center mb-3", variants[variant])}>
           <Icon className="w-5 h-5" />
@@ -634,154 +635,83 @@ function BookingCard({
   const isAmountReleased = payment?.status === 'released';
   const isAmountPaid = payment && ['paid', 'held', 'released'].includes(payment.status);
   const isAmountPending = payment && ['pending'].includes(payment.status);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   return (
-    <Card className="w-full min-w-0 overflow-hidden border-gray-200 hover:shadow-lg transition-all duration-300">
-      <div className={cn("h-1.5 w-full", getStatusBarColor(booking.status))} />
-
-      <CardContent className="p-10">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-12">
-          <div className="min-w-0 space-y-6">
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge variant="outline" className={cn("px-3 py-1 text-xs font-bold uppercase tracking-wider gap-1.5", statusInfo.bg, statusInfo.color)}>
-                <StatusIcon className="w-3.5 h-3.5" />
+    <>
+      <Card className="w-full min-w-0 rounded-2xl shadow-md shadow-gray-200/60 transition-shadow hover:shadow-lg">
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <Badge variant="outline" className={cn("mb-3 gap-1.5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide", statusInfo.bg, statusInfo.color)}>
+                <StatusIcon className="h-3.5 w-3.5" />
                 {statusInfo.label}
               </Badge>
-
-              {paymentStatusInfo && (
-                <Badge variant="secondary" className={cn("px-3 py-1 text-xs font-bold uppercase tracking-wider gap-1.5", paymentStatusInfo.color, "bg-gray-100")}>
-                  <span className={cn("w-2 h-2 rounded-full", paymentStatusInfo.dot)} />
-                  {paymentStatusInfo.label}
-                </Badge>
-              )}
-
-              <span className="text-xs font-mono text-gray-400 bg-gray-50 px-2 py-1 rounded">
-                #{booking._id.slice(-6).toUpperCase()}
-              </span>
+              <p className="truncate text-base font-bold text-gray-900 sm:text-lg">{otherPersonName}</p>
+              <p className="mt-1 flex items-center gap-1.5 text-sm text-gray-500"><Calendar className="h-4 w-4" />{new Date(booking.startDate).toLocaleDateString('pt-BR')} — {new Date(booking.endDate).toLocaleDateString('pt-BR')}</p>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-12 gap-y-8">
-              <InfoRow icon={User} label={otherPersonLabel} value={otherPersonName} />
-              <InfoRow
-                icon={Calendar}
-                label="Período"
-                value={`${new Date(booking.startDate).toLocaleDateString('pt-BR')} → ${new Date(booking.endDate).toLocaleDateString('pt-BR')}`}
-              />
-              {booking.address && (
-                <InfoRow icon={MapPin} label="Local" value={booking.address} />
-              )}
-              {(booking.clientPhone || (booking.clientId as any)?.phone) && (
-                <InfoRow
-                  icon={Phone}
-                  label="Telefone"
-                  value={booking.clientPhone || (booking.clientId as any)?.phone}
-                />
-              )}
-            </div>
-
-            {booking.notes && (
-              <div className="flex gap-3 bg-gray-50/50 border border-gray-100 rounded-xl p-4">
-                <AlertCircle className="w-5 h-5 text-gray-400 shrink-0" />
-                <p className="text-sm text-gray-500 leading-relaxed italic">"{booking.notes}"</p>
-              </div>
-            )}
-
-            {booking.checkInAt && (
-              <div className="flex items-center gap-2.5 text-sm font-medium text-emerald-700 bg-emerald-50/50 border border-emerald-100 rounded-xl px-4 py-2.5">
-                <MapPin className="w-4 h-4 shrink-0" />
-                <span>
-                  Check-in realizado: {new Date(booking.checkInAt).toLocaleString('pt-BR')}
-                  {typeof booking.checkInDistanceMeters === 'number' &&
-                    ` · ${Math.round(booking.checkInDistanceMeters)}m do destino`}
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-4">
-            <div className={cn(
-              "rounded-2xl p-6 text-center border transition-all",
-              isAmountReleased ? 'bg-green-50/50 border-green-100' : 
-              isAmountPaid ? 'bg-blue-50/50 border-blue-100' : 
-              isAmountPending ? 'bg-amber-50/50 border-amber-100' : 
-              'bg-gray-50 border-gray-100'
-            )}>
-              <p className={cn(
-                "text-xs font-bold uppercase tracking-widest mb-2",
-                isAmountReleased ? 'text-green-600' : 
-                isAmountPaid ? 'text-blue-600' : 
-                isAmountPending ? 'text-amber-600' : 
-                'text-gray-400'
-              )}>
-                {isCaregiver ? (isAmountReleased ? 'Valor recebido' : 'Valor a receber') : (isAmountPaid ? 'Total pago' : 'Total a pagar')}
-              </p>
-              <p className={cn(
-                "text-3xl font-black tracking-tighter",
-                isAmountReleased ? 'text-green-700' : 
-                isAmountPaid ? 'text-blue-700' : 
-                isAmountPending ? 'text-amber-700' : 
-                'text-gray-700'
-              )}>
-                R$ {(cardAmount ?? Number(booking.totalAmount) ?? 0).toFixed(2)}
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              {booking.status === 'pending' && isCaregiver && (
-                <Button onClick={() => onStatusUpdate(booking._id, 'confirmed')} disabled={actionLoading} className="w-full bg-green-600 hover:bg-green-700">
-                  Aceitar Agendamento
-                </Button>
-              )}
-              {booking.status === 'pending' && (
-                <Button variant="outline" onClick={() => onStatusUpdate(booking._id, 'cancelled')} disabled={actionLoading} className="w-full border-red-200 text-red-600 hover:bg-red-50">
-                  Recusar / Cancelar
-                </Button>
-              )}
-              {booking.status === 'confirmed' && isCaregiver && (
-                <Button onClick={() => onCheckIn(booking._id)} disabled={actionLoading || !canCheckInNow} className="w-full">
-                  Realizar Check-in
-                </Button>
-              )}
-              {booking.status === 'in_progress' && isCaregiver && (
-                <Button onClick={() => onStatusUpdate(booking._id, 'completed')} disabled={actionLoading} className="w-full">
-                  Concluir Atendimento
-                </Button>
-              )}
-              {payment?.status === 'pending' && !isCaregiver && (
-                <Button onClick={() => onOpenPayment(booking._id)} disabled={actionLoading} className="w-full bg-primary-600">
-                  Pagar Agora
-                </Button>
-              )}
+            <div className="shrink-0 text-right">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{isCaregiver ? 'A receber' : 'Total'}</p>
+              <p className="mt-1 text-lg font-bold text-gray-900">R$ {(cardAmount ?? Number(booking.totalAmount) ?? 0).toFixed(2)}</p>
             </div>
           </div>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100">
-          <div className="flex gap-2">
-            {booking.status !== 'cancelled' && (
-              <Button variant="secondary" size="sm" onClick={() => onOpenChat(booking._id)} className="rounded-full">
-                <MessageCircle className="w-4 h-4 mr-2" />
-                Conversar
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            {booking.status === 'pending' && isCaregiver && (
+              <Button onClick={() => onStatusUpdate(booking._id, 'confirmed')} disabled={actionLoading} className="w-full bg-green-600 hover:bg-green-700 sm:flex-1">
+                Aceitar
               </Button>
             )}
-            {showReports && (
-              <Button variant="outline" size="sm" onClick={() => onOpenReports(booking._id)} className="rounded-full border-primary-200 text-primary-700 hover:bg-primary-50">
-                <FileText className="w-4 h-4 mr-2" />
-                Relatórios
-                {feedbackCount > 0 && (
-                  <Badge className="ml-2 bg-primary-600 hover:bg-primary-600">{feedbackCount}</Badge>
-                )}
+            {booking.status === 'pending' && (
+              <Button variant="outline" onClick={() => onStatusUpdate(booking._id, 'cancelled')} disabled={actionLoading} className="w-full text-red-600 hover:bg-red-50 sm:flex-1">
+                Recusar / cancelar
+              </Button>
+            )}
+            {booking.status === 'confirmed' && isCaregiver && (
+              <Button onClick={() => onCheckIn(booking._id)} disabled={actionLoading || !canCheckInNow} className="w-full sm:flex-1">
+                Realizar check-in
+              </Button>
+            )}
+            {booking.status === 'in_progress' && isCaregiver && (
+              <Button onClick={() => onStatusUpdate(booking._id, 'completed')} disabled={actionLoading} className="w-full sm:flex-1">
+                Concluir atendimento
+              </Button>
+            )}
+            {payment?.status === 'pending' && !isCaregiver && (
+              <Button onClick={() => onOpenPayment(booking._id)} disabled={actionLoading} className="w-full sm:flex-1">
+                Pagar agora
               </Button>
             )}
           </div>
-          
-          <div className="text-xs text-gray-400 flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5" />
-            Última atualização: {new Date(booking.updatedAt || booking.createdAt).toLocaleDateString('pt-BR')}
+          <Button variant="outline" className="mt-2 w-full rounded-xl" onClick={() => setDetailsOpen(true)}>Ver detalhes</Button>
+        </CardContent>
+      </Card>
+
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-h-[90vh] max-w-[calc(100%-1.5rem)] gap-0 overflow-y-auto rounded-2xl p-0 sm:max-w-2xl">
+          <DialogHeader className="border-b border-gray-100 px-5 py-5 sm:px-6">
+            <div className="flex items-start justify-between gap-4 pr-8">
+              <div><DialogTitle className="text-lg font-bold text-gray-900">Detalhes do agendamento</DialogTitle><DialogDescription className="mt-1">#{booking._id.slice(-6).toUpperCase()} · Atualizado em {new Date(booking.updatedAt || booking.createdAt).toLocaleDateString('pt-BR')}</DialogDescription></div>
+              <Badge variant="outline" className={cn("shrink-0 gap-1.5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide", statusInfo.bg, statusInfo.color)}><StatusIcon className="h-3.5 w-3.5" />{statusInfo.label}</Badge>
+            </div>
+          </DialogHeader>
+          <div className="space-y-5 px-5 py-5 sm:px-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2"><InfoRow icon={User} label={otherPersonLabel} value={otherPersonName} /><InfoRow icon={Calendar} label="Período" value={`${new Date(booking.startDate).toLocaleDateString('pt-BR')} → ${new Date(booking.endDate).toLocaleDateString('pt-BR')}`} />{booking.address && <InfoRow icon={MapPin} label="Local" value={booking.address} />}{(booking.clientPhone || (booking.clientId as any)?.phone) && <InfoRow icon={Phone} label="Telefone" value={booking.clientPhone || (booking.clientId as any)?.phone} />}</div>
+            <div className="rounded-xl bg-gray-50 p-4"><p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{isCaregiver ? (isAmountReleased ? 'Valor recebido' : 'Valor a receber') : (isAmountPaid ? 'Total pago' : 'Total a pagar')}</p><p className="mt-1 text-2xl font-bold text-gray-900">R$ {(cardAmount ?? Number(booking.totalAmount) ?? 0).toFixed(2)}</p>{paymentStatusInfo && <p className={cn("mt-1 text-sm font-medium", paymentStatusInfo.color)}>{paymentStatusInfo.label}</p>}</div>
+            {booking.notes && <div className="flex gap-2.5 rounded-xl bg-gray-50 p-3"><AlertCircle className="h-4 w-4 shrink-0 text-gray-400" /><p className="text-sm leading-relaxed text-gray-600">{booking.notes}</p></div>}
+            {booking.checkInAt && <div className="flex items-center gap-2.5 rounded-xl bg-emerald-50 px-3 py-2.5 text-sm font-medium text-emerald-700"><MapPin className="h-4 w-4 shrink-0" />Check-in realizado: {new Date(booking.checkInAt).toLocaleString('pt-BR')}{typeof booking.checkInDistanceMeters === 'number' && ` · ${Math.round(booking.checkInDistanceMeters)}m do destino`}</div>}
           </div>
-        </div>
-      </CardContent>
-    </Card>
+          <DialogFooter className="sticky bottom-0 mx-0 mb-0 rounded-none bg-white px-5 py-4 sm:flex-wrap sm:justify-start sm:px-6">
+            {booking.status !== 'cancelled' && <Button variant="secondary" size="sm" onClick={() => onOpenChat(booking._id)} className="w-full sm:w-auto"><MessageCircle className="mr-2 h-4 w-4" />Conversar</Button>}
+            {showReports && <Button variant="outline" size="sm" onClick={() => onOpenReports(booking._id)} className="w-full sm:w-auto"><FileText className="mr-2 h-4 w-4" />Relatórios {feedbackCount > 0 && <Badge className="ml-2">{feedbackCount}</Badge>}</Button>}
+            {booking.status === 'pending' && isCaregiver && <Button onClick={() => onStatusUpdate(booking._id, 'confirmed')} disabled={actionLoading} className="w-full bg-green-600 hover:bg-green-700 sm:w-auto">Aceitar</Button>}
+            {booking.status === 'pending' && <Button variant="outline" onClick={() => onStatusUpdate(booking._id, 'cancelled')} disabled={actionLoading} className="w-full text-red-600 hover:bg-red-50 sm:w-auto">Recusar / cancelar</Button>}
+            {booking.status === 'confirmed' && isCaregiver && <Button onClick={() => onCheckIn(booking._id)} disabled={actionLoading || !canCheckInNow} className="w-full sm:w-auto">Realizar check-in</Button>}
+            {booking.status === 'in_progress' && isCaregiver && <Button onClick={() => onStatusUpdate(booking._id, 'completed')} disabled={actionLoading} className="w-full sm:w-auto">Concluir atendimento</Button>}
+            {payment?.status === 'pending' && !isCaregiver && <Button onClick={() => onOpenPayment(booking._id)} disabled={actionLoading} className="w-full sm:w-auto">Pagar agora</Button>}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -790,15 +720,15 @@ function BookingCard({
 ───────────────────────────────────────────── */
 function InfoRow({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
   return (
-    <div className="flex items-start gap-4">
-      <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center shrink-0 mt-0.5 border border-gray-100 shadow-sm">
-        <Icon className="w-6 h-6 text-gray-400" />
+    <div className="flex min-w-0 items-start gap-3">
+      <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-50">
+        <Icon className="h-4 w-4 text-gray-400" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-black text-gray-400 uppercase tracking-[0.15em] leading-none mb-2">
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider leading-none text-gray-400">
           {label}
         </p>
-        <p className="text-lg font-bold text-gray-900 leading-tight">
+        <p className="break-words text-sm font-semibold leading-snug text-gray-900 sm:text-base">
           {value}
         </p>
       </div>

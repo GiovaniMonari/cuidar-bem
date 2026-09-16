@@ -210,7 +210,7 @@ export function CareReportForm({
   }, [error]);
 
   return (
-    <Card className="shadow-sm border-gray-200 overflow-hidden">
+    <Card className="shadow-sm overflow-hidden">
       <CardHeader className="bg-primary-600 py-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-white flex items-center gap-2 text-lg">

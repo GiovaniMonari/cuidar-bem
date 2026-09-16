@@ -95,7 +95,7 @@ function LoginFormContent() {
           <p className="text-gray-500 mt-2 font-medium">Sua conta CuidarBem te espera</p>
         </div>
 
-        <Card className="border-gray-200 shadow-xl shadow-primary-500/5">
+        <Card className="shadow-xl shadow-primary-500/5">
           <CardContent className="p-8">
             {serverError && (
               <Alert variant="destructive" className="mb-6 bg-red-50 text-red-900 border-red-100">

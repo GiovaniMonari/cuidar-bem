@@ -181,7 +181,7 @@ export default function DependentsPage() {
           <p className="text-gray-600 mt-2">Cadastre as pessoas que recebem atendimento para agilizar suas próximas solicitações.</p>
         </header>
 
-        <Card className="border-primary-100 shadow-sm bg-primary-50/40">
+        <Card className="shadow-sm bg-primary-50/40">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <UserRound className="w-5 h-5 text-primary-600" />
@@ -203,7 +203,7 @@ export default function DependentsPage() {
         </Card>
 
         <div className="grid gap-6 lg:grid-cols-[1fr_360px] items-start">
-          <Card className="border-gray-200 shadow-sm">
+          <Card className="shadow-sm">
             <CardHeader><CardTitle className="flex items-center gap-2"><UserRound className="w-5 h-5 text-primary-600" />Pessoas cadastradas</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               {dependents.length === 0 ? (
@@ -224,7 +224,7 @@ export default function DependentsPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-gray-200 shadow-sm">
+          <Card className="shadow-sm">
             <CardHeader><CardTitle>{editingId ? 'Editar dependente' : 'Adicionar dependente'}</CardTitle></CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">

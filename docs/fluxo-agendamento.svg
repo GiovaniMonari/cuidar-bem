@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="2100" viewBox="0 0 1920 2100" role="img" aria-labelledby="title desc">
+  <title id="title">Fluxo completo de agendamento — CuidarBem</title>
+  <desc id="desc">Diagrama do ciclo de um agendamento, desde a escolha do cuidador até a avaliação e a liberação do pagamento.</desc>
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#173b4d" flood-opacity=".13"/></filter>
+    <marker id="arrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="10" markerHeight="10" orient="auto"><path d="M1 1l10 5-10 5z" fill="#3b6171"/></marker>
+    <style>
+      .bg{fill:#f7fbfc}.lane{fill:#fff;stroke:#d8e8eb;stroke-width:2}.h{font:800 34px Arial,sans-serif;fill:#123c4a}.sub{font:500 19px Arial,sans-serif;fill:#52717b}.lane-title{font:800 22px Arial,sans-serif;fill:#fff;letter-spacing:.5px}.card{fill:#fff;stroke:#c9dfe4;stroke-width:2}.primary{fill:#e8f8f4;stroke:#18a47c;stroke-width:2.5}.decision{fill:#fff7df;stroke:#e4a72c;stroke-width:2.5}.end{fill:#eaf0ff;stroke:#5276d5;stroke-width:2.5}.cancel{fill:#fff0f1;stroke:#dd5963;stroke-width:2.5}.label{font:800 19px Arial,sans-serif;fill:#163e4d}.body{font:500 16px Arial,sans-serif;fill:#44636d}.small{font:600 14px Arial,sans-serif;fill:#58757e}.tag{font:800 13px Arial,sans-serif;fill:#fff;letter-spacing:.6px}.arrow{fill:none;stroke:#3b6171;stroke-width:3;marker-end:url(#arrow)}.branch{font:800 15px Arial,sans-serif;fill:#805d11}.note{fill:#f2f8fa;stroke:#d4e6ea;stroke-width:1.5}.legend{font:600 15px Arial,sans-serif;fill:#45636c}
+    </style>
+  </defs>
+  <rect class="bg" width="1920" height="2100"/>
+  <text x="110" y="90" class="h" font-size="42">FLUXO COMPLETO DE AGENDAMENTO</text>
+  <text x="110" y="126" class="sub">CuidarBem · da solicitação à conclusão, pagamento e avaliação</text>
+  <rect x="110" y="155" width="1700" height="8" rx="4" fill="#18a47c"/>
+
+  <!-- Swim lanes -->
+  <rect x="80" y="205" width="1760" height="1330" rx="20" class="lane"/>
+  <rect x="80" y="205" width="1760" height="54" rx="20" fill="#176f70"/>
+  <text x="110" y="240" class="lane-title">CLIENTE</text>
+  <rect x="80" y="570" width="1760" height="54" rx="20" fill="#2f8a77"/>
+  <text x="110" y="605" class="lane-title">PLATAFORMA · VALIDAÇÕES E NOTIFICAÇÕES</text>
+  <rect x="80" y="1080" width="1760" height="54" rx="20" fill="#4f70b8"/>
+  <text x="110" y="1115" class="lane-title">CUIDADOR</text>
+
+  <!-- Client row -->
+  <g filter="url(#shadow)">
+    <rect x="130" y="315" width="245" height="112" rx="16" class="card"/><text x="252" y="354" text-anchor="middle" class="label">1. Escolhe cuidador</text><text x="252" y="383" text-anchor="middle" class="body">e serviço desejado</text>
+    <rect x="455" y="315" width="265" height="112" rx="16" class="card"/><text x="587" y="351" text-anchor="middle" class="label">2. Define período</text><text x="587" y="379" text-anchor="middle" class="body">data, horário e duração</text><text x="587" y="401" text-anchor="middle" class="small">ou intervalo de dias</text>
+    <rect x="800" y="315" width="280" height="112" rx="16" class="card"/><text x="940" y="350" text-anchor="middle" class="label">3. Informa dados</text><text x="940" y="378" text-anchor="middle" class="body">paciente, endereço e notas</text><text x="940" y="400" text-anchor="middle" class="small">confirma localização no mapa</text>
+    <rect x="1160" y="315" width="260" height="112" rx="16" class="primary"/><text x="1290" y="353" text-anchor="middle" class="label">4. Aceita termos</text><text x="1290" y="382" text-anchor="middle" class="body">e envia solicitação</text>
+    <rect x="1500" y="315" width="255" height="112" rx="16" class="card"/><text x="1627" y="352" text-anchor="middle" class="label">Acompanha na agenda</text><text x="1627" y="381" text-anchor="middle" class="body">e conversa pelo chat</text>
+  </g>
+  <path d="M375 371H455M720 371H800M1080 371H1160M1420 371H1500" class="arrow"/>
+
+  <!-- validation flow -->
+  <g filter="url(#shadow)">
+    <path d="M230 744l110-76 110 76-110 76z" class="decision"/><text x="340" y="730" text-anchor="middle" class="label">Dados válidos?</text><text x="340" y="754" text-anchor="middle" class="small">idade, condição, datas,</text><text x="340" y="774" text-anchor="middle" class="small">endereço e coordenadas</text>
+    <path d="M585 744l110-76 110 76-110 76z" class="decision"/><text x="695" y="730" text-anchor="middle" class="label">Cuidador apto?</text><text x="695" y="754" text-anchor="middle" class="small">verificado, disponível e</text><text x="695" y="774" text-anchor="middle" class="small">oferece o serviço</text>
+    <path d="M940 744l110-76 110 76-110 76z" class="decision"/><text x="1050" y="730" text-anchor="middle" class="label">Horário livre?</text><text x="1050" y="754" text-anchor="middle" class="small">agenda compatível e</text><text x="1050" y="774" text-anchor="middle" class="small">1 h entre atendimentos</text>
+    <rect x="1280" y="680" width="245" height="128" rx="16" class="primary"/><text x="1402" y="722" text-anchor="middle" class="label">Cria agendamento</text><text x="1402" y="750" text-anchor="middle" class="body">status: PENDENTE</text><text x="1402" y="777" text-anchor="middle" class="small">registra aceite e valores</text>
+    <rect x="1600" y="680" width="175" height="128" rx="16" class="card"/><text x="1687" y="721" text-anchor="middle" class="label">Notifica</text><text x="1687" y="750" text-anchor="middle" class="body">e-mail ao cliente</text><text x="1687" y="774" text-anchor="middle" class="body">e cuidador</text>
+  </g>
+  <path d="M450 744H585M805 744H940M1160 744H1280M1525 744H1600" class="arrow"/>
+  <path d="M340 820v80H180" class="arrow"/><text x="270" y="890" class="branch">NÃO → corrige dados</text>
+  <path d="M695 820v80H535" class="arrow"/><text x="620" y="890" class="branch">NÃO → nova escolha</text>
+  <path d="M1050 820v80H890" class="arrow"/><text x="972" y="890" class="branch">NÃO → outro horário</text>
+  <text x="470" y="735" class="branch">SIM</text><text x="825" y="735" class="branch">SIM</text><text x="1180" y="735" class="branch">SIM</text>
+
+  <!-- pending to confirmation -->
+  <g filter="url(#shadow)">
+    <rect x="175" y="945" width="335" height="100" rx="16" class="note"/><text x="342" y="980" text-anchor="middle" class="label">Solicitação pendente</text><text x="342" y="1007" text-anchor="middle" class="body">Aguardando decisão do cuidador</text>
+    <rect x="635" y="945" width="315" height="100" rx="16" class="cancel"/><text x="792" y="980" text-anchor="middle" class="label">Cancelamento</text><text x="792" y="1007" text-anchor="middle" class="body">cliente pode cancelar</text>
+    <rect x="1075" y="945" width="320" height="100" rx="16" class="primary"/><text x="1235" y="980" text-anchor="middle" class="label">Confirmação do cuidador</text><text x="1235" y="1007" text-anchor="middle" class="body">status: CONFIRMADO</text>
+    <rect x="1515" y="945" width="235" height="100" rx="16" class="card"/><text x="1632" y="980" text-anchor="middle" class="label">Chat liberado</text><text x="1632" y="1007" text-anchor="middle" class="body">+ e-mail ao cliente</text>
+  </g>
+  <path d="M510 995H635M950 995H1075M1395 995H1515" class="arrow"/>
+
+  <!-- caregiver action -->
+  <g filter="url(#shadow)">
+    <rect x="200" y="1200" width="285" height="112" rx="16" class="card"/><text x="342" y="1238" text-anchor="middle" class="label">5. Recebe pedido</text><text x="342" y="1266" text-anchor="middle" class="body">na agenda e por e-mail</text>
+    <path d="M685 1256l120-80 120 80-120 80z" class="decision"/><text x="805" y="1244" text-anchor="middle" class="label">Aceita?</text><text x="805" y="1269" text-anchor="middle" class="small">confirma ou cancela</text>
+    <rect x="1120" y="1200" width="295" height="112" rx="16" class="primary"/><text x="1267" y="1238" text-anchor="middle" class="label">6. Vai ao local</text><text x="1267" y="1266" text-anchor="middle" class="body">faz check-in pelo app</text><text x="1267" y="1288" text-anchor="middle" class="small">até 2 h antes; raio de 300 m</text>
+    <rect x="1515" y="1200" width="245" height="112" rx="16" class="primary"/><text x="1637" y="1238" text-anchor="middle" class="label">7. Atendimento</text><text x="1637" y="1266" text-anchor="middle" class="body">status: EM ANDAMENTO</text>
+  </g>
+  <path d="M485 1256H685M925 1256H1120M1415 1256H1515" class="arrow"/>
+  <path d="M805 1336v70H625" class="arrow"/><text x="685" y="1394" class="branch">NÃO → CANCELADO</text><text x="970" y="1248" class="branch">SIM</text>
+
+  <!-- completion -->
+  <g filter="url(#shadow)">
+    <rect x="180" y="1435" width="270" height="106" rx="16" class="card"/><text x="315" y="1473" text-anchor="middle" class="label">8. Finaliza serviço</text><text x="315" y="1501" text-anchor="middle" class="body">cuidador conclui no app</text>
+    <rect x="575" y="1435" width="280" height="106" rx="16" class="end"/><text x="715" y="1473" text-anchor="middle" class="label">CONCLUÍDO</text><text x="715" y="1501" text-anchor="middle" class="body">histórico atualizado</text>
+    <rect x="980" y="1435" width="300" height="106" rx="16" class="primary"/><text x="1130" y="1473" text-anchor="middle" class="label">Libera pagamento</text><text x="1130" y="1501" text-anchor="middle" class="body">ao cuidador (quando retido/pago)</text>
+    <rect x="1405" y="1435" width="290" height="106" rx="16" class="card"/><text x="1550" y="1473" text-anchor="middle" class="label">Solicita avaliação</text><text x="1550" y="1501" text-anchor="middle" class="body">ao cliente por e-mail</text>
+  </g>
+  <path d="M450 1488H575M855 1488H980M1280 1488H1405" class="arrow"/>
+
+  <!-- cancellation and legend -->
+  <rect x="80" y="1620" width="1760" height="370" rx="20" class="lane"/>
+  <text x="120" y="1680" class="h" font-size="26">Tratamento de exceções e encerramento</text>
+  <g filter="url(#shadow)">
+    <rect x="130" y="1725" width="450" height="155" rx="16" class="cancel"/><text x="355" y="1765" text-anchor="middle" class="label">Cancelado</text><text x="355" y="1794" text-anchor="middle" class="body">Cliente pode cancelar; cuidador pode recusar/cancelar.</text><text x="355" y="1820" text-anchor="middle" class="body">Se houver pagamento retido ou pago: solicita reembolso.</text><text x="355" y="1846" text-anchor="middle" class="small">Chat é fechado se não houver outro agendamento ativo entre as partes.</text>
+    <rect x="650" y="1725" width="500" height="155" rx="16" class="note"/><text x="900" y="1765" text-anchor="middle" class="label">Regras importantes</text><text x="900" y="1794" text-anchor="middle" class="body">Não permite duplicidade do mesmo serviço no mesmo dia.</text><text x="900" y="1820" text-anchor="middle" class="body">Conclusão exige check-in; início só pelo check-in validado.</text><text x="900" y="1846" text-anchor="middle" class="small">O valor informado deve coincidir com o preço atual do cuidador.</text>
+    <rect x="1220" y="1725" width="530" height="155" rx="16" class="end"/><text x="1485" y="1765" text-anchor="middle" class="label">Fim do ciclo</text><text x="1485" y="1794" text-anchor="middle" class="body">Avaliação fortalece o perfil do cuidador e o histórico do cliente.</text><text x="1485" y="1820" text-anchor="middle" class="body">Agenda mantém o acompanhamento de todos os estados.</text>
+  </g>
+  <circle cx="150" cy="1940" r="10" fill="#e8f8f4" stroke="#18a47c" stroke-width="2"/><text x="170" y="1946" class="legend">Ação / estado principal</text>
+  <circle cx="445" cy="1940" r="10" fill="#fff7df" stroke="#e4a72c" stroke-width="2"/><text x="465" y="1946" class="legend">Ponto de decisão</text>
+  <circle cx="700" cy="1940" r="10" fill="#fff0f1" stroke="#dd5963" stroke-width="2"/><text x="720" y="1946" class="legend">Cancelamento ou retorno</text>
+  <circle cx="1050" cy="1940" r="10" fill="#eaf0ff" stroke="#5276d5" stroke-width="2"/><text x="1070" y="1946" class="legend">Conclusão / resultado</text>
+  <text x="1810" y="2050" text-anchor="end" class="small">Fluxo derivado da implementação atual · 16 set. 2026</text>
+</svg>

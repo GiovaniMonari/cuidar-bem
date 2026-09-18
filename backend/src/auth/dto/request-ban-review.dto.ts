@@ -2,7 +2,7 @@ import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RequestBanReviewDto {
-  @ApiProperty({ example: 'maria@email.com', description: 'E-mail da conta bloqueada' })
+  @ApiProperty({ example: 'usuario@exemplo.com', description: 'E-mail da conta bloqueada' })
   @IsEmail()
   email: string;
 

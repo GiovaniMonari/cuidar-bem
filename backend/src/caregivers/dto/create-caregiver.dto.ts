@@ -76,7 +76,7 @@ class PayoutAccountDto {
   pixKeyType?: 'cpf' | 'cnpj' | 'email' | 'phone' | 'random';
 
   @IsOptional()
-  @ApiPropertyOptional({ example: 'maria@email.com' })
+  @ApiPropertyOptional({ example: 'contato@exemplo.com' })
   @IsString()
   pixKey?: string;
 }

@@ -1,0 +1,25 @@
+
+> cuidar-bem-frontend@1.0.0 build
+> next build
+
+  Ôû▓ Next.js 14.2.35
+  - Environments: .env
+
+   Creating an optimized production build ...
+ Ô£ô Compiled successfully
+   Linting and checking validity of types ...
+   Collecting page data ...
+
+> Build error occurred
+Error: ENOENT: no such file or directory, open 'C:\Users\gitav\Downloads\cuidar-bem\frontend\.next\server\pages-manifest.json'
+    at async open (node:internal/fs/promises:633:25)
+    at async Object.readFile (node:internal/fs/promises:1237:14)
+    at async readManifest (C:\Users\gitav\Downloads\cuidar-bem\frontend\node_modules\next\dist\build\index.js:165:23)
+    at async C:\Users\gitav\Downloads\cuidar-bem\frontend\node_modules\next\dist\build\index.js:1043:35
+    at async Span.traceAsyncFn (C:\Users\gitav\Downloads\cuidar-bem\frontend\node_modules\next\dist\trace\trace.js:154:20)
+    at async build (C:\Users\gitav\Downloads\cuidar-bem\frontend\node_modules\next\dist\build\index.js:368:9) {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\gitav\\Downloads\\cuidar-bem\\frontend\\.next\\server\\pages-manifest.json'
+}

@@ -988,7 +988,7 @@ function CaregiverTipsSection() {
     {
       icon: FileText,
       title: 'Perfil completo converte mais',
-      desc: 'Cuidadores com perfil 100% preenchido recebem até 3x mais contatos. Adicione foto, bio detalhada e certificações.',
+      desc: 'Um perfil completo com foto, bio e certificações ajuda a transmitir confiança e clareza desde o primeiro contato.',
       action: { label: 'Completar perfil', href: '/perfil/cuidador' },
       color: 'bg-blue-50 border-blue-100',
       iconColor: 'text-blue-600 bg-blue-100',
@@ -1068,18 +1068,18 @@ function CaregiverStatsSection() {
                 A plataforma que trabalha por você
               </h2>
               <p className="text-white/70 text-lg leading-relaxed">
-                Milhares de famílias buscam cuidadores todos os dias. Mantenha
-                seu perfil atualizado e esteja sempre disponível para novas
-                oportunidades.
+                A qualidade da conexão começa com um perfil claro, seguro e bem
+                atualizado. Isso ajuda famílias e cuidadores a se encontrarem com
+                mais confiança.
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4 w-full lg:w-auto">
               {[
-                { value: '2.400+', label: 'Famílias cadastradas', icon: Users },
-                { value: '98%', label: 'Satisfação dos clientes', icon: Star },
-                { value: '150+', label: 'Cuidadores ativos', icon: UserCheck },
-                { value: '4.8', label: 'Avaliação média', icon: BarChart3 },
+                { value: 'Verificado', label: 'Perfis com validação', icon: Users },
+                { value: 'Humanizado', label: 'Atendimento acolhedor', icon: Star },
+                { value: 'Confiável', label: 'Cuidado com segurança', icon: UserCheck },
+                { value: 'Acessível', label: 'Suporte e comunicação', icon: BarChart3 },
               ].map((stat, i) => (
                 <div
                   key={i}

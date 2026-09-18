@@ -61,28 +61,28 @@ async function seed() {
   const password = await bcrypt.hash('123456', 12);
 
   const caregiverUsers = await userModel.insertMany([
-    { name: 'Maria Silva', email: 'maria@email.com', password, role: 'caregiver', phone: '(11) 99999-0001' },
-    { name: 'João Santos', email: 'joao@email.com', password, role: 'caregiver', phone: '(11) 99999-0002' },
-    { name: 'Ana Oliveira', email: 'ana@email.com', password, role: 'caregiver', phone: '(21) 99999-0003' },
-    { name: 'Carlos Lima', email: 'carlos@email.com', password, role: 'caregiver', phone: '(31) 99999-0004' },
-    { name: 'Fernanda Costa', email: 'fernanda@email.com', password, role: 'caregiver', phone: '(41) 99999-0005' },
-    { name: 'Roberto Almeida', email: 'roberto@email.com', password, role: 'caregiver', phone: '(11) 99999-0006' },
+    { name: 'Cuidador Demo 1', email: 'demo.cuidador1@cuidarbem.com', password, role: 'caregiver', phone: '(11) 90000-0001' },
+    { name: 'Cuidador Demo 2', email: 'demo.cuidador2@cuidarbem.com', password, role: 'caregiver', phone: '(11) 90000-0002' },
+    { name: 'Cuidador Demo 3', email: 'demo.cuidador3@cuidarbem.com', password, role: 'caregiver', phone: '(21) 90000-0003' },
+    { name: 'Cuidador Demo 4', email: 'demo.cuidador4@cuidarbem.com', password, role: 'caregiver', phone: '(31) 90000-0004' },
+    { name: 'Cuidador Demo 5', email: 'demo.cuidador5@cuidarbem.com', password, role: 'caregiver', phone: '(41) 90000-0005' },
+    { name: 'Cuidador Demo 6', email: 'demo.cuidador6@cuidarbem.com', password, role: 'caregiver', phone: '(11) 90000-0006' },
   ]);
 
   await userModel.create({
-    name: 'Cliente Teste',
-    email: 'cliente@email.com',
+    name: 'Cliente Demo',
+    email: 'demo.cliente@cuidarbem.com',
     password,
     role: 'client',
-    phone: '(11) 98888-0001',
+    phone: '(11) 90000-0007',
   });
 
   await userModel.create({
-    name: 'Admin CuidarBem',
+    name: 'Administrador Demo',
     email: 'admin@cuidarbem.com',
     password,
     role: 'admin',
-    phone: '(11) 97777-0001',
+    phone: '(11) 90000-0008',
     moderationStatus: 'active',
     isOnline: false,
   });
@@ -102,8 +102,8 @@ async function seed() {
         '18:00',
       ),
       certifications: ['COREN Ativo', 'Esp. Geriatria'],
-      rating: 4.8,
-      reviewCount: 24,
+      rating: 0,
+      reviewCount: 0,
       isAvailable: true,
     },
     {
@@ -120,8 +120,8 @@ async function seed() {
         '17:00',
       ),
       certifications: ['CREFITO Ativo', 'Esp. Neurologia'],
-      rating: 4.9,
-      reviewCount: 18,
+      rating: 0,
+      reviewCount: 0,
       isAvailable: true,
     },
     {
@@ -138,8 +138,8 @@ async function seed() {
         '19:00',
       ),
       certifications: ['Técnica em Enfermagem'],
-      rating: 4.7,
-      reviewCount: 32,
+      rating: 0,
+      reviewCount: 0,
       isAvailable: true,
     },
     {
@@ -156,8 +156,8 @@ async function seed() {
         '16:00',
       ),
       certifications: ['Psicologia - CRP Ativo'],
-      rating: 4.6,
-      reviewCount: 15,
+      rating: 0,
+      reviewCount: 0,
       isAvailable: true,
     },
     {
@@ -174,8 +174,8 @@ async function seed() {
         '20:00',
       ),
       certifications: ['COREN Ativo', 'Esp. Cuidados Paliativos'],
-      rating: 5.0,
-      reviewCount: 41,
+      rating: 0,
+      reviewCount: 0,
       isAvailable: true,
     },
     {
@@ -192,15 +192,15 @@ async function seed() {
         '21:00',
       ),
       certifications: ['Técnico em Enfermagem'],
-      rating: 4.3,
-      reviewCount: 8,
+      rating: 0,
+      reviewCount: 0,
       isAvailable: true,
     },
   ]);
 
   console.log('✅ Seed executado com sucesso!');
-  console.log('Login teste - Cliente: cliente@email.com / 123456');
-  console.log('Login teste - Cuidador: maria@email.com / 123456');
+  console.log('Login teste - Cliente: demo.cliente@cuidarbem.com / 123456');
+  console.log('Login teste - Cuidador: demo.cuidador1@cuidarbem.com / 123456');
   console.log('Login teste - Admin: admin@cuidarbem.com / 123456');
   await app.close();
 }

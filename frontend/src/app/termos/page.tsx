@@ -204,9 +204,8 @@ export default function TermsPage() {
           <section className="bg-primary-50 rounded-xl p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-2">Dúvidas?</h2>
             <p className="text-gray-600 text-sm">
-              Entre em contato conosco:<br />
-              <strong>E-mail:</strong> contato@cuidarbem.services<br />
-              <strong>Telefone:</strong> (11) 3000-0000
+              Entre em contato conosco pelo e-mail da plataforma:<br />
+              <strong>E-mail:</strong> contato@cuidarbem.services
             </p>
           </section>
         </div>

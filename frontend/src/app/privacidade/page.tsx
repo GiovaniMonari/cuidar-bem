@@ -216,10 +216,8 @@ export default function PrivacyPage() {
               Dúvidas sobre privacidade?
             </h2>
             <p className="text-gray-600 text-sm">
-              Entre em contato com nosso Encarregado de Proteção de Dados (DPO):<br />
+              Entre em contato conosco:<br />
               <strong>E-mail:</strong> contato@cuidarbem.services<br />
-              <strong>Telefone:</strong> (11) 3000-0000<br />
-              <strong>Endereço:</strong> Av. Paulista, 1000 - São Paulo/SP - CEP 01310-100
             </p>
           </section>
         </div>

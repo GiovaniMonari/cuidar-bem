@@ -195,7 +195,7 @@ export default function PrivacyPage() {
                   </div>
                   <p className="text-sm mt-3">
                     Para exercer seus direitos, entre em contato pelo e-mail:{' '}
-                    <strong>privacidade@cuidarbem.com.br</strong>
+                    <strong>contato@cuidarbem.services</strong>
                   </p>
                 </div>
               ),
@@ -217,7 +217,7 @@ export default function PrivacyPage() {
             </h2>
             <p className="text-gray-600 text-sm">
               Entre em contato com nosso Encarregado de Proteção de Dados (DPO):<br />
-              <strong>E-mail:</strong> privacidade@cuidarbem.com.br<br />
+              <strong>E-mail:</strong> contato@cuidarbem.services<br />
               <strong>Telefone:</strong> (11) 3000-0000<br />
               <strong>Endereço:</strong> Av. Paulista, 1000 - São Paulo/SP - CEP 01310-100
             </p>

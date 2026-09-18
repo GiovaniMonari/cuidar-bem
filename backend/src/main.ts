@@ -29,7 +29,7 @@ async function bootstrap() {
       ].join('\n'),
     )
     .setVersion('1.0.0')
-    .setContact('Cuidar Bem', 'https://www.cuidarbem.services', 'suporte@cuidarbem.services')
+    .setContact('Cuidar Bem', 'https://www.cuidarbem.services', 'contato@cuidarbem.services')
     .addServer(`http://localhost:${process.env.PORT || 3001}`, 'Desenvolvimento local')
     .addServer('https://www.cuidarbem.services', 'Produção')
     .addBearerAuth(

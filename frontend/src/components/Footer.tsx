@@ -81,7 +81,7 @@ export function Footer() {
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2 text-gray-400">
                 <Mail className="w-4 h-4" />
-                contato@cuidarbem.com.br
+                contato@cuidarbem.services
               </div>
             </div>
           </div>

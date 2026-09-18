@@ -114,7 +114,7 @@ export default function CookiesPage() {
                 </div>
                 <div className="bg-primary-50 p-4 rounded-xl text-center">
                   <p className="font-semibold text-primary-700 text-sm mb-1">Fale Conosco</p>
-                  <p className="text-xs text-gray-500">privacidade@cuidarbem.com.br</p>
+                  <p className="text-xs text-gray-500">contato@cuidarbem.services</p>
                 </div>
               </div>
               <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
@@ -128,7 +128,7 @@ export default function CookiesPage() {
             <h2 className="text-lg font-bold text-gray-900 mb-2">Dúvidas sobre cookies?</h2>
             <p className="text-gray-600 text-sm">
               Entre em contato:<br />
-              <strong>E-mail:</strong> privacidade@cuidarbem.com.br<br />
+              <strong>E-mail:</strong> contato@cuidarbem.services<br />
               <strong>Telefone:</strong> (11) 3000-0000
             </p>
           </section>

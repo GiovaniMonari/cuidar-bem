@@ -158,7 +158,7 @@ export default function SecurityPage() {
             Nossa equipe de segurança está disponível para ajudar.
           </p>
           <a
-            href="mailto:seguranca@cuidarbem.com.br"
+            href="mailto:contato@cuidarbem.services"
             className="btn-accent inline-flex items-center gap-2"
           >
             Reportar Problema

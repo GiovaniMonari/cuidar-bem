@@ -35,6 +35,9 @@ import {
   Wallet,
   Medal,
   Trophy,
+  ShieldCheck,
+  Headphones,
+  Lock,
   Smartphone,
   Download,
   WifiOff,
@@ -342,6 +345,22 @@ function HeroTrustPillars() {
 }
 
 function PWAInfoSection() {
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+    if (isStandalone) {
+      setIsInstalled(true);
+    }
+  }, []);
+
+  if (isInstalled) {
+    return null;
+  }
+
   const benefits = [
     {
       icon: Smartphone,
@@ -638,56 +657,55 @@ function HowItWorksSection() {
   );
 }
 
-function TestimonialsSection() {
+function TrustAndSafetySection() {
+  const pillars = [
+    {
+      icon: ShieldCheck,
+      title: 'Verificação Rigorosa',
+      desc: 'Checagem de antecedentes criminais, documentos pessoais e validação de qualificações de todos os cuidadores.',
+      color: 'bg-blue-50 text-blue-600 border-blue-100',
+    },
+    {
+      icon: Lock,
+      title: 'Pagamento Seguro',
+      desc: 'Transações protegidas de ponta a ponta com garantia de liberação financeira apenas após a realização do serviço.',
+      color: 'bg-purple-50 text-purple-600 border-purple-100',
+    },
+    {
+      icon: Headphones,
+      title: 'Suporte & Acompanhamento',
+      desc: 'Equipe dedicada para auxiliar famílias e cuidadores antes, durante e após o atendimento.',
+      color: 'bg-green-50 text-green-600 border-green-100',
+    },
+  ];
+
   return (
-    <section className="py-20">
+    <section className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
+          <div className="inline-flex items-center gap-2 bg-primary-100 text-primary-700 px-3 py-1 rounded-full text-sm font-semibold mb-3">
+            <ShieldCheck className="w-4 h-4" />
+            Tranquilidade Garantida
+          </div>
           <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
-            O que dizem nossos clientes
+            Por que a CuidarBem é Confiável?
           </h2>
           <p className="text-gray-500 max-w-2xl mx-auto text-lg">
-            Famílias que encontraram o cuidado ideal através da CuidarBem
+            Nossos pilares de segurança e qualidade para você cuidar de quem ama com total paz de espírito.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
-          {[
-            {
-              name: 'Maria Aparecida',
-              role: 'Filha de paciente',
-              text: 'Encontrei a cuidadora perfeita para minha mãe. Profissional, carinhosa e muito atenciosa. Recomendo demais!',
-              rating: 5,
-            },
-            {
-              name: 'Carlos Eduardo',
-              role: 'Esposo de paciente',
-              text: 'A plataforma facilitou muito a busca. Em menos de uma semana já tínhamos uma profissional qualificada cuidando da minha esposa.',
-              rating: 5,
-            },
-            {
-              name: 'Ana Paula',
-              role: 'Mãe de PcD',
-              text: 'Excelente serviço! O cuidador que encontramos tem experiência com autismo e meu filho se adaptou muito bem.',
-              rating: 5,
-            },
-          ].map((testimonial, i) => (
-            <div key={i} className="card p-6">
-              <div className="flex items-center gap-1 mb-4">
-                {[...Array(testimonial.rating)].map((_, starIndex) => (
-                  <Star key={starIndex} className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-                ))}
+        <div className="grid md:grid-cols-3 gap-8">
+          {pillars.map((item, i) => (
+            <div
+              key={i}
+              className="p-8 rounded-3xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+            >
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 border ${item.color}`}>
+                <item.icon className="w-7 h-7" />
               </div>
-              <p className="text-gray-600 mb-6 italic">"{testimonial.text}"</p>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-bold">
-                  {testimonial.name.charAt(0)}
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-900">{testimonial.name}</div>
-                  <div className="text-sm text-gray-500">{testimonial.role}</div>
-                </div>
-              </div>
+              <h3 className="font-bold text-xl text-gray-900 mb-3">{item.title}</h3>
+              <p className="text-gray-600 text-sm leading-relaxed">{item.desc}</p>
             </div>
           ))}
         </div>
@@ -1127,7 +1145,7 @@ function GuestHome({ caregivers, loading }: { caregivers: Caregiver[]; loading: 
       <ServicesSection />
       <TopCaregiversSection caregivers={caregivers} loading={loading} />
       <HowItWorksSection />
-      <TestimonialsSection />
+      <TrustAndSafetySection />
       <GuestCTASection />
     </>
   );
